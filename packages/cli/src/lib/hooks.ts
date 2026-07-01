@@ -72,6 +72,7 @@ async function runHook(
       }
 
       // First line only — never expose raw stack traces to the user
+      /* c8 ignore next -- split() always returns ≥1 element, making the ?? fallback unreachable */
       const firstLine = asNode.message.split('\n')[0] ?? asNode.message;
       throw new Error(`Hook "${hookName}" failed: ${firstLine}`);
     }

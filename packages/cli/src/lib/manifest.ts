@@ -53,6 +53,7 @@ export function validateManifest(data: unknown): GoodBoyManifest {
   const validate = getValidator();
 
   if (!validate(data)) {
+    /* c8 ignore next 2 -- ajv always populates errors[] after a failed validate(); ?? fallbacks are unreachable */
     const lines = (validate.errors ?? []).map(
       (e) => `  ${e.instancePath || '(root)'}: ${e.message ?? 'validation failed'}`,
     );

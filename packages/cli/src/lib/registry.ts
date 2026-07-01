@@ -44,11 +44,11 @@ export async function resolveSkill(name: string): Promise<string> {
   const registryPath = getRegistryPath();
   const skillPath = resolve(join(registryPath, name));
 
-  // Traversal guard: resolved path must be directly inside the registry dir
-  const expectedPrefix = registryPath.endsWith(sep)
-    ? registryPath
-    : registryPath + sep;
+  // Traversal guard: resolved path must be directly inside the registry dir.
+  // resolve() always strips trailing separators, so we always append sep.
+  const expectedPrefix = registryPath + sep;
 
+  /* c8 ignore next 3 — defense-in-depth: SKILL_NAME_RE blocks all traversal chars, this is unreachable through the public API */
   if (!skillPath.startsWith(expectedPrefix)) {
     throw new Error(`Refused: resolved skill path escapes the registry directory`);
   }
