@@ -29,13 +29,27 @@ We will acknowledge your report within **72 hours** and aim to issue a fix or mi
 - Do not test against other users' systems or infrastructure
 - Do not use automated scanning tools against the registry endpoint
 
+## Security Architecture
+
+GoodBoy applies defence-in-depth across every trust boundary. Multiple independent controls must fail simultaneously for a threat to succeed.
+
+| Threat | Layer 1 (schema) | Layer 2 (runtime) | Layer 3 (fs/exec) |
+|---|---|---|---|
+| Hook command injection | `FORBIDDEN_CHARS` rejects shell metacharacters | `execFile` (no shell, explicit argv) | Binary whitelist advisory warning |
+| Path traversal in skill name | `SKILL_NAME_RE` rejects non-`[a-z0-9-]` | URL-decode + null-byte strip before validation | `startsWith(registryPath + sep)` path guard |
+| Symlink escape during install | — | `scanForSymlinks()` rejects symlinks pointing outside skill dir | Runs after preinstall hook to catch hook-created symlinks |
+| Malicious MCP server URL | `pattern: "^https?://"` in schema | Private/loopback hostname blocked in `validateManifest` | — |
+| Oversized manifest | 512 KB file-size check before read | Nesting depth > 10 rejected before `JSON.parse` | — |
+| URL-scheme injection in deps | Value pattern allows only semver / `*` / `latest` | — | — |
+| Environment variable leakage in hooks | — | Hooks run with minimal env (`PATH`, `HOME`, `NODE_ENV` only) | — |
+
 ## Phase 1 Known Limitations
 
 The following are **by design** for Phase 1 and are documented here, not as vulnerabilities, but as known constraints that users must understand before installing skills.
 
 ### 1. Hooks run with full user permissions
 
-Skill lifecycle hooks (`preinstall`, `postinstall`, `preremove`, `postremove`) are executed as the current operating-system user. There is no sandboxing, chroot, capability dropping, or seccomp filtering. A malicious hook can read, write, or delete any file the user owns, make network requests, and spawn child processes.
+Skill lifecycle hooks (`preinstall`, `postinstall`, `preremove`, `postremove`) are executed as the current operating-system user. There is no sandboxing, chroot, capability dropping, or seccomp filtering. A malicious hook can read, write, or delete any file the user owns, make network requests, and spawn child processes. Hooks receive a minimal environment (see table above) but this does not prevent outbound network calls.
 
 **Mitigation:** Only install skills from sources you explicitly trust. Never install a skill from an unknown or untrusted author.
 
@@ -45,16 +59,10 @@ Skills are not signed in Phase 1. The local registry performs no integrity check
 
 **Plan:** Phase 3 will introduce publisher verification and signature checking via the hosted registry.
 
-### 3. Symlink attacks are partially mitigated
-
-`goodboy install` refuses to copy skill directories that contain symbolic links. However, this check is performed on the registry source directory at the time of install. A skill that creates symlinks via its `preinstall` hook (pointing outside the skill directory) in the destination path is not fully constrained.
-
-**Mitigation for users:** Review hook commands in a skill's `manifest.json` before installing from untrusted sources.
-
-### 4. No network egress control
+### 3. No network egress control
 
 Hooks can make outbound network requests. There is no firewall rule, capability restriction, or egress filter applied during hook execution.
 
-### 5. TOCTOU in skill resolution
+### 4. TOCTOU in skill resolution
 
 The `resolveSkill()` function checks that a skill path exists (`existsSync`) and then returns the path. If the directory is replaced between the check and the subsequent read, a different directory may be used. On single-user developer machines this is very low risk. A full fix would require keeping the directory open via a file descriptor throughout the install operation.
