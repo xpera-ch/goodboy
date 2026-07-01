@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & type-check (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18', '20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate schema types
+        run: npm run generate:types
+
+      - name: Build CLI
+        run: npm run build -w packages/cli
+
+      - name: Type-check registry client
+        run: npm run build -w packages/registry-client
+
+      - name: Verify no forbidden patterns in CLI source
+        run: |
+          if grep -rn "shell: true\|eval(\|new Function(" packages/cli/src/; then
+            echo "Forbidden pattern detected in CLI source"
+            exit 1
+          fi
+          echo "No forbidden patterns found"
