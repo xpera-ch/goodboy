@@ -15,7 +15,8 @@
     },
     "version": {
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "maxLength": 32
     },
     "description": {
       "type": "string",
@@ -25,27 +26,33 @@
       "type": "object",
       "required": ["name"],
       "additionalProperties": false,
+      "maxProperties": 3,
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 128
         },
         "email": {
           "type": "string",
-          "format": "email"
+          "format": "email",
+          "maxLength": 254
         },
         "url": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "maxLength": 2048
         }
       }
     },
     "license": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 64
     },
     "keywords": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 64
       },
       "maxItems": 10
     },
@@ -54,11 +61,13 @@
       "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
     },
     "readme": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 256
     },
     "homepage": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "maxLength": 2048
     },
     "repository": {
       "type": "object",
@@ -69,37 +78,44 @@
         },
         "url": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "maxLength": 2048
         }
       }
     },
     "changelog": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "maxLength": 2048
     },
     "entry": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 256
     },
     "language": {
       "type": "string",
       "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
     },
     "claude_code_version": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 32
     },
     "mcp_servers": {
       "type": "array",
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 64
           },
           "url": {
             "type": "string",
             "format": "uri",
-            "pattern": "^https://"
+            "maxLength": 2048,
+            "pattern": "^https?://"
           }
         }
       }
@@ -109,15 +125,18 @@
       "additionalProperties": false,
       "properties": {
         "node": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 32
         },
         "python": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 32
         }
       }
     },
     "os": {
       "type": "array",
+      "maxItems": 3,
       "items": {
         "type": "string",
         "enum": ["darwin", "linux", "win32"]
@@ -129,18 +148,25 @@
     },
     "dependencies": {
       "type": "object",
+      "maxProperties": 100,
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^([~^]?\\d+\\.\\d+(\\.\\d+)?|\\*|latest)$"
       }
     },
     "devDependencies": {
       "type": "object",
+      "maxProperties": 100,
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^([~^]?\\d+\\.\\d+(\\.\\d+)?|\\*|latest)$"
       }
     },
     "permissions": {
       "type": "array",
+      "maxItems": 5,
       "items": {
         "type": "string",
         "enum": ["read_files", "write_files", "network", "shell", "env"]
@@ -149,18 +175,23 @@
     "hooks": {
       "type": "object",
       "additionalProperties": false,
+      "maxProperties": 4,
       "properties": {
         "preinstall": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 256
         },
         "postinstall": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 256
         },
         "preremove": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 256
         },
         "postremove": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 256
         }
       }
     },
@@ -170,7 +201,8 @@
       "default": "experimental"
     },
     "publisher": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 128
     },
     "visibility": {
       "type": "string",
