@@ -4,12 +4,14 @@ import { join, sep } from 'node:path';
 import type { Dirent } from 'node:fs';
 
 vi.mock('node:fs');
+vi.mock('node:fs/promises');
 vi.mock('./manifest.js');
 vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readdir, readlink } from 'node:fs/promises';
 import { readManifest, validateManifest } from './manifest.js';
 import { logger } from './logger.js';
 import {
@@ -17,12 +19,15 @@ import {
   getSkillsPath,
   resolveSkill,
   listInstalled,
+  scanForSymlinks,
 } from './registry.js';
 import { loadFixture } from '../__fixtures__/index.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
 const mockReaddirSync = vi.mocked(readdirSync);
+const mockReaddir = vi.mocked(readdir);
+const mockReadlink = vi.mocked(readlink);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
 const mockLoggerWarn = vi.mocked(logger.warn);
@@ -306,6 +311,148 @@ describe('listInstalled()', () => {
     await listInstalled();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('invalid manifest'),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveSkill() — name normalisation hardening (HARDENING 5)
+// ---------------------------------------------------------------------------
+
+describe('resolveSkill() — name normalisation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env['GOODBOY_REGISTRY'];
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('rejects a URL-encoded path traversal (..%2F)', async () => {
+    await expect(resolveSkill('..%2Fetc'))
+      .rejects.toThrow('Skill name contains invalid characters');
+    expect(mockExistsSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a name containing a null byte', async () => {
+    await expect(resolveSkill('my-skill\x00evil'))
+      .rejects.toThrow('Skill name contains invalid characters');
+    expect(mockExistsSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a name with leading whitespace', async () => {
+    await expect(resolveSkill(' my-skill'))
+      .rejects.toThrow('Skill name contains invalid characters');
+    expect(mockExistsSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a name with trailing whitespace', async () => {
+    await expect(resolveSkill('my-skill '))
+      .rejects.toThrow('Skill name contains invalid characters');
+    expect(mockExistsSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects %2F (forward slash encoding)', async () => {
+    await expect(resolveSkill('foo%2Fbar'))
+      .rejects.toThrow('Skill name contains invalid characters');
+  });
+
+  it('rejects a malformed percent sequence (bare %) via SKILL_NAME_RE after decode fails', async () => {
+    // decodeURIComponent('%') throws URIError; catch sets decoded = '%'
+    // normalized = '%', which then fails SKILL_NAME_RE
+    await expect(resolveSkill('%'))
+      .rejects.toThrow('Invalid skill name "%"');
+    expect(mockExistsSync).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scanForSymlinks() — HARDENING 2
+// ---------------------------------------------------------------------------
+
+function makeFsDirent(
+  name: string,
+  opts: { isDir?: boolean; isSymlink?: boolean },
+): Dirent {
+  return {
+    name,
+    isDirectory: () => !!opts.isDir,
+    isFile: () => !opts.isDir && !opts.isSymlink,
+    isSymbolicLink: () => !!opts.isSymlink,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+    path: '/skill',
+    parentPath: '/skill',
+  } as unknown as Dirent;
+}
+
+describe('scanForSymlinks()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('resolves without error when the directory has no symlinks', async () => {
+    mockReaddir.mockResolvedValue([
+      makeFsDirent('file.ts', { isDir: false }),
+    ] as Awaited<ReturnType<typeof readdir>>);
+    await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
+  });
+
+  it('recurses into subdirectories', async () => {
+    mockReaddir
+      .mockResolvedValueOnce([
+        makeFsDirent('sub', { isDir: true }),
+      ] as Awaited<ReturnType<typeof readdir>>)
+      .mockResolvedValueOnce([
+        makeFsDirent('inner.ts', { isDir: false }),
+      ] as Awaited<ReturnType<typeof readdir>>);
+    await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
+    expect(mockReaddir).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws when a symlink points outside the skill directory', async () => {
+    mockReaddir.mockResolvedValue([
+      makeFsDirent('evil-link', { isSymlink: true }),
+    ] as Awaited<ReturnType<typeof readdir>>);
+    mockReadlink.mockResolvedValue('/etc/passwd');
+
+    await expect(scanForSymlinks('/skill')).rejects.toThrow(
+      'Security: skill contains a symlink pointing outside its directory',
+    );
+  });
+
+  it('error message includes the symlink path and resolved target', async () => {
+    mockReaddir.mockResolvedValue([
+      makeFsDirent('link', { isSymlink: true }),
+    ] as Awaited<ReturnType<typeof readdir>>);
+    mockReadlink.mockResolvedValue('/etc/secret');
+
+    const err = await scanForSymlinks('/skill').catch((e: unknown) => e as Error);
+    expect(err.message).toContain('/skill/link');
+    expect(err.message).toContain('/etc/secret');
+  });
+
+  it('permits a symlink pointing inside the skill directory', async () => {
+    mockReaddir.mockResolvedValue([
+      makeFsDirent('internal-link', { isSymlink: true }),
+    ] as Awaited<ReturnType<typeof readdir>>);
+    // Relative target resolves to /skill/target — inside /skill
+    mockReadlink.mockResolvedValue('target');
+
+    await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
+  });
+
+  it('rejects a symlink with a relative target that escapes the directory', async () => {
+    mockReaddir.mockResolvedValue([
+      makeFsDirent('escape-link', { isSymlink: true }),
+    ] as Awaited<ReturnType<typeof readdir>>);
+    mockReadlink.mockResolvedValue('../../etc/passwd');
+
+    await expect(scanForSymlinks('/skill')).rejects.toThrow(
+      'Security: skill contains a symlink pointing outside its directory',
     );
   });
 });

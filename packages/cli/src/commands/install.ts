@@ -1,31 +1,12 @@
 import { Command } from 'commander';
-import { cpSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { cpSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
+import { scanForSymlinks } from '../lib/registry.js';
 import { logger } from '../lib/logger.js';
-
-// KNOWN LIMITATION (Phase 1): symlinks created by a preinstall hook inside
-// skillPath (the registry source) after this check passes will be copied by
-// cpSync. To partially mitigate this, assertNoSymlinks is called a second
-// time after preinstall runs (before copy). A complete fix requires an
-// O_NOFOLLOW-based copy routine. Tracked in SECURITY.md §3.
-function assertNoSymlinks(dirPath: string, root: string): void {
-  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
-    const fullPath = join(dirPath, entry.name);
-    if (entry.isSymbolicLink()) {
-      const rel = fullPath.slice(root.length + 1);
-      throw new Error(
-        `Skill contains a symlink "${rel}" — installation refused to prevent path traversal`,
-      );
-    }
-    if (entry.isDirectory()) {
-      assertNoSymlinks(fullPath, root);
-    }
-  }
-}
 
 async function run(name: string): Promise<void> {
   const registry = createRegistryAdapter();
@@ -50,15 +31,7 @@ async function run(name: string): Promise<void> {
     throw err;
   }
 
-  // First symlink check: reject skills that already contain symlinks
-  try {
-    assertNoSymlinks(skillPath, skillPath);
-  } catch (err) {
-    spinner.fail('Skill rejected: symlink detected');
-    throw err;
-  }
-
-  // Run preinstall hook (manifest validated above, symlinks checked above)
+  // Run preinstall hook (manifest validated above)
   if (manifest.hooks?.preinstall !== undefined) {
     spinner.text = `Running preinstall hook for "${name}"…`;
     try {
@@ -69,12 +42,12 @@ async function run(name: string): Promise<void> {
     }
   }
 
-  // Second symlink check: the preinstall hook may have created symlinks
-  // in skillPath after the first check passed. Defense-in-depth.
+  // Symlink scan: reject symlinks escaping the skill directory.
+  // Runs after preinstall so any hook-created symlinks are also caught.
   try {
-    assertNoSymlinks(skillPath, skillPath);
+    await scanForSymlinks(skillPath);
   } catch (err) {
-    spinner.fail('Skill rejected: preinstall hook created a symlink');
+    spinner.fail('Skill rejected: symlink pointing outside skill directory detected');
     throw err;
   }
 
@@ -87,6 +60,15 @@ async function run(name: string): Promise<void> {
   if (!destPath.startsWith(expectedPrefix)) {
     spinner.fail('Refused: destination path escapes the skills directory');
     throw new Error('Refused: destination path escapes the skills directory');
+  }
+
+  // Destination must not already exist as a non-directory (e.g. a file or symlink)
+  if (existsSync(destPath)) {
+    const destStat = statSync(destPath);
+    if (!destStat.isDirectory()) {
+      spinner.fail('Refused: destination path exists but is not a directory');
+      throw new Error('Refused: destination path exists but is not a directory');
+    }
   }
 
   try {
