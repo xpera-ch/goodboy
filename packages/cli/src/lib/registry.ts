@@ -1,3 +1,8 @@
+/**
+ * Internal module — do not import directly from command files.
+ * Use RegistryAdapter via createRegistryAdapter() instead.
+ * @internal
+ */
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve, isAbsolute, sep } from 'node:path';
 import { homedir } from 'node:os';

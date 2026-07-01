@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import Table from 'cli-table3';
 import chalk from 'chalk';
-import { listInstalled } from '../lib/registry.js';
+import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { logger } from '../lib/logger.js';
 
 function statusColor(status: string): string {
@@ -18,7 +18,8 @@ function visibilityColor(visibility: string): string {
 }
 
 async function run(): Promise<void> {
-  const skills = await listInstalled();
+  const registry = createRegistryAdapter();
+  const skills = await registry.listInstalled();
 
   if (skills.length === 0) {
     logger.info('No skills installed. Run `goodboy install <name>` to get started.');

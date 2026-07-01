@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { cpSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import ora from 'ora';
-import { resolveSkill, getSkillsPath } from '../lib/registry.js';
+import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
 import { logger } from '../lib/logger.js';
@@ -28,11 +28,12 @@ function assertNoSymlinks(dirPath: string, root: string): void {
 }
 
 async function run(name: string): Promise<void> {
+  const registry = createRegistryAdapter();
   const spinner = ora(`Installing skill "${name}"…`).start();
 
   let skillPath: string;
   try {
-    skillPath = await resolveSkill(name);
+    skillPath = await registry.resolveSkill(name);
   } catch (err) {
     spinner.fail(`Cannot locate skill "${name}"`);
     throw err;
@@ -78,7 +79,7 @@ async function run(name: string): Promise<void> {
   }
 
   // Copy skill into skills directory
-  const skillsPath = getSkillsPath();
+  const skillsPath = registry.getSkillsLocation();
   const destPath = join(skillsPath, name);
 
   // Traversal guard on destination
