@@ -1,0 +1,256 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Stats } from 'node:fs';
+
+vi.mock('node:fs');
+
+import { statSync, readFileSync, writeFileSync } from 'node:fs';
+import { readManifest, validateManifest, writeManifest } from './manifest.js';
+import { loadFixture } from '../__fixtures__/index.js';
+
+const mockStatSync = vi.mocked(statSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
+
+function fakeStats(size: number): Stats {
+  return { size } as unknown as Stats;
+}
+
+// ---------------------------------------------------------------------------
+// readManifest()
+// ---------------------------------------------------------------------------
+
+describe('readManifest()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('parses and returns valid JSON content', async () => {
+    const fixture = loadFixture('valid-minimal');
+    mockStatSync.mockReturnValue(fakeStats(100));
+    (mockReadFileSync as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify(fixture));
+    const result = await readManifest('/fake/manifest.json');
+    expect(result).toEqual(fixture);
+  });
+
+  it('throws a clean error when the file does not exist', async () => {
+    mockStatSync.mockImplementation(() => { throw new Error('ENOENT: no such file'); });
+    await expect(readManifest('/nonexistent/manifest.json'))
+      .rejects.toThrow('manifest.json not found');
+  });
+
+  it('error message is exactly "manifest.json not found" with no path leak', async () => {
+    mockStatSync.mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT: no such file or directory, stat "/real/private/path"'), {
+        code: 'ENOENT',
+        path: '/real/private/path',
+      });
+    });
+    const err = await readManifest('/fake/path').catch((e: unknown) => e as Error);
+    expect(err.message).toBe('manifest.json not found');
+  });
+
+  it('throws when file exceeds the 512 KB size limit', async () => {
+    mockStatSync.mockReturnValue(fakeStats(512 * 1024 + 1));
+    await expect(readManifest('/fake/manifest.json'))
+      .rejects.toThrow('manifest.json exceeds the 512 KB size limit');
+  });
+
+  it('does not read file content when the size check fails', async () => {
+    mockStatSync.mockReturnValue(fakeStats(512 * 1024 + 1));
+    await readManifest('/fake/manifest.json').catch(() => {});
+    expect(mockReadFileSync).not.toHaveBeenCalled();
+  });
+
+  it('accepts a file exactly at the 512 KB boundary', async () => {
+    const fixture = loadFixture('valid-minimal');
+    mockStatSync.mockReturnValue(fakeStats(512 * 1024));
+    (mockReadFileSync as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify(fixture));
+    await expect(readManifest('/fake/manifest.json')).resolves.toBeDefined();
+  });
+
+  it('throws a clean error on permission denied', async () => {
+    mockStatSync.mockReturnValue(fakeStats(100));
+    mockReadFileSync.mockImplementation(() => { throw new Error('EACCES: permission denied'); });
+    await expect(readManifest('/fake/manifest.json'))
+      .rejects.toThrow('Cannot read manifest.json: permission denied');
+  });
+
+  it('throws a clean error when the file contains invalid JSON', async () => {
+    mockStatSync.mockReturnValue(fakeStats(100));
+    (mockReadFileSync as ReturnType<typeof vi.fn>).mockReturnValue('{ not valid json }');
+    await expect(readManifest('/fake/manifest.json'))
+      .rejects.toThrow('manifest.json contains invalid JSON');
+  });
+
+  it('error messages never contain raw stack traces', async () => {
+    mockStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    const err = await readManifest('/fake/manifest.json').catch((e: unknown) => e as Error);
+    expect(err.message).not.toMatch(/\s+at\s+\w/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateManifest() — uses real ajv + real schema, no fs mocking needed
+// ---------------------------------------------------------------------------
+
+describe('validateManifest()', () => {
+  it('accepts valid-minimal.json', () => {
+    expect(() => validateManifest(loadFixture('valid-minimal'))).not.toThrow();
+  });
+
+  it('accepts valid-complete.json', () => {
+    expect(() => validateManifest(loadFixture('valid-complete'))).not.toThrow();
+  });
+
+  it('accepts valid-deprecated.json', () => {
+    expect(() => validateManifest(loadFixture('valid-deprecated'))).not.toThrow();
+  });
+
+  it('rejects invalid-missing-name.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-missing-name')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-missing-version.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-missing-version')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-missing-entry.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-missing-entry')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-missing-schema-version.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-missing-schema-version')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-bad-status.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-bad-status')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-additional-props.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-additional-props')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-bad-version-format.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-bad-version-format')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-bad-name-pattern.json', () => {
+    expect(() => validateManifest(loadFixture('invalid-bad-name-pattern')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-mcp-file-url.json (non-HTTPS scheme in mcp_servers)', () => {
+    expect(() => validateManifest(loadFixture('invalid-mcp-file-url')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects invalid-mcp-javascript-url.json (non-HTTPS scheme in mcp_servers)', () => {
+    expect(() => validateManifest(loadFixture('invalid-mcp-javascript-url')))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('error message includes "Invalid manifest:" prefix', () => {
+    try {
+      validateManifest(loadFixture('invalid-missing-name'));
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as Error).message).toMatch(/^Invalid manifest:/);
+    }
+  });
+
+  it('error output lists all validation errors, not just the first', () => {
+    // An empty object is missing all nine required fields; allErrors:true means
+    // the error list should contain more than one entry.
+    try {
+      validateManifest({});
+      expect.fail('should have thrown');
+    } catch (err) {
+      const lines = (err as Error).message.split('\n');
+      // First line is the header; subsequent lines are individual errors
+      expect(lines.length).toBeGreaterThan(2);
+    }
+  });
+
+  it('error message contains the failing field path', () => {
+    try {
+      validateManifest(loadFixture('invalid-bad-status'));
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as Error).message).toContain('/status');
+    }
+  });
+
+  it('error message uses "(root)" for top-level required field violations', () => {
+    try {
+      validateManifest({});
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as Error).message).toContain('(root)');
+    }
+  });
+
+  it('rejects null input', () => {
+    expect(() => validateManifest(null)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects array input', () => {
+    expect(() => validateManifest([])).toThrow('Invalid manifest:');
+  });
+
+  it('rejects string input', () => {
+    expect(() => validateManifest('{"name":"test"}')).toThrow('Invalid manifest:');
+  });
+
+  it('rejects number input', () => {
+    expect(() => validateManifest(42)).toThrow('Invalid manifest:');
+  });
+
+  it('returns the manifest object typed as GoodBoyManifest on success', () => {
+    const result = validateManifest(loadFixture('valid-minimal'));
+    expect(result).toHaveProperty('name', 'test-skill');
+    expect(result).toHaveProperty('schema_version', '1.0.0');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// writeManifest()
+// ---------------------------------------------------------------------------
+
+describe('writeManifest()', () => {
+  const validManifest = loadFixture('valid-minimal') as Parameters<typeof writeManifest>[1];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('writes JSON with 2-space indentation and trailing newline', async () => {
+    await writeManifest('/fake/manifest.json', validManifest);
+    expect(mockWriteFileSync).toHaveBeenCalledOnce();
+    const [, content] = vi.mocked(writeFileSync).mock.calls[0]!;
+    expect(typeof content).toBe('string');
+    const written = content as string;
+    expect(written.endsWith('\n')).toBe(true);
+    expect(written).toContain('  '); // 2-space indent present
+    expect(JSON.parse(written)).toEqual(validManifest);
+  });
+
+  it('writes to the resolved path with utf-8 encoding', async () => {
+    await writeManifest('/fake/manifest.json', validManifest);
+    const [path, , encoding] = vi.mocked(writeFileSync).mock.calls[0]!;
+    expect(String(path)).toMatch(/manifest\.json$/);
+    expect(encoding).toBe('utf-8');
+  });
+
+  it('throws a clean error on permission denied', async () => {
+    mockWriteFileSync.mockImplementation(() => { throw new Error('EACCES'); });
+    await expect(writeManifest('/fake/manifest.json', validManifest))
+      .rejects.toThrow('Cannot write manifest.json: check directory permissions');
+  });
+});
