@@ -4,11 +4,16 @@ import type { GoodBoyManifest } from '../types/index.js';
 // Explicit factory — avoids copying util.promisify.custom from Node's real execFile,
 // which would cause promisify() to bypass our mock entirely.
 vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
+vi.mock('./logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
 
 import { execFile } from 'node:child_process';
+import { logger } from './logger.js';
 import { runHooks } from './hooks.js';
 
 const mockExecFile = vi.mocked(execFile);
+const mockLoggerWarn = vi.mocked(logger.warn);
 
 const BASE: GoodBoyManifest = {
   name: 'test-skill',
@@ -276,5 +281,188 @@ describe('runHooks() — execution', () => {
     };
     await runHooks(manifest, ['preinstall', 'postinstall'], CTX).catch(() => {});
     expect(mockExecFile).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HARDENING 1 — new checks (FORBIDDEN_CHARS expansion, arg count, binary
+// whitelist advisory, execFile options, hook output handling)
+// ---------------------------------------------------------------------------
+
+describe('runHooks() — expanded FORBIDDEN_CHARS', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects ! (history expansion)', async () => {
+    await expect(runHooks(withHook('postinstall', 'node !foo'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command contains forbidden shell metacharacters');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects # (comment injection)', async () => {
+    await expect(runHooks(withHook('postinstall', 'node setup.js # rm -rf /'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command contains forbidden shell metacharacters');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects newline character in command', async () => {
+    await expect(runHooks(withHook('postinstall', 'node setup.js\nrm -rf /'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command contains forbidden shell metacharacters');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects null byte in command', async () => {
+    await expect(runHooks(withHook('postinstall', 'node\x00evil'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command contains forbidden shell metacharacters');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects * (glob expansion)', async () => {
+    await expect(runHooks(withHook('postinstall', 'node *.js'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command contains forbidden shell metacharacters');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('runHooks() — argument count limit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects a command with more than 10 arguments', async () => {
+    // 'node' + 11 args = 12 parts total; 11 args exceeds max 10
+    const tooManyArgs = 'node ' + Array.from({ length: 11 }, (_, i) => `a${i}`).join(' ');
+    await expect(runHooks(withHook('postinstall', tooManyArgs), ['postinstall'], CTX))
+      .rejects.toThrow('Hook command has too many arguments (max 10)');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('accepts a command with exactly 10 arguments', async () => {
+    setupSuccess();
+    const tenArgs = 'node ' + Array.from({ length: 10 }, (_, i) => `a${i}`).join(' ');
+    await expect(runHooks(withHook('postinstall', tenArgs), ['postinstall'], CTX))
+      .resolves.toBeUndefined();
+  });
+});
+
+describe('runHooks() — binary whitelist advisory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('logs a warning for a binary not in the allowed list', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'alpha'), ['postinstall'], CTX);
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('"alpha" is not in the GoodBoy allowed list'),
+    );
+  });
+
+  it('does not log a warning for a binary in the allowed list', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX);
+    expect(mockLoggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('still calls execFile even when binary is not in the allowed list', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'alpha'), ['postinstall'], CTX);
+    expect(mockExecFile).toHaveBeenCalledOnce();
+  });
+});
+
+describe('runHooks() — execFile options hardening', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls execFile with maxBuffer of 1 MiB', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ maxBuffer: 1024 * 1024 }),
+      expect.any(Function),
+    );
+  });
+
+  it('calls execFile with windowsHide: true', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ windowsHide: true }),
+      expect.any(Function),
+    );
+  });
+
+  it('calls execFile with a minimal env containing NODE_ENV', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({ NODE_ENV: expect.any(String) }),
+      }),
+      expect.any(Function),
+    );
+  });
+});
+
+describe('runHooks() — hook output handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows last 200 chars of stderr on failure', async () => {
+    const stderrContent = 'Error: permission denied reading config';
+    mockExecFile.mockImplementation((...args: any[]) => {
+      const cb = args[args.length - 1];
+      if (typeof cb === 'function') {
+        cb(Object.assign(new Error('Command failed'), { stderr: stderrContent }));
+      }
+    });
+    const err = await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX)
+      .catch((e: unknown) => e as Error);
+    expect(err.message).toContain(stderrContent);
+  });
+
+  it('truncates stderr to the last 200 characters on failure', async () => {
+    const longStderr = 'x'.repeat(300);
+    mockExecFile.mockImplementation((...args: any[]) => {
+      const cb = args[args.length - 1];
+      if (typeof cb === 'function') {
+        cb(Object.assign(new Error('Command failed'), { stderr: longStderr }));
+      }
+    });
+    const err = await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX)
+      .catch((e: unknown) => e as Error);
+    // Prefix "Hook "postinstall" failed: " + 200 x's = under 300 total chars
+    expect(err.message.length).toBeLessThan(300);
+    expect(err.message).toContain('x'.repeat(200));
+  });
+
+  it('falls back to first line of error.message when no stderr present', async () => {
+    setupFailure('first line\n    at stack frame');
+    const err = await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX)
+      .catch((e: unknown) => e as Error);
+    expect(err.message).toContain('first line');
+    expect(err.message).not.toContain('at stack frame');
+  });
+
+  it('falls back to error.message when stderr is present but empty', async () => {
+    mockExecFile.mockImplementation((...args: any[]) => {
+      const cb = args[args.length - 1];
+      if (typeof cb === 'function') {
+        cb(Object.assign(new Error('command failed'), { stderr: '' }));
+      }
+    });
+    const err = await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX)
+      .catch((e: unknown) => e as Error);
+    expect(err.message).toContain('command failed');
   });
 });

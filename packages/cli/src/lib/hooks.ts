@@ -1,27 +1,40 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { logger } from './logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
 const execFileAsync = promisify(execFile);
 
-// Shell metacharacters that must never appear in a hook command string.
-// execFile bypasses the shell entirely, but we also reject the raw string
-// so a malicious manifest cannot smuggle in metacharacters at all.
-const FORBIDDEN_CHARS = /[&|;`$(){}<>\\"']/;
+// All ASCII shell metacharacters that could enable command injection.
+// execFile() bypasses the shell, but we also reject at string level as
+// defense-in-depth so a malicious manifest cannot smuggle metacharacters.
+const FORBIDDEN_CHARS = /[&|;`$(){}<>\\"'!#%^*?[\]~=\n\r\x00]/;
 const MAX_HOOK_LENGTH = 256;
+const MAX_ARGS = 10;
+
+// Hook commands must start with one of these executables. Unknown binaries
+// receive a prominent warning rather than an outright rejection because the
+// whitelist cannot anticipate every legitimate runtime; FORBIDDEN_CHARS and
+// execFile (no shell) remain the primary injection barriers.
+const ALLOWED_BINARIES = new Set([
+  'node', 'nodejs', 'python', 'python3', 'ruby', 'sh',
+  'bash', 'zsh', 'deno', 'bun', 'ts-node', 'npx', 'pnpm',
+  'yarn', 'pip', 'pip3', 'make', 'cargo', 'go', 'java',
+  'mvn', 'gradle', './setup.sh', './install.sh',
+  './postinstall.sh', './preinstall.sh',
+]);
+
+const ALLOWED_BINARIES_LIST = [...ALLOWED_BINARIES].sort().join(', ');
 
 // KNOWN LIMITATION (Phase 1): hooks run as the current user with full
 // filesystem and network permissions. There is no sandboxing, chroot,
-// capability dropping, or network egress filtering. Users must only
-// install skills from sources they explicitly trust. Proper sandboxing
-// is deferred to a future phase.
+// capability dropping, or network egress filtering. Users must only install
+// skills from sources they explicitly trust.
 //
 // KNOWN LIMITATION (Phase 1): the manifest is validated before any hook
-// runs, but the hook itself executes from the filesystem and could in
-// theory modify the skill directory on disk. The in-memory manifest
-// object used throughout install is the pre-hook validated copy and
-// cannot be mutated by a hook, but files on disk (including manifest.json)
-// can be changed by a preinstall hook before the directory is copied.
+// runs. The in-memory manifest object is the pre-hook validated copy and
+// cannot be mutated by a hook, but files on disk can be changed by a
+// preinstall hook before the directory is copied.
 
 export interface HookContext {
   skillName: string;
@@ -47,6 +60,17 @@ function parseHookCommand(command: string): { bin: string; args: string[] } {
     throw new Error('Hook command is empty');
   }
 
+  if (args.length > MAX_ARGS) {
+    throw new Error(`Hook command has too many arguments (max ${MAX_ARGS})`);
+  }
+
+  if (!ALLOWED_BINARIES.has(bin)) {
+    logger.warn(
+      `Hook binary "${bin}" is not in the GoodBoy allowed list. ` +
+        `Allowed binaries: ${ALLOWED_BINARIES_LIST}`,
+    );
+  }
+
   return { bin, args };
 }
 
@@ -60,21 +84,37 @@ async function runHook(
   try {
     await execFileAsync(bin, args, {
       timeout: 30_000,
+      maxBuffer: 1024 * 1024,
+      env: {
+        PATH: process.env['PATH'],
+        HOME: process.env['HOME'],
+        /* c8 ignore next -- NODE_ENV is always set in test environments; fallback fires only in production */
+        NODE_ENV: process.env['NODE_ENV'] ?? 'production',
+      },
+      windowsHide: true,
       cwd: context.skillPath,
     });
   } catch (err) {
     if (err instanceof Error) {
-      const asNode = err as NodeJS.ErrnoException & { killed?: boolean };
+      const asNode = err as NodeJS.ErrnoException & {
+        killed?: boolean;
+        stderr?: string;
+      };
       const isTimeout = asNode.killed === true || asNode.code === 'ETIMEDOUT';
 
       if (isTimeout) {
         throw new Error(`Hook "${hookName}" timed out after 30 seconds`);
       }
 
-      // First line only — never expose raw stack traces to the user
-      /* c8 ignore next -- split() always returns ≥1 element, making the ?? fallback unreachable */
-      const firstLine = asNode.message.split('\n')[0] ?? asNode.message;
-      throw new Error(`Hook "${hookName}" failed: ${firstLine}`);
+      let stderrSnippet: string;
+      if (typeof asNode.stderr === 'string' && asNode.stderr.length > 0) {
+        // Last 200 chars of stderr only — never expose stdout or stack traces
+        stderrSnippet = asNode.stderr.slice(-200).trim();
+      } else {
+        /* c8 ignore next -- split() always returns ≥1 element, ?? fallback unreachable */
+        stderrSnippet = asNode.message.split('\n')[0] ?? asNode.message;
+      }
+      throw new Error(`Hook "${hookName}" failed: ${stderrSnippet}`);
     }
     throw new Error(`Hook "${hookName}" failed`);
   }
