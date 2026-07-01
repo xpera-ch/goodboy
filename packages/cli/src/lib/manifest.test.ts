@@ -82,6 +82,24 @@ describe('readManifest()', () => {
       .rejects.toThrow('manifest.json contains invalid JSON');
   });
 
+  it('rejects a manifest with nesting depth greater than 10', async () => {
+    // Build a JSON string with 11 levels of nesting
+    const deepJson = '{'.repeat(11) + '}'.repeat(11);
+    mockStatSync.mockReturnValue(fakeStats(deepJson.length));
+    (mockReadFileSync as ReturnType<typeof vi.fn>).mockReturnValue(deepJson);
+    await expect(readManifest('/fake/manifest.json'))
+      .rejects.toThrow('nesting depth exceeds maximum allowed (10)');
+  });
+
+  it('accepts a manifest at exactly nesting depth 10', async () => {
+    // A JSON string with exactly 10 levels — just under the limit
+    const fixture = loadFixture('valid-minimal');
+    const json = JSON.stringify(fixture);
+    mockStatSync.mockReturnValue(fakeStats(json.length));
+    (mockReadFileSync as ReturnType<typeof vi.fn>).mockReturnValue(json);
+    await expect(readManifest('/fake/manifest.json')).resolves.toBeDefined();
+  });
+
   it('error messages never contain raw stack traces', async () => {
     mockStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
     const err = await readManifest('/fake/manifest.json').catch((e: unknown) => e as Error);
@@ -210,6 +228,99 @@ describe('validateManifest()', () => {
 
   it('rejects number input', () => {
     expect(() => validateManifest(42)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a dependency with a file:// value', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      dependencies: { 'bad-dep': 'file:///local/lib' },
+    };
+    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a dependency with an http:// value', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      dependencies: { 'bad-dep': 'http://example.com/lib' },
+    };
+    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a dependency with a git+ssh:// value', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      dependencies: { 'bad-dep': 'git+ssh://github.com/foo/bar' },
+    };
+    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
+  });
+
+  it('accepts a dependency with a valid semver value', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      dependencies: { 'good-dep': '^1.2.3' },
+    };
+    expect(() => validateManifest(manifest)).not.toThrow();
+  });
+
+  it('rejects a localhost MCP server URL at runtime', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'local', url: 'https://localhost/api' }],
+    };
+    expect(() => validateManifest(manifest))
+      .toThrow('mcp_servers contains an invalid or disallowed URL');
+  });
+
+  it('rejects a 127.0.0.1 MCP server URL at runtime', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'local', url: 'http://127.0.0.1:8080/api' }],
+    };
+    expect(() => validateManifest(manifest))
+      .toThrow('mcp_servers contains an invalid or disallowed URL');
+  });
+
+  it('rejects a 192.168.x.x MCP server URL at runtime', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'lan', url: 'https://192.168.1.100/api' }],
+    };
+    expect(() => validateManifest(manifest))
+      .toThrow('mcp_servers contains an invalid or disallowed URL');
+  });
+
+  it('rejects a 169.254.x.x (link-local) MCP server URL at runtime', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'link', url: 'https://169.254.1.1/api' }],
+    };
+    expect(() => validateManifest(manifest))
+      .toThrow('mcp_servers contains an invalid or disallowed URL');
+  });
+
+  it('rejects IPv6 loopback (::1) MCP server URL at runtime', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'v6', url: 'http://[::1]/api' }],
+    };
+    expect(() => validateManifest(manifest))
+      .toThrow('mcp_servers contains an invalid or disallowed URL');
+  });
+
+  it('accepts a public HTTPS MCP server URL', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'pub', url: 'https://mcp.example.com/api' }],
+    };
+    expect(() => validateManifest(manifest)).not.toThrow();
+  });
+
+  it('accepts an HTTP MCP server URL for non-local hosts', () => {
+    const manifest = {
+      ...loadFixture('valid-complete'),
+      mcp_servers: [{ name: 'pub', url: 'http://mcp.example.com/api' }],
+    };
+    expect(() => validateManifest(manifest)).not.toThrow();
   });
 
   it('returns the manifest object typed as GoodBoyManifest on success', () => {

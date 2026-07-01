@@ -9,6 +9,7 @@ const addFormats = (addFormatsPkg as unknown as { default: (ajv: Ajv) => Ajv }).
 const _require = createRequire(import.meta.url);
 
 const MAX_MANIFEST_BYTES = 512 * 1024; // 512 KB
+const MAX_NESTING_DEPTH = 10;
 
 let _validator: ReturnType<Ajv['compile']> | null = null;
 
@@ -19,6 +20,59 @@ function getValidator(): ReturnType<Ajv['compile']> {
   const schema = _require('@goodboy/schema/src/manifest.schema.json') as Record<string, unknown>;
   _validator = ajv.compile(schema);
   return _validator;
+}
+
+// Heuristic nesting depth check: counts opening brackets/braces.
+// This is intentionally fast and runs before JSON.parse() to guard against
+// deeply nested payloads that could exhaust the stack. Brackets inside
+// string values inflate the count slightly but legitimate manifests are
+// well within the limit.
+function estimateNestingDepth(jsonString: string): number {
+  let depth = 0;
+  let maxDepth = 0;
+  for (const ch of jsonString) {
+    if (ch === '{' || ch === '[') {
+      depth++;
+      if (depth > maxDepth) maxDepth = depth;
+    } else if (ch === '}' || ch === ']') {
+      depth--;
+    }
+  }
+  return maxDepth;
+}
+
+const PRIVATE_IP_RE = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\.0\.0\.0$/,
+  /^10\./,
+  /^172\.(1[6-9]|2[0-9]|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^::1$/,
+];
+
+function validateMcpServerUrl(url: string): void {
+  let parsed: URL;
+  /* c8 ignore start -- ajv "format: uri" + pattern "^https?://" make both the catch clause and
+     the protocol check unreachable through the public validateManifest() API */
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
+  }
+  /* c8 ignore stop */
+
+  // WHATWG URL keeps brackets for IPv6 (e.g. "[::1]") — strip them before matching.
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+  for (const re of PRIVATE_IP_RE) {
+    if (re.test(hostname)) {
+      throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
+    }
+  }
 }
 
 export async function readManifest(filePath: string): Promise<unknown> {
@@ -42,6 +96,12 @@ export async function readManifest(filePath: string): Promise<unknown> {
     throw new Error(`Cannot read manifest.json: permission denied`);
   }
 
+  if (estimateNestingDepth(raw) > MAX_NESTING_DEPTH) {
+    throw new Error(
+      `Manifest structure is invalid: nesting depth exceeds maximum allowed (${MAX_NESTING_DEPTH})`,
+    );
+  }
+
   try {
     return JSON.parse(raw) as unknown;
   } catch {
@@ -60,7 +120,19 @@ export function validateManifest(data: unknown): GoodBoyManifest {
     throw new Error(`Invalid manifest:\n${lines.join('\n')}`);
   }
 
-  return data as GoodBoyManifest;
+  const manifest = data as GoodBoyManifest;
+
+  // Runtime second pass: block private/loopback MCP server URLs that pass
+  // the schema pattern (^https?://) but point to internal infrastructure.
+  if (Array.isArray(manifest.mcp_servers)) {
+    for (const server of manifest.mcp_servers) {
+      if (typeof server.url === 'string') {
+        validateMcpServerUrl(server.url);
+      }
+    }
+  }
+
+  return manifest;
 }
 
 export async function writeManifest(filePath: string, data: GoodBoyManifest): Promise<void> {
