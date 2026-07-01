@@ -82,7 +82,7 @@
     },
     "language": {
       "type": "string",
-      "enum": ["typescript", "javascript", "python", "rust", "other"]
+      "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
     },
     "claude_code_version": {
       "type": "string"
