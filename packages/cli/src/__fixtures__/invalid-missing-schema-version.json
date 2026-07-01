@@ -1,0 +1,10 @@
+{
+  "name": "test-skill",
+  "version": "0.1.0",
+  "description": "Missing required schema_version field",
+  "author": { "name": "Test Author" },
+  "license": "MIT",
+  "entry": "index.md",
+  "language": "typescript",
+  "status": "experimental"
+}

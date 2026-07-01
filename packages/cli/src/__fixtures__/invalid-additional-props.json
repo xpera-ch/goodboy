@@ -1,0 +1,12 @@
+{
+  "name": "test-skill",
+  "version": "0.1.0",
+  "description": "Contains an unknown top-level property",
+  "author": { "name": "Test Author" },
+  "license": "MIT",
+  "entry": "index.md",
+  "language": "typescript",
+  "schema_version": "1.0.0",
+  "status": "experimental",
+  "unknownField": "rejected by additionalProperties: false"
+}

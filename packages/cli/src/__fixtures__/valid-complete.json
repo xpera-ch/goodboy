@@ -1,0 +1,51 @@
+{
+  "name": "complete-skill",
+  "version": "1.2.3",
+  "description": "A complete test skill with all optional fields populated",
+  "author": {
+    "name": "Test Author",
+    "email": "test@example.com",
+    "url": "https://example.com"
+  },
+  "license": "Apache-2.0",
+  "entry": "index.ts",
+  "language": "typescript",
+  "schema_version": "1.0.0",
+  "status": "stable",
+  "visibility": "public",
+  "category": "code",
+  "keywords": ["test", "example", "complete"],
+  "readme": "README.md",
+  "homepage": "https://example.com/skill",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/skill"
+  },
+  "changelog": "https://github.com/example/skill/blob/main/CHANGELOG.md",
+  "claude_code_version": "1.0.0",
+  "mcp_servers": [
+    {
+      "name": "example-mcp",
+      "url": "https://mcp.example.com"
+    }
+  ],
+  "engines": {
+    "node": ">=18",
+    "python": ">=3.9"
+  },
+  "os": ["darwin", "linux"],
+  "dependencies": {
+    "some-lib": "^1.0.0"
+  },
+  "devDependencies": {
+    "some-dev-lib": "^2.0.0"
+  },
+  "permissions": ["read_files"],
+  "hooks": {
+    "preinstall": "node --version",
+    "postinstall": "node --version",
+    "preremove": "node --version",
+    "postremove": "node --version"
+  },
+  "publisher": "test-publisher"
+}

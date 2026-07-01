@@ -1,0 +1,11 @@
+{
+  "name": "test-skill",
+  "version": "1.0",
+  "description": "Version is missing the patch segment",
+  "author": { "name": "Test Author" },
+  "license": "MIT",
+  "entry": "index.md",
+  "language": "typescript",
+  "schema_version": "1.0.0",
+  "status": "experimental"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Test_Skill!",
+  "version": "0.1.0",
+  "description": "Name contains uppercase and special characters",
+  "author": { "name": "Test Author" },
+  "license": "MIT",
+  "entry": "index.md",
+  "language": "typescript",
+  "schema_version": "1.0.0",
+  "status": "experimental"
+}
