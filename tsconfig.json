@@ -11,5 +11,5 @@
     "resolveJsonModule": true
   },
   "include": ["scripts/**/*"],
-  "exclude": ["node_modules", "dist", "types/ts"]
+  "exclude": ["node_modules", "dist", "packages/schema/generated"]
 }

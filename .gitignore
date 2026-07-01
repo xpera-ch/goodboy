@@ -3,5 +3,7 @@ dist/
 *.js
 *.js.map
 *.tsbuildinfo
-types/ts/
+packages/schema/generated/
+coverage/
+.env
 .DS_Store

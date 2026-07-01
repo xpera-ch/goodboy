@@ -1,0 +1,14 @@
+{
+  "name": "@goodboy/schema",
+  "version": "1.0.0",
+  "description": "GoodBoy skill manifest JSON Schema and generated type definitions",
+  "types": "./generated/ts/index.d.ts",
+  "files": ["src", "versions", "generated"],
+  "scripts": {
+    "generate": "ts-node ../../scripts/generate-types.ts"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.5.0"
+  }
+}

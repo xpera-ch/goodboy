@@ -4,10 +4,12 @@
   "private": true,
   "description": "A personal skill registry and intelligent dispatcher for Claude Code",
   "workspaces": [
-    "packages/*"
+    "packages/cli",
+    "packages/schema",
+    "packages/registry-client"
   ],
   "scripts": {
-    "generate:types": "ts-node scripts/generate-types.ts"
+    "generate:types": "npm run generate -w packages/schema"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
