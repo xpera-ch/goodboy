@@ -1,0 +1,14 @@
+{
+  "name": "@goodboy/registry-client",
+  "version": "0.0.1",
+  "description": "HTTP client for the GoodBoy public registry API",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
+  }
+}

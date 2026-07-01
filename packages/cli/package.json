@@ -1,0 +1,21 @@
+{
+  "name": "@goodboy/cli",
+  "version": "0.0.1",
+  "description": "The GoodBoy CLI tool",
+  "bin": {
+    "goodboy": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@goodboy/schema": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}
