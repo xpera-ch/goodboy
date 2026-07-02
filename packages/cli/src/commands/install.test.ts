@@ -21,14 +21,17 @@ vi.mock('node:fs', () => ({
 vi.mock('../lib/registry-adapter.js');
 vi.mock('../lib/manifest.js');
 vi.mock('../lib/hooks.js');
+vi.mock('../lib/consent.js');
 vi.mock('../lib/registry.js');
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
+import { cpSync, mkdirSync } from 'node:fs';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
+import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/registry.js';
 import { installCommand } from './install.js';
 
@@ -36,7 +39,10 @@ const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
 const mockRunHooks = vi.mocked(runHooks);
+const mockRequestConsent = vi.mocked(requestConsent);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
+const mockCpSync = vi.mocked(cpSync);
+const mockMkdirSync = vi.mocked(mkdirSync);
 
 const SKILL_PATH = '/fake/registry/test-skill';
 const SKILLS_DIR = join(homedir(), '.goodboy', 'skills');
@@ -85,6 +91,7 @@ describe('install command — hook dispatch', () => {
     mockReadManifest.mockResolvedValue({});
     mockScanForSymlinks.mockResolvedValue(undefined);
     mockRunHooks.mockResolvedValue(undefined);
+    mockRequestConsent.mockResolvedValue(true);
   });
 
   it('installs a passive skill without calling runHooks', async () => {
@@ -125,5 +132,29 @@ describe('install command — hook dispatch', () => {
     mockValidateManifest.mockReturnValue(EXEC_BASE);
     await installCommand.parseAsync(['test-skill'], { from: 'user' });
     expect(mockRunHooks).not.toHaveBeenCalled();
+  });
+
+  it('passes the validated manifest to requestConsent', async () => {
+    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    await installCommand.parseAsync(['test-skill'], { from: 'user' });
+    expect(mockRequestConsent).toHaveBeenCalledWith(EXEC_BASE);
+  });
+
+  it('aborts with no filesystem writes when consent is declined', async () => {
+    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockRequestConsent.mockResolvedValue(false);
+    await installCommand.parseAsync(['test-skill'], { from: 'user' });
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockScanForSymlinks).not.toHaveBeenCalled();
+    expect(mockRunHooks).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when consent is declined', async () => {
+    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockRequestConsent.mockResolvedValue(false);
+    await expect(
+      installCommand.parseAsync(['test-skill'], { from: 'user' }),
+    ).resolves.toBeDefined();
   });
 });

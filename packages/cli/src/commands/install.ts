@@ -5,6 +5,7 @@ import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
+import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/registry.js';
 import { logger } from '../lib/logger.js';
 
@@ -29,6 +30,13 @@ async function run(name: string): Promise<void> {
   } catch (err) {
     spinner.fail('Manifest validation failed');
     throw err;
+  }
+
+  // Consent gate — must run on the validated manifest, before any filesystem operations
+  const consented = await requestConsent(manifest);
+  if (!consented) {
+    spinner.warn('Installation cancelled.');
+    return;
   }
 
   // Run preinstall hook (manifest validated above)
