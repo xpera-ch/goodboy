@@ -9,7 +9,8 @@
     "packages/registry-client"
   ],
   "scripts": {
-    "generate:types": "npm run generate -w packages/schema"
+    "generate:types": "npm run generate -w packages/schema",
+    "verify:types": "npm run generate:types && git diff --exit-code packages/schema/generated/"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -31,6 +31,9 @@ jobs:
       - name: Regenerate schema types
         run: npm run generate:types
 
+      - name: Verify generated types are committed
+        run: git diff --exit-code packages/schema/generated/
+
       - name: Build CLI
         run: npm run build -w packages/cli
 
