@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GoodBoyManifest } from '../types/index.js';
+import type { ExecutableSkillManifest } from '../types/index.js';
 
 vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
 vi.mock('node:fs');
@@ -11,9 +11,7 @@ import { runHooks, resolveHookPath } from './hooks.js';
 const mockExecFile = vi.mocked(execFile);
 const mockLstatSync = vi.mocked(lstatSync);
 
-type ExecutableManifest = Extract<GoodBoyManifest, { kind: 'executable' }>;
-
-const BASE: ExecutableManifest = {
+const BASE: ExecutableSkillManifest = {
   kind: 'executable',
   name: 'test-skill',
   version: '0.1.0',
@@ -30,9 +28,9 @@ const BASE: ExecutableManifest = {
 const CTX = { skillName: 'test-skill', skillPath: '/tmp/test-skill' };
 
 function withHook(
-  hookName: keyof NonNullable<ExecutableManifest['hooks']>,
+  hookName: keyof NonNullable<ExecutableSkillManifest['hooks']>,
   entry: { script: string; args?: string[] },
-): ExecutableManifest {
+): ExecutableSkillManifest {
   return { ...BASE, hooks: { [hookName]: entry } };
 }
 
@@ -102,7 +100,7 @@ describe('runHooks() — execution', () => {
   });
 
   it('does nothing when the requested hook is not defined on the manifest', async () => {
-    const manifest: ExecutableManifest = { ...BASE, hooks: { preinstall: { script: 'hooks/run.sh' } } };
+    const manifest: ExecutableSkillManifest = { ...BASE, hooks: { preinstall: { script: 'hooks/run.sh' } } };
     await runHooks(manifest, ['postinstall'], CTX);
     expect(mockExecFile).not.toHaveBeenCalled();
   });
@@ -154,7 +152,7 @@ describe('runHooks() — execution', () => {
       if (typeof cb === 'function') cb(null, '', '');
       return undefined as unknown as ReturnType<typeof execFile>;
     });
-    const manifest: ExecutableManifest = {
+    const manifest: ExecutableSkillManifest = {
       ...BASE,
       hooks: {
         preinstall: { script: 'hooks/first.sh' },
@@ -207,7 +205,7 @@ describe('runHooks() — execution', () => {
 
   it('stops execution after the first failing hook', async () => {
     setupFailure('first hook failed');
-    const manifest: ExecutableManifest = {
+    const manifest: ExecutableSkillManifest = {
       ...BASE,
       hooks: {
         preinstall: { script: 'hooks/first.sh' },
@@ -216,6 +214,18 @@ describe('runHooks() — execution', () => {
     };
     await runHooks(manifest, ['preinstall', 'postinstall'], CTX).catch(() => {});
     expect(mockExecFile).toHaveBeenCalledOnce();
+  });
+
+  it('throws for a passive-kind manifest passed at runtime', async () => {
+    const passiveManifest = {
+      kind: 'passive',
+      name: 'test', version: '0.1.0', description: 'Test',
+      author: { name: 'Test' }, license: 'MIT',
+      content: 'SKILL.md', schema_version: '1.0.0', status: 'experimental',
+    };
+    await expect(
+      runHooks(passiveManifest as unknown as ExecutableSkillManifest, ['preinstall'], CTX),
+    ).rejects.toThrow('runHooks: manifest must be an executable skill');
   });
 });
 

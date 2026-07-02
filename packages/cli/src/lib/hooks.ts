@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { lstatSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
-import type { GoodBoyManifest } from '../types/index.js';
+import type { GoodBoyManifest, ExecutableSkillManifest } from '../types/index.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -104,10 +104,15 @@ export function resolveHookPath(skillDir: string, hookRelativePath: string): str
 }
 
 export async function runHooks(
-  manifest: Extract<GoodBoyManifest, { kind: 'executable' }>,
+  manifest: ExecutableSkillManifest,
   hookNames: Array<'preinstall' | 'postinstall' | 'preremove' | 'postremove'>,
   context: HookContext,
 ): Promise<void> {
+  // Kept as runtime guard: TypeScript narrows this at call sites, but JS callers
+  // and manifests bypassing validateManifest are not covered by the type system.
+  if ((manifest as GoodBoyManifest).kind !== 'executable') {
+    throw new Error('runHooks: manifest must be an executable skill');
+  }
   for (const hookName of hookNames) {
     const hookEntry = manifest.hooks[hookName];
     if (hookEntry !== undefined) {
