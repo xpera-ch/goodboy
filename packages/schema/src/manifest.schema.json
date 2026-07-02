@@ -24,6 +24,7 @@
           "description": "Static argv values. No whitespace, no shell metacharacters. Each element maps to one position in the script's argv; they are never joined or passed through a shell.",
           "items": {
             "type": "string",
+            "minLength": 1,
             "maxLength": 256,
             "pattern": "^[A-Za-z0-9_.:=/-]+$"
           }

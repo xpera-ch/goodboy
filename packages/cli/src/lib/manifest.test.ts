@@ -390,6 +390,11 @@ describe('validateManifest()', () => {
       .toThrow('Invalid manifest:');
   });
 
+  it('rejects an empty string args element', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: [''] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
   it('rejects an args array with more than 20 items', () => {
     expect(() => validateManifest({
       ...loadFixture('valid-minimal'),
