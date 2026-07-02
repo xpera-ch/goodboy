@@ -2,31 +2,9 @@ import { execFile } from 'node:child_process';
 import { lstatSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
-import { logger } from './logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
 const execFileAsync = promisify(execFile);
-
-// All ASCII shell metacharacters that could enable command injection.
-// execFile() bypasses the shell, but we also reject at string level as
-// defense-in-depth so a malicious manifest cannot smuggle metacharacters.
-const FORBIDDEN_CHARS = /[&|;`$(){}<>\\"'!#%^*?[\]~=\n\r\x00]/;
-const MAX_HOOK_LENGTH = 256;
-const MAX_ARGS = 10;
-
-// Hook commands must start with one of these executables. Unknown binaries
-// receive a prominent warning rather than an outright rejection because the
-// whitelist cannot anticipate every legitimate runtime; FORBIDDEN_CHARS and
-// execFile (no shell) remain the primary injection barriers.
-const ALLOWED_BINARIES = new Set([
-  'node', 'nodejs', 'python', 'python3', 'ruby', 'sh',
-  'bash', 'zsh', 'deno', 'bun', 'ts-node', 'npx', 'pnpm',
-  'yarn', 'pip', 'pip3', 'make', 'cargo', 'go', 'java',
-  'mvn', 'gradle', './setup.sh', './install.sh',
-  './postinstall.sh', './preinstall.sh',
-]);
-
-const ALLOWED_BINARIES_LIST = [...ALLOWED_BINARIES].sort().join(', ');
 
 // KNOWN LIMITATION (Phase 1): hooks run as the current user with full
 // filesystem and network permissions. There is no sandboxing, chroot,
@@ -43,52 +21,16 @@ export interface HookContext {
   skillPath: string;
 }
 
-function parseHookCommand(command: string): { bin: string; args: string[] } {
-  if (command.length > MAX_HOOK_LENGTH) {
-    throw new Error(
-      `Hook command exceeds the maximum allowed length of ${MAX_HOOK_LENGTH} characters`,
-    );
-  }
-
-  if (FORBIDDEN_CHARS.test(command)) {
-    throw new Error(`Hook command contains forbidden shell metacharacters`);
-  }
-
-  const parts = command.trim().split(/\s+/);
-  const bin = parts[0];
-  const args = parts.slice(1);
-
-  if (!bin) {
-    throw new Error('Hook command is empty');
-  }
-
-  if (args.length > MAX_ARGS) {
-    throw new Error(`Hook command has too many arguments (max ${MAX_ARGS})`);
-  }
-
-  if (!ALLOWED_BINARIES.has(bin)) {
-    logger.warn(
-      `Hook binary "${bin}" is not in the GoodBoy allowed list. ` +
-        `Allowed binaries: ${ALLOWED_BINARIES_LIST}`,
-    );
-  }
-
-  return { bin, args };
-}
-
 async function runHook(
   hookName: string,
-  command: string,
+  hookEntry: { script: string; args?: string[] },
   context: HookContext,
 ): Promise<void> {
-  const { bin, args } = parseHookCommand(command);
-
-  // When the binary looks like a relative path (contains /), validate it
-  // against skillPath before execution — the actual runtime security boundary.
-  const resolvedBin = bin.includes('/') ? resolveHookPath(context.skillPath, bin) : bin;
+  const resolvedScript = resolveHookPath(context.skillPath, hookEntry.script);
+  const args = hookEntry.args ?? [];
 
   try {
-    await execFileAsync(resolvedBin, args, {
+    await execFileAsync(resolvedScript, args, {
       timeout: 30_000,
       maxBuffer: 1024 * 1024,
       env: {
@@ -167,9 +109,9 @@ export async function runHooks(
   context: HookContext,
 ): Promise<void> {
   for (const hookName of hookNames) {
-    const command = manifest.hooks?.[hookName];
-    if (command !== undefined) {
-      await runHook(hookName, command, context);
+    const hookEntry = manifest.hooks?.[hookName];
+    if (hookEntry !== undefined) {
+      await runHook(hookName, hookEntry, context);
     }
   }
 }

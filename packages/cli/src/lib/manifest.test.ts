@@ -330,19 +330,78 @@ describe('validateManifest()', () => {
     expect(result).toHaveProperty('schema_version', '1.0.0');
   });
 
-  it('rejects a hook value containing ".."', () => {
+  it('rejects a hooks.* value that is a bare string (old format)', () => {
     expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: '../evil.sh' } }))
       .toThrow('Invalid manifest:');
   });
 
-  it('rejects a hook value that is an absolute path', () => {
+  it('rejects a hooks.* value that is a bare absolute path string (old format)', () => {
     expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: '/etc/passwd' } }))
       .toThrow('Invalid manifest:');
   });
 
-  it('accepts a hook value that is a normal relative path', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: 'scripts/run.sh' } }))
+  it('accepts a valid hook entry with script only (no args)', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/run.sh' } } }))
       .not.toThrow();
+  });
+
+  it('rejects a hook script without the "hooks/" prefix', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'scripts/run.sh' } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects a hook script without a file extension', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/noext' } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects a hook script containing ".." (excluded by segment character class)', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/../evil.sh' } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a semicolon', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: [';rm'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a pipe character', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a|b'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a dollar sign', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['$HOME'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a backtick', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['`cmd`'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a space', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a b'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args item containing a double quote', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['"value"'] } } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects an args array with more than 20 items', () => {
+    expect(() => validateManifest({
+      ...loadFixture('valid-minimal'),
+      hooks: { preinstall: { script: 'hooks/r.sh', args: Array.from({ length: 21 }, () => 'a') } },
+    })).toThrow('Invalid manifest:');
+  });
+
+  it('accepts a valid hook entry with script and args', () => {
+    expect(() => validateManifest({
+      ...loadFixture('valid-minimal'),
+      hooks: { preinstall: { script: 'hooks/setup.sh', args: ['--mode', 'prod'] } },
+    })).not.toThrow();
   });
 
   it('generated GoodBoyManifest has permissions as a plain array type', () => {
