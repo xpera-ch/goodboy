@@ -14,7 +14,14 @@ const execFileAsync = promisify(execFile);
 // KNOWN LIMITATION (Phase 1): the manifest is validated before any hook
 // runs. The in-memory manifest object is the pre-hook validated copy and
 // cannot be mutated by a hook, but files on disk can be changed by a
-// preinstall hook before the directory is copied.
+// preinstall hook before the directory is copied. Specifically, scanForSymlinks
+// catches symlinks pointing outside the skill directory but does NOT catch
+// hardlinks: a preinstall hook could create a hardlink to an external file,
+// which would then be copied to the destination by cpSync. Prerequisite: the
+// attacker must have already passed the user consent gate. Accepted for Phase 1
+// because hardlinks are same-filesystem-only, limiting the blast radius, and
+// because reaching this path requires the user to have explicitly approved the
+// skill's permissions.
 
 export interface HookContext {
   skillName: string;
