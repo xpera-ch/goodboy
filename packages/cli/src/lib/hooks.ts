@@ -83,8 +83,12 @@ async function runHook(
 ): Promise<void> {
   const { bin, args } = parseHookCommand(command);
 
+  // When the binary looks like a relative path (contains /), validate it
+  // against skillPath before execution — the actual runtime security boundary.
+  const resolvedBin = bin.includes('/') ? resolveHookPath(context.skillPath, bin) : bin;
+
   try {
-    await execFileAsync(bin, args, {
+    await execFileAsync(resolvedBin, args, {
       timeout: 30_000,
       maxBuffer: 1024 * 1024,
       env: {

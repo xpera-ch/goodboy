@@ -471,6 +471,48 @@ describe('runHooks() — hook output handling', () => {
 });
 
 // ---------------------------------------------------------------------------
+// runHooks() — resolveHookPath integration
+// Verifies that path-style binaries (containing "/") are resolved through
+// resolveHookPath before execFile is called, making the runtime guard active.
+// ---------------------------------------------------------------------------
+
+describe('runHooks() — resolveHookPath integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls resolveHookPath and uses the resolved absolute path for a path-style binary', async () => {
+    mockLstatSync.mockReturnValue(
+      { isSymbolicLink: () => false, isFile: () => true } as unknown as ReturnType<typeof lstatSync>,
+    );
+    setupSuccess();
+    await runHooks(withHook('postinstall', './setup.sh'), ['postinstall'], CTX);
+    expect(mockLstatSync).toHaveBeenCalledWith(`${CTX.skillPath}/setup.sh`);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      `${CTX.skillPath}/setup.sh`,
+      [],
+      expect.objectContaining({ cwd: CTX.skillPath }),
+      expect.any(Function),
+    );
+  });
+
+  it('rejects a symlinked hook script before execFile is called', async () => {
+    mockLstatSync.mockReturnValue(
+      { isSymbolicLink: () => true, isFile: () => false } as unknown as ReturnType<typeof lstatSync>,
+    );
+    await expect(runHooks(withHook('postinstall', './setup.sh'), ['postinstall'], CTX))
+      .rejects.toThrow('Hook path must not be a symbolic link');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('does not call lstatSync for a bare binary name like "node"', async () => {
+    setupSuccess();
+    await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX);
+    expect(mockLstatSync).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // resolveHookPath() — path validation and traversal guard
 // ---------------------------------------------------------------------------
 

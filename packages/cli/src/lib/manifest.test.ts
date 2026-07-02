@@ -350,6 +350,20 @@ describe('validateManifest()', () => {
     const p: GoodBoyManifest['permissions'] = ['read_files', 'network'];
     expect(p).toBeDefined();
   });
+
+  it('rejects permissions with more than 5 items', () => {
+    expect(() => validateManifest({
+      ...loadFixture('valid-minimal'),
+      permissions: ['read_files', 'write_files', 'network', 'shell', 'env', 'read_files'],
+    })).toThrow('Invalid manifest:');
+  });
+
+  it('rejects mcp_servers with more than 20 items', () => {
+    expect(() => validateManifest({
+      ...loadFixture('valid-minimal'),
+      mcp_servers: Array.from({ length: 21 }, (_, i) => ({ name: `s${i}`, url: `https://s${i}.example.com` })),
+    })).toThrow('Invalid manifest:');
+  });
 });
 
 // ---------------------------------------------------------------------------
