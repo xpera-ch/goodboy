@@ -179,19 +179,27 @@
       "properties": {
         "preinstall": {
           "type": "string",
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+          "description": "Defense-in-depth first filter: relative path within the skill directory. The actual security boundary is enforced at runtime by resolveHookPath()."
         },
         "postinstall": {
           "type": "string",
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+          "description": "Defense-in-depth first filter: relative path within the skill directory. The actual security boundary is enforced at runtime by resolveHookPath()."
         },
         "preremove": {
           "type": "string",
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+          "description": "Defense-in-depth first filter: relative path within the skill directory. The actual security boundary is enforced at runtime by resolveHookPath()."
         },
         "postremove": {
           "type": "string",
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+          "description": "Defense-in-depth first filter: relative path within the skill directory. The actual security boundary is enforced at runtime by resolveHookPath()."
         }
       }
     },

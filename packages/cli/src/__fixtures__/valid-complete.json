@@ -42,10 +42,10 @@
   },
   "permissions": ["read_files"],
   "hooks": {
-    "preinstall": "node --version",
-    "postinstall": "node --version",
-    "preremove": "node --version",
-    "postremove": "node --version"
+    "preinstall": "scripts/run.sh",
+    "postinstall": "scripts/run.sh",
+    "preremove": "scripts/run.sh",
+    "postremove": "scripts/run.sh"
   },
   "publisher": "test-publisher"
 }

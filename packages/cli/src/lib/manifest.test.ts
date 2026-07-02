@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Stats } from 'node:fs';
+import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('node:fs');
 
@@ -327,6 +328,27 @@ describe('validateManifest()', () => {
     const result = validateManifest(loadFixture('valid-minimal'));
     expect(result).toHaveProperty('name', 'test-skill');
     expect(result).toHaveProperty('schema_version', '1.0.0');
+  });
+
+  it('rejects a hook value containing ".."', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: '../evil.sh' } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('rejects a hook value that is an absolute path', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: '/etc/passwd' } }))
+      .toThrow('Invalid manifest:');
+  });
+
+  it('accepts a hook value that is a normal relative path', () => {
+    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: { preinstall: 'scripts/run.sh' } }))
+      .not.toThrow();
+  });
+
+  it('generated GoodBoyManifest has permissions as a plain array type', () => {
+    // Type-level regression guard: if permissions were a tuple union, this assignment would fail tsc
+    const p: GoodBoyManifest['permissions'] = ['read_files', 'network'];
+    expect(p).toBeDefined();
   });
 });
 

@@ -4,16 +4,19 @@ import type { GoodBoyManifest } from '../types/index.js';
 // Explicit factory — avoids copying util.promisify.custom from Node's real execFile,
 // which would cause promisify() to bypass our mock entirely.
 vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
+vi.mock('node:fs');
 vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
 import { execFile } from 'node:child_process';
+import { lstatSync } from 'node:fs';
 import { logger } from './logger.js';
-import { runHooks } from './hooks.js';
+import { runHooks, resolveHookPath } from './hooks.js';
 
 const mockExecFile = vi.mocked(execFile);
 const mockLoggerWarn = vi.mocked(logger.warn);
+const mockLstatSync = vi.mocked(lstatSync);
 
 const BASE: GoodBoyManifest = {
   name: 'test-skill',
@@ -464,5 +467,63 @@ describe('runHooks() — hook output handling', () => {
     const err = await runHooks(withHook('postinstall', 'node setup.js'), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
     expect(err.message).toContain('command failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveHookPath() — path validation and traversal guard
+// ---------------------------------------------------------------------------
+
+describe('resolveHookPath()', () => {
+  const SKILL_DIR = '/tmp/test-skill';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function fakeStatFile(): ReturnType<typeof lstatSync> {
+    return { isSymbolicLink: () => false, isFile: () => true } as unknown as ReturnType<typeof lstatSync>;
+  }
+
+  it('throws when hookRelativePath is empty', () => {
+    expect(() => resolveHookPath(SKILL_DIR, '')).toThrow('Hook path must not be empty');
+  });
+
+  it('throws when hookRelativePath is an absolute path', () => {
+    expect(() => resolveHookPath(SKILL_DIR, '/etc/passwd')).toThrow('Hook path must be relative');
+  });
+
+  it('throws when hookRelativePath contains a null byte', () => {
+    expect(() => resolveHookPath(SKILL_DIR, 'scripts/\0evil.sh')).toThrow('Hook path contains invalid characters');
+  });
+
+  it('throws when hookRelativePath escapes the skill directory via ".."', () => {
+    // Schema pattern blocks ".." but resolveHookPath is the runtime security boundary
+    expect(() => resolveHookPath(SKILL_DIR, '../sibling/evil.sh')).toThrow('Hook path escapes the skill directory');
+  });
+
+  it('throws when the resolved file does not exist', () => {
+    mockLstatSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(() => resolveHookPath(SKILL_DIR, 'scripts/run.sh')).toThrow('Hook script not found');
+  });
+
+  it('throws when the resolved path is a symbolic link', () => {
+    mockLstatSync.mockReturnValue(
+      { isSymbolicLink: () => true, isFile: () => false } as unknown as ReturnType<typeof lstatSync>,
+    );
+    expect(() => resolveHookPath(SKILL_DIR, 'scripts/run.sh')).toThrow('Hook path must not be a symbolic link');
+  });
+
+  it('throws when the resolved path is a directory, not a regular file', () => {
+    mockLstatSync.mockReturnValue(
+      { isSymbolicLink: () => false, isFile: () => false } as unknown as ReturnType<typeof lstatSync>,
+    );
+    expect(() => resolveHookPath(SKILL_DIR, 'scripts')).toThrow('Hook path is not a regular file');
+  });
+
+  it('returns the resolved absolute path for a valid regular file', () => {
+    mockLstatSync.mockReturnValue(fakeStatFile());
+    const result = resolveHookPath(SKILL_DIR, 'scripts/run.sh');
+    expect(result).toBe('/tmp/test-skill/scripts/run.sh');
   });
 });

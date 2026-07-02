@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { lstatSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { logger } from './logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
@@ -118,6 +120,41 @@ async function runHook(
     }
     throw new Error(`Hook "${hookName}" failed`);
   }
+}
+
+export function resolveHookPath(skillDir: string, hookRelativePath: string): string {
+  if (!hookRelativePath) {
+    throw new Error('Hook path must not be empty');
+  }
+  if (hookRelativePath.startsWith('/')) {
+    throw new Error('Hook path must be relative');
+  }
+  if (hookRelativePath.includes('\0')) {
+    throw new Error('Hook path contains invalid characters');
+  }
+
+  const base = resolve(skillDir);
+  const resolved = resolve(base, hookRelativePath);
+
+  if (!resolved.startsWith(base + sep)) {
+    throw new Error('Hook path escapes the skill directory');
+  }
+
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(resolved);
+  } catch {
+    throw new Error('Hook script not found');
+  }
+
+  if (stat.isSymbolicLink()) {
+    throw new Error('Hook path must not be a symbolic link');
+  }
+  if (!stat.isFile()) {
+    throw new Error('Hook path is not a regular file');
+  }
+
+  return resolved;
 }
 
 export async function runHooks(
