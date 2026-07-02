@@ -423,6 +423,13 @@ describe('validateManifest()', () => {
     })).toThrow('Invalid manifest:');
   });
 
+  it('rejects permissions with duplicate values', () => {
+    expect(() => validateManifest({
+      ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),
+      permissions: ['shell', 'shell'],
+    })).toThrow('Invalid manifest:');
+  });
+
   it('rejects mcp_servers with more than 20 items', () => {
     expect(() => validateManifest({
       ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),

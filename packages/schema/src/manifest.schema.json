@@ -310,6 +310,7 @@
         "permissions": {
           "type": "array",
           "maxItems": 5,
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "enum": ["read_files", "write_files", "network", "shell", "env"]
