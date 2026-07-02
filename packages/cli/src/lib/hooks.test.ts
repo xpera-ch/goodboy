@@ -11,7 +11,10 @@ import { runHooks, resolveHookPath } from './hooks.js';
 const mockExecFile = vi.mocked(execFile);
 const mockLstatSync = vi.mocked(lstatSync);
 
-const BASE: GoodBoyManifest = {
+type ExecutableManifest = Extract<GoodBoyManifest, { kind: 'executable' }>;
+
+const BASE: ExecutableManifest = {
+  kind: 'executable',
   name: 'test-skill',
   version: '0.1.0',
   description: 'Test skill',
@@ -19,6 +22,7 @@ const BASE: GoodBoyManifest = {
   license: 'MIT',
   entry: 'index.ts',
   language: 'typescript',
+  hooks: {},
   schema_version: '1.0.0',
   status: 'experimental',
 };
@@ -26,9 +30,9 @@ const BASE: GoodBoyManifest = {
 const CTX = { skillName: 'test-skill', skillPath: '/tmp/test-skill' };
 
 function withHook(
-  hookName: keyof NonNullable<GoodBoyManifest['hooks']>,
+  hookName: keyof NonNullable<ExecutableManifest['hooks']>,
   entry: { script: string; args?: string[] },
-): GoodBoyManifest {
+): ExecutableManifest {
   return { ...BASE, hooks: { [hookName]: entry } };
 }
 
@@ -39,6 +43,7 @@ function setupSuccess(): void {
   mockExecFile.mockImplementation((...args: any[]) => {
     const cb = args[args.length - 1];
     if (typeof cb === 'function') cb(null, '', '');
+    return undefined as unknown as ReturnType<typeof execFile>;
   });
 }
 
@@ -47,6 +52,7 @@ function setupFailure(message: string): void {
   mockExecFile.mockImplementation((...args: any[]) => {
     const cb = args[args.length - 1];
     if (typeof cb === 'function') cb(new Error(message));
+    return undefined as unknown as ReturnType<typeof execFile>;
   });
 }
 
@@ -61,6 +67,7 @@ function setupTimeout(useKilled = true): void {
       });
       cb(err);
     }
+    return undefined as unknown as ReturnType<typeof execFile>;
   });
 }
 
@@ -69,6 +76,7 @@ function setupNonErrorThrow(): void {
   mockExecFile.mockImplementation((...args: any[]) => {
     const cb = args[args.length - 1];
     if (typeof cb === 'function') cb('string error, not an Error instance');
+    return undefined as unknown as ReturnType<typeof execFile>;
   });
 }
 
@@ -94,7 +102,7 @@ describe('runHooks() — execution', () => {
   });
 
   it('does nothing when the requested hook is not defined on the manifest', async () => {
-    const manifest: GoodBoyManifest = { ...BASE, hooks: { preinstall: { script: 'hooks/run.sh' } } };
+    const manifest: ExecutableManifest = { ...BASE, hooks: { preinstall: { script: 'hooks/run.sh' } } };
     await runHooks(manifest, ['postinstall'], CTX);
     expect(mockExecFile).not.toHaveBeenCalled();
   });
@@ -144,8 +152,9 @@ describe('runHooks() — execution', () => {
       calls.push(args[0] as string);
       const cb = args[args.length - 1];
       if (typeof cb === 'function') cb(null, '', '');
+      return undefined as unknown as ReturnType<typeof execFile>;
     });
-    const manifest: GoodBoyManifest = {
+    const manifest: ExecutableManifest = {
       ...BASE,
       hooks: {
         preinstall: { script: 'hooks/first.sh' },
@@ -174,8 +183,8 @@ describe('runHooks() — execution', () => {
     setupFailure('first line\n    at Object.<anonymous> (hidden.js:1)\n    at ...more');
     const err = await runHooks(withHook('postinstall', { script: 'hooks/run.sh' }), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
-    expect(err.message).not.toContain('at Object');
-    expect(err.message).not.toContain('hidden.js');
+    expect((err as Error).message).not.toContain('at Object');
+    expect((err as Error).message).not.toContain('hidden.js');
   });
 
   it('throws `Hook "X" timed out` when killed:true', async () => {
@@ -198,7 +207,7 @@ describe('runHooks() — execution', () => {
 
   it('stops execution after the first failing hook', async () => {
     setupFailure('first hook failed');
-    const manifest: GoodBoyManifest = {
+    const manifest: ExecutableManifest = {
       ...BASE,
       hooks: {
         preinstall: { script: 'hooks/first.sh' },
@@ -352,10 +361,11 @@ describe('runHooks() — hook output handling', () => {
       if (typeof cb === 'function') {
         cb(Object.assign(new Error('Command failed'), { stderr: stderrContent }));
       }
+      return undefined as unknown as ReturnType<typeof execFile>;
     });
     const err = await runHooks(withHook('postinstall', { script: 'hooks/run.sh' }), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
-    expect(err.message).toContain(stderrContent);
+    expect((err as Error).message).toContain(stderrContent);
   });
 
   it('truncates stderr to the last 200 characters on failure', async () => {
@@ -366,19 +376,20 @@ describe('runHooks() — hook output handling', () => {
       if (typeof cb === 'function') {
         cb(Object.assign(new Error('Command failed'), { stderr: longStderr }));
       }
+      return undefined as unknown as ReturnType<typeof execFile>;
     });
     const err = await runHooks(withHook('postinstall', { script: 'hooks/run.sh' }), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
-    expect(err.message.length).toBeLessThan(300);
-    expect(err.message).toContain('x'.repeat(200));
+    expect((err as Error).message.length).toBeLessThan(300);
+    expect((err as Error).message).toContain('x'.repeat(200));
   });
 
   it('falls back to first line of error.message when no stderr present', async () => {
     setupFailure('first line\n    at stack frame');
     const err = await runHooks(withHook('postinstall', { script: 'hooks/run.sh' }), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
-    expect(err.message).toContain('first line');
-    expect(err.message).not.toContain('at stack frame');
+    expect((err as Error).message).toContain('first line');
+    expect((err as Error).message).not.toContain('at stack frame');
   });
 
   it('falls back to error.message when stderr is present but empty', async () => {
@@ -388,10 +399,11 @@ describe('runHooks() — hook output handling', () => {
       if (typeof cb === 'function') {
         cb(Object.assign(new Error('command failed'), { stderr: '' }));
       }
+      return undefined as unknown as ReturnType<typeof execFile>;
     });
     const err = await runHooks(withHook('postinstall', { script: 'hooks/run.sh' }), ['postinstall'], CTX)
       .catch((e: unknown) => e as Error);
-    expect(err.message).toContain('command failed');
+    expect((err as Error).message).toContain('command failed');
   });
 });
 

@@ -95,7 +95,7 @@ describe('security — symlink attack prevention', () => {
   it('absolute symlink pointing outside skill dir aborts installation', async () => {
     mockReaddir.mockResolvedValue([
       makeDirent('evil-link', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('/etc/passwd');
 
     await expect(scanForSymlinks('/skill')).rejects.toThrow(
@@ -106,7 +106,7 @@ describe('security — symlink attack prevention', () => {
   it('relative traversal symlink pointing outside skill dir aborts installation', async () => {
     mockReaddir.mockResolvedValue([
       makeDirent('escape', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('../../etc/passwd');
 
     await expect(scanForSymlinks('/skill')).rejects.toThrow(
@@ -117,7 +117,7 @@ describe('security — symlink attack prevention', () => {
   it('symlink pointing inside skill dir is permitted', async () => {
     mockReaddir.mockResolvedValue([
       makeDirent('internal', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('safe-target');
 
     await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
@@ -127,7 +127,7 @@ describe('security — symlink attack prevention', () => {
     mockReaddir.mockResolvedValue([
       makeDirent('index.ts', { isDir: false }),
       makeDirent('package.json', { isDir: false }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
     await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
   });
@@ -159,7 +159,7 @@ describe('security — manifest nesting depth', () => {
 describe('security — dependency value injection', () => {
   it('file:// dependency value is rejected by schema', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'evil': 'file:///local' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -167,7 +167,7 @@ describe('security — dependency value injection', () => {
 
   it('http:// dependency value is rejected by schema', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'evil': 'http://evil.com/lib' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -175,7 +175,7 @@ describe('security — dependency value injection', () => {
 
   it('git+ssh:// dependency value is rejected by schema', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'evil': 'git+ssh://github.com/foo' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -189,7 +189,7 @@ describe('security — dependency value injection', () => {
 describe('security — MCP server private/loopback URL blocking', () => {
   it('localhost is blocked at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'local', url: 'https://localhost/rpc' }],
     };
     expect(() => validateManifest(manifest))
@@ -198,7 +198,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
 
   it('127.0.0.1 is blocked at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'lo', url: 'http://127.0.0.1:9000/rpc' }],
     };
     expect(() => validateManifest(manifest))
@@ -207,7 +207,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
 
   it('192.168.x.x is blocked at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'lan', url: 'https://192.168.0.1/rpc' }],
     };
     expect(() => validateManifest(manifest))
@@ -216,7 +216,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
 
   it('10.x.x.x is blocked at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'priv', url: 'https://10.0.0.1/rpc' }],
     };
     expect(() => validateManifest(manifest))
@@ -227,7 +227,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
     // file:// does not match ^https?:// pattern in schema
     expect(() =>
       validateManifest({
-        ...loadFixture('valid-complete'),
+        ...(loadFixture('valid-complete') as Record<string, unknown>),
         mcp_servers: [{ name: 'f', url: 'file:///etc/passwd' }],
       }),
     ).toThrow('Invalid manifest:');
@@ -236,7 +236,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
   it('javascript: MCP URL is blocked by schema', () => {
     expect(() =>
       validateManifest({
-        ...loadFixture('valid-complete'),
+        ...(loadFixture('valid-complete') as Record<string, unknown>),
         mcp_servers: [{ name: 'j', url: 'javascript:void(0)' }],
       }),
     ).toThrow('Invalid manifest:');
@@ -244,7 +244,7 @@ describe('security — MCP server private/loopback URL blocking', () => {
 
   it('public HTTPS MCP URL is accepted', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'pub', url: 'https://api.example.com/rpc' }],
     };
     expect(() => validateManifest(manifest)).not.toThrow();
@@ -268,12 +268,12 @@ describe('security — error message hygiene', () => {
       });
     });
     const err = await readManifest('/fake/path').catch((e: unknown) => e as Error);
-    expect(err.message).not.toContain(homedir());
+    expect((err as Error).message).not.toContain(homedir());
   });
 
   it('readManifest error contains no raw stack traces', async () => {
     mockStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
     const err = await readManifest('/fake/path').catch((e: unknown) => e as Error);
-    expect(err.message).not.toMatch(/\s+at\s+\w/);
+    expect((err as Error).message).not.toMatch(/\s+at\s+\w/);
   });
 });

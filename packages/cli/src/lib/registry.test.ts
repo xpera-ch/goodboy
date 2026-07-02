@@ -221,7 +221,7 @@ describe('listInstalled()', () => {
   it('returns manifests for valid skill directories', async () => {
     const fixture = loadFixture('valid-minimal');
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture as ReturnType<typeof validateManifest>);
 
@@ -234,7 +234,7 @@ describe('listInstalled()', () => {
     mockExistsSync.mockReturnValue(true);
     mockReaddirSync.mockReturnValue([
       makeDirent('some-file.txt', false),
-    ] as ReturnType<typeof readdirSync>);
+    ] as unknown as ReturnType<typeof readdirSync>);
 
     const result = await listInstalled();
     expect(result).toHaveLength(0);
@@ -247,7 +247,7 @@ describe('listInstalled()', () => {
     mockReaddirSync.mockReturnValue([
       makeDirent('bad-skill', true),
       makeDirent('good-skill', true),
-    ] as ReturnType<typeof readdirSync>);
+    ] as unknown as ReturnType<typeof readdirSync>);
 
     mockReadManifest
       .mockRejectedValueOnce(new Error('manifest.json not found'))
@@ -263,7 +263,7 @@ describe('listInstalled()', () => {
 
   it('includes the error message in the warning when a manifest is invalid', async () => {
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('broken', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('broken', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockRejectedValue(new Error('manifest.json contains invalid JSON'));
 
     await listInstalled();
@@ -279,7 +279,7 @@ describe('listInstalled()', () => {
       makeDirent('bad-1', true),
       makeDirent('bad-2', true),
       makeDirent('good', true),
-    ] as ReturnType<typeof readdirSync>);
+    ] as unknown as ReturnType<typeof readdirSync>);
 
     mockReadManifest
       .mockRejectedValueOnce(new Error('bad-1 broken'))
@@ -293,7 +293,7 @@ describe('listInstalled()', () => {
   it('reads manifests from <skillsPath>/<dirName>/manifest.json', async () => {
     const fixture = loadFixture('valid-minimal');
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('my-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('my-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture as ReturnType<typeof validateManifest>);
 
@@ -305,7 +305,7 @@ describe('listInstalled()', () => {
 
   it('logs a generic warning when a non-Error is thrown during manifest loading', async () => {
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('weird', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('weird', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockRejectedValue('a plain string error');
 
     await listInstalled();
@@ -397,7 +397,7 @@ describe('scanForSymlinks()', () => {
   it('resolves without error when the directory has no symlinks', async () => {
     mockReaddir.mockResolvedValue([
       makeFsDirent('file.ts', { isDir: false }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
   });
 
@@ -405,10 +405,10 @@ describe('scanForSymlinks()', () => {
     mockReaddir
       .mockResolvedValueOnce([
         makeFsDirent('sub', { isDir: true }),
-      ] as Awaited<ReturnType<typeof readdir>>)
+      ] as unknown as Awaited<ReturnType<typeof readdir>>)
       .mockResolvedValueOnce([
         makeFsDirent('inner.ts', { isDir: false }),
-      ] as Awaited<ReturnType<typeof readdir>>);
+      ] as unknown as Awaited<ReturnType<typeof readdir>>);
     await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
     expect(mockReaddir).toHaveBeenCalledTimes(2);
   });
@@ -416,7 +416,7 @@ describe('scanForSymlinks()', () => {
   it('throws when a symlink points outside the skill directory', async () => {
     mockReaddir.mockResolvedValue([
       makeFsDirent('evil-link', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('/etc/passwd');
 
     await expect(scanForSymlinks('/skill')).rejects.toThrow(
@@ -427,18 +427,18 @@ describe('scanForSymlinks()', () => {
   it('error message includes the symlink path and resolved target', async () => {
     mockReaddir.mockResolvedValue([
       makeFsDirent('link', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('/etc/secret');
 
     const err = await scanForSymlinks('/skill').catch((e: unknown) => e as Error);
-    expect(err.message).toContain('/skill/link');
-    expect(err.message).toContain('/etc/secret');
+    expect((err as Error).message).toContain('/skill/link');
+    expect((err as Error).message).toContain('/etc/secret');
   });
 
   it('permits a symlink pointing inside the skill directory', async () => {
     mockReaddir.mockResolvedValue([
       makeFsDirent('internal-link', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     // Relative target resolves to /skill/target — inside /skill
     mockReadlink.mockResolvedValue('target');
 
@@ -448,7 +448,7 @@ describe('scanForSymlinks()', () => {
   it('rejects a symlink with a relative target that escapes the directory', async () => {
     mockReaddir.mockResolvedValue([
       makeFsDirent('escape-link', { isSymlink: true }),
-    ] as Awaited<ReturnType<typeof readdir>>);
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadlink.mockResolvedValue('../../etc/passwd');
 
     await expect(scanForSymlinks('/skill')).rejects.toThrow(

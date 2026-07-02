@@ -142,7 +142,7 @@ describe('LocalRegistryAdapter.search()', () => {
   it('skips non-directory entries', async () => {
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('readme.txt', false)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('readme.txt', false)] as unknown as ReturnType<typeof readdirSync>);
     const result = await adapter.search('readme');
     expect(result).toEqual([]);
     expect(mockReadManifest).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('LocalRegistryAdapter.search()', () => {
   it('silently skips skills with unreadable manifests', async () => {
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('bad-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('bad-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockRejectedValue(new Error('not found'));
     const result = await adapter.search('bad');
     expect(result).toEqual([]);
@@ -161,7 +161,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-minimal') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -174,7 +174,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-minimal') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('some-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('some-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -187,7 +187,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-complete') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('complete-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('complete-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -200,7 +200,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-complete') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('complete-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('complete-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -213,7 +213,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-minimal') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -225,7 +225,7 @@ describe('LocalRegistryAdapter.search()', () => {
     const fixture = loadFixture('valid-minimal') as GoodBoyManifest;
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -239,7 +239,7 @@ describe('LocalRegistryAdapter.search()', () => {
     // valid-minimal has no keywords field
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as ReturnType<typeof readdirSync>);
+    mockReaddirSync.mockReturnValue([makeDirent('test-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
@@ -256,7 +256,7 @@ describe('LocalRegistryAdapter.search()', () => {
     mockReaddirSync.mockReturnValue([
       makeDirent('test-skill', true),
       makeDirent('test-skill-2', true),
-    ] as ReturnType<typeof readdirSync>);
+    ] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest
       .mockResolvedValueOnce(fixture)
       .mockResolvedValueOnce(fixture2);

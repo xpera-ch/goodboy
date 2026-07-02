@@ -47,7 +47,7 @@ describe('readManifest()', () => {
       });
     });
     const err = await readManifest('/fake/path').catch((e: unknown) => e as Error);
-    expect(err.message).toBe('manifest.json not found');
+    expect((err as Error).message).toBe('manifest.json not found');
   });
 
   it('throws when file exceeds the 512 KB size limit', async () => {
@@ -104,7 +104,7 @@ describe('readManifest()', () => {
   it('error messages never contain raw stack traces', async () => {
     mockStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
     const err = await readManifest('/fake/manifest.json').catch((e: unknown) => e as Error);
-    expect(err.message).not.toMatch(/\s+at\s+\w/);
+    expect((err as Error).message).not.toMatch(/\s+at\s+\w/);
   });
 });
 
@@ -233,7 +233,7 @@ describe('validateManifest()', () => {
 
   it('rejects a dependency with a file:// value', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'bad-dep': 'file:///local/lib' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -241,7 +241,7 @@ describe('validateManifest()', () => {
 
   it('rejects a dependency with an http:// value', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'bad-dep': 'http://example.com/lib' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -249,7 +249,7 @@ describe('validateManifest()', () => {
 
   it('rejects a dependency with a git+ssh:// value', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'bad-dep': 'git+ssh://github.com/foo/bar' },
     };
     expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
@@ -257,7 +257,7 @@ describe('validateManifest()', () => {
 
   it('accepts a dependency with a valid semver value', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       dependencies: { 'good-dep': '^1.2.3' },
     };
     expect(() => validateManifest(manifest)).not.toThrow();
@@ -265,7 +265,7 @@ describe('validateManifest()', () => {
 
   it('rejects a localhost MCP server URL at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'local', url: 'https://localhost/api' }],
     };
     expect(() => validateManifest(manifest))
@@ -274,7 +274,7 @@ describe('validateManifest()', () => {
 
   it('rejects a 127.0.0.1 MCP server URL at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'local', url: 'http://127.0.0.1:8080/api' }],
     };
     expect(() => validateManifest(manifest))
@@ -283,7 +283,7 @@ describe('validateManifest()', () => {
 
   it('rejects a 192.168.x.x MCP server URL at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'lan', url: 'https://192.168.1.100/api' }],
     };
     expect(() => validateManifest(manifest))
@@ -292,7 +292,7 @@ describe('validateManifest()', () => {
 
   it('rejects a 169.254.x.x (link-local) MCP server URL at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'link', url: 'https://169.254.1.1/api' }],
     };
     expect(() => validateManifest(manifest))
@@ -301,7 +301,7 @@ describe('validateManifest()', () => {
 
   it('rejects IPv6 loopback (::1) MCP server URL at runtime', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'v6', url: 'http://[::1]/api' }],
     };
     expect(() => validateManifest(manifest))
@@ -310,7 +310,7 @@ describe('validateManifest()', () => {
 
   it('accepts a public HTTPS MCP server URL', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'pub', url: 'https://mcp.example.com/api' }],
     };
     expect(() => validateManifest(manifest)).not.toThrow();
@@ -318,7 +318,7 @@ describe('validateManifest()', () => {
 
   it('accepts an HTTP MCP server URL for non-local hosts', () => {
     const manifest = {
-      ...loadFixture('valid-complete'),
+      ...(loadFixture('valid-complete') as Record<string, unknown>),
       mcp_servers: [{ name: 'pub', url: 'http://mcp.example.com/api' }],
     };
     expect(() => validateManifest(manifest)).not.toThrow();
@@ -331,80 +331,80 @@ describe('validateManifest()', () => {
   });
 
   it('rejects a hooks.* value that is a bare string (old format)', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: '../evil.sh' } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: '../evil.sh' } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects a hooks.* value that is a bare absolute path string (old format)', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: '/etc/passwd' } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: '/etc/passwd' } }))
       .toThrow('Invalid manifest:');
   });
 
   it('accepts a valid hook entry with script only (no args)', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/run.sh' } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/run.sh' } } }))
       .not.toThrow();
   });
 
   it('rejects a hook script without the "hooks/" prefix', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'scripts/run.sh' } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'scripts/run.sh' } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects a hook script without a file extension', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/noext' } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/noext' } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects a hook script containing ".." (excluded by segment character class)', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/../evil.sh' } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/../evil.sh' } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a semicolon', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: [';rm'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: [';rm'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a pipe character', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a|b'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a|b'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a dollar sign', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['$HOME'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: ['$HOME'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a backtick', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['`cmd`'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: ['`cmd`'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a space', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a b'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: ['a b'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args item containing a double quote', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: ['"value"'] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: ['"value"'] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an empty string args element', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), hooks: { preinstall: { script: 'hooks/r.sh', args: [''] } } }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), hooks: { preinstall: { script: 'hooks/r.sh', args: [''] } } }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an args array with more than 20 items', () => {
     expect(() => validateManifest({
-      ...loadFixture('valid-minimal-executable'),
+      ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),
       hooks: { preinstall: { script: 'hooks/r.sh', args: Array.from({ length: 21 }, () => 'a') } },
     })).toThrow('Invalid manifest:');
   });
 
   it('accepts a valid hook entry with script and args', () => {
     expect(() => validateManifest({
-      ...loadFixture('valid-minimal-executable'),
+      ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),
       hooks: { preinstall: { script: 'hooks/setup.sh', args: ['--mode', 'prod'] } },
     })).not.toThrow();
   });
@@ -418,14 +418,14 @@ describe('validateManifest()', () => {
 
   it('rejects permissions with more than 5 items', () => {
     expect(() => validateManifest({
-      ...loadFixture('valid-minimal-executable'),
+      ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),
       permissions: ['read_files', 'write_files', 'network', 'shell', 'env', 'read_files'],
     })).toThrow('Invalid manifest:');
   });
 
   it('rejects mcp_servers with more than 20 items', () => {
     expect(() => validateManifest({
-      ...loadFixture('valid-minimal-executable'),
+      ...(loadFixture('valid-minimal-executable') as Record<string, unknown>),
       mcp_servers: Array.from({ length: 21 }, (_, i) => ({ name: `s${i}`, url: `https://s${i}.example.com` })),
     })).toThrow('Invalid manifest:');
   });
@@ -445,22 +445,22 @@ describe('validateManifest() — kind split', () => {
   });
 
   it('rejects a passive manifest containing entry', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal'), entry: 'index.ts' }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal') as Record<string, unknown>), entry: 'index.ts' }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects a passive manifest containing hooks', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal'), hooks: {} }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal') as Record<string, unknown>), hooks: {} }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects a passive manifest containing permissions', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal'), permissions: ['read_files'] }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal') as Record<string, unknown>), permissions: ['read_files'] }))
       .toThrow('Invalid manifest:');
   });
 
   it('rejects an executable manifest containing content', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal-executable'), content: 'SKILL.md' }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), content: 'SKILL.md' }))
       .toThrow('Invalid manifest:');
   });
 
@@ -495,7 +495,7 @@ describe('validateManifest() — kind split', () => {
   });
 
   it('rejects a manifest with kind set to "unknown"', () => {
-    expect(() => validateManifest({ ...loadFixture('valid-minimal'), kind: 'unknown' }))
+    expect(() => validateManifest({ ...(loadFixture('valid-minimal') as Record<string, unknown>), kind: 'unknown' }))
       .toThrow('Invalid manifest:');
   });
 
@@ -527,25 +527,25 @@ describe('validateManifest() — kind split', () => {
 
 describe('assertKindConstraints()', () => {
   it('throws for passive skill with entry field present', () => {
-    const data = { ...loadFixture('valid-minimal'), entry: 'index.ts' } as unknown as GoodBoyManifest;
+    const data = { ...(loadFixture('valid-minimal') as Record<string, unknown>), entry: 'index.ts' } as unknown as GoodBoyManifest;
     expect(() => assertKindConstraints(data))
       .toThrow('passive skill contains executable-only field(s): entry');
   });
 
   it('throws for passive skill with hooks field present', () => {
-    const data = { ...loadFixture('valid-minimal'), hooks: {} } as unknown as GoodBoyManifest;
+    const data = { ...(loadFixture('valid-minimal') as Record<string, unknown>), hooks: {} } as unknown as GoodBoyManifest;
     expect(() => assertKindConstraints(data))
       .toThrow('passive skill contains executable-only field(s): hooks');
   });
 
   it('throws for passive skill with permissions field present', () => {
-    const data = { ...loadFixture('valid-minimal'), permissions: ['read_files'] } as unknown as GoodBoyManifest;
+    const data = { ...(loadFixture('valid-minimal') as Record<string, unknown>), permissions: ['read_files'] } as unknown as GoodBoyManifest;
     expect(() => assertKindConstraints(data))
       .toThrow('passive skill contains executable-only field(s): permissions');
   });
 
   it('throws for executable skill with content field present', () => {
-    const data = { ...loadFixture('valid-minimal-executable'), content: 'SKILL.md' } as unknown as GoodBoyManifest;
+    const data = { ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), content: 'SKILL.md' } as unknown as GoodBoyManifest;
     expect(() => assertKindConstraints(data))
       .toThrow('executable skill contains passive-only field: content');
   });
