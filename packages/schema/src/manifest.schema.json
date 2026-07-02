@@ -16,6 +16,7 @@
         "script": {
           "type": "string",
           "maxLength": 256,
+          "description": "Path must start with 'hooks/' and end with a non-empty extension. Rejection of dotfile-style names (hooks/.foo.sh), trailing dots (hooks/x.), and double slashes (hooks//x.sh) are incidental side effects of requiring non-empty path segments ([A-Za-z0-9_-]+) and a non-empty extension ([A-Za-z0-9]+) — they are not independently guarded. Any simplification of this pattern must re-verify those three cases against live Ajv before assuming they are still covered.",
           "pattern": "^hooks/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
         },
         "args": {
