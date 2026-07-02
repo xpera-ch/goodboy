@@ -1,10 +1,11 @@
 {
   "kind": "executable",
-  "name": "test-skill",
+  "name": "exec-skill",
   "version": "0.1.0",
-  "description": "Missing required entry field",
+  "description": "A minimal executable skill",
   "author": { "name": "Test Author" },
   "license": "MIT",
+  "entry": "index.ts",
   "language": "typescript",
   "hooks": {},
   "schema_version": "1.0.0",

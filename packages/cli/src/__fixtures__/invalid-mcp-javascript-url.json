@@ -1,4 +1,5 @@
 {
+  "kind": "executable",
   "name": "mcp-skill",
   "version": "0.1.0",
   "description": "MCP server entry with javascript: URL (non-HTTPS scheme rejected by schema)",
@@ -6,6 +7,7 @@
   "license": "MIT",
   "entry": "index.ts",
   "language": "typescript",
+  "hooks": {},
   "schema_version": "1.0.0",
   "status": "experimental",
   "mcp_servers": [

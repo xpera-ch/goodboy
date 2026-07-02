@@ -1,11 +1,11 @@
 {
+  "kind": "passive",
   "name": "old-skill",
   "version": "0.9.0",
   "description": "A skill marked as deprecated",
   "author": { "name": "Test Author" },
   "license": "MIT",
-  "entry": "index.ts",
-  "language": "typescript",
+  "content": "SKILL.md",
   "schema_version": "1.0.0",
   "status": "deprecated"
 }

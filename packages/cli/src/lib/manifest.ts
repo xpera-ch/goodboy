@@ -109,6 +109,31 @@ export async function readManifest(filePath: string): Promise<unknown> {
   }
 }
 
+const EXEC_ONLY_FIELDS = [
+  'entry', 'language', 'mcp_servers', 'engines', 'os',
+  'dependencies', 'devDependencies', 'permissions', 'hooks',
+] as const;
+
+// Exported for direct testing so the check can be verified independently of Ajv.
+// validateManifest calls this after Ajv passes; callers of validateManifest get
+// the guarantee for free and must not duplicate it.
+export function assertKindConstraints(data: GoodBoyManifest): void {
+  if (data.kind === 'passive') {
+    const violations = EXEC_ONLY_FIELDS.filter(
+      (f) => Object.prototype.hasOwnProperty.call(data, f),
+    );
+    if (violations.length > 0) {
+      throw new Error(
+        `Invalid manifest: passive skill contains executable-only field(s): ${violations.join(', ')}`,
+      );
+    }
+  } else if (data.kind === 'executable') {
+    if (Object.prototype.hasOwnProperty.call(data, 'content')) {
+      throw new Error('Invalid manifest: executable skill contains passive-only field: content');
+    }
+  }
+}
+
 export function validateManifest(data: unknown): GoodBoyManifest {
   const validate = getValidator();
 
@@ -122,9 +147,11 @@ export function validateManifest(data: unknown): GoodBoyManifest {
 
   const manifest = data as GoodBoyManifest;
 
+  assertKindConstraints(manifest);
+
   // Runtime second pass: block private/loopback MCP server URLs that pass
   // the schema pattern (^https?://) but point to internal infrastructure.
-  if (Array.isArray(manifest.mcp_servers)) {
+  if (manifest.kind === 'executable' && Array.isArray(manifest.mcp_servers)) {
     for (const server of manifest.mcp_servers) {
       if (typeof server.url === 'string') {
         validateMcpServerUrl(server.url);

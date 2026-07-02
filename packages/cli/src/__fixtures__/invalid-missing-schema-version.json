@@ -1,4 +1,5 @@
 {
+  "kind": "executable",
   "name": "test-skill",
   "version": "0.1.0",
   "description": "Missing required schema_version field",
@@ -6,5 +7,6 @@
   "license": "MIT",
   "entry": "index.md",
   "language": "typescript",
+  "hooks": {},
   "status": "experimental"
 }

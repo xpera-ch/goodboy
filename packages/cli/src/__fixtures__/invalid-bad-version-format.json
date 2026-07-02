@@ -1,4 +1,5 @@
 {
+  "kind": "executable",
   "name": "test-skill",
   "version": "1.0",
   "description": "Version is missing the patch segment",
@@ -6,6 +7,7 @@
   "license": "MIT",
   "entry": "index.md",
   "language": "typescript",
+  "hooks": {},
   "schema_version": "1.0.0",
   "status": "experimental"
 }
