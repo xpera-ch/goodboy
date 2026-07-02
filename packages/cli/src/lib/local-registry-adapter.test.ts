@@ -7,10 +7,14 @@ import type { GoodBoyManifest } from '../types/index.js';
 vi.mock('node:fs');
 vi.mock('./registry.js');
 vi.mock('./manifest.js');
+vi.mock('./logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
 
 import { existsSync, readdirSync } from 'node:fs';
 import { getRegistryPath, getSkillsPath, resolveSkill, listInstalled } from './registry.js';
 import { readManifest, validateManifest } from './manifest.js';
+import { logger } from './logger.js';
 import { LocalRegistryAdapter } from './local-registry-adapter.js';
 import { createRegistryAdapter } from './registry-adapter.js';
 import { loadFixture } from '../__fixtures__/index.js';
@@ -23,6 +27,7 @@ const mockResolveSkill = vi.mocked(resolveSkill);
 const mockListInstalled = vi.mocked(listInstalled);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
+const mockLogger = vi.mocked(logger);
 
 const DEFAULT_REGISTRY = join(homedir(), '.goodboy', 'registry');
 const DEFAULT_SKILLS = join(homedir(), '.goodboy', 'skills');
@@ -148,13 +153,14 @@ describe('LocalRegistryAdapter.search()', () => {
     expect(mockReadManifest).not.toHaveBeenCalled();
   });
 
-  it('silently skips skills with unreadable manifests', async () => {
+  it('warns and skips skills with unreadable manifests', async () => {
     mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
     mockExistsSync.mockReturnValue(true);
     mockReaddirSync.mockReturnValue([makeDirent('bad-skill', true)] as unknown as ReturnType<typeof readdirSync>);
     mockReadManifest.mockRejectedValue(new Error('not found'));
     const result = await adapter.search('bad');
     expect(result).toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('"bad-skill"'));
   });
 
   it('returns matching skills by name', async () => {

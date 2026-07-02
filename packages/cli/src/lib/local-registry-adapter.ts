@@ -8,6 +8,7 @@ import {
   listInstalled,
 } from './registry.js';
 import { readManifest, validateManifest } from './manifest.js';
+import { logger } from './logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
 /**
@@ -48,8 +49,10 @@ export class LocalRegistryAdapter implements RegistryAdapter {
         if (this.matchesQuery(manifest, queryLower)) {
           results.push(manifest);
         }
-      } catch {
-        // skip skills with missing or invalid manifests silently
+      } catch (err) {
+        logger.warn(
+          `Skipping "${entry.name}": ${err instanceof Error ? err.message : 'invalid manifest'}`,
+        );
       }
     }
 
