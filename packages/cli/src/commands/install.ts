@@ -62,9 +62,9 @@ async function run(name: string): Promise<void> {
   // Runs after preinstall so any hook-created symlinks are also caught.
   try {
     await scanForSymlinks(skillPath);
-  } catch (err) {
+  } catch {
     spinner.fail('Skill rejected: symlink pointing outside skill directory detected');
-    throw err;
+    throw new Error('Skill rejected: symlink pointing outside skill directory detected');
   }
 
   // Copy skill into skills directory

@@ -36,6 +36,7 @@ import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
+import { logger } from '../lib/logger.js';
 import { installCommand } from './install.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
@@ -44,6 +45,7 @@ const mockValidateManifest = vi.mocked(validateManifest);
 const mockRunHooks = vi.mocked(runHooks);
 const mockRequestConsent = vi.mocked(requestConsent);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
+const mockLogger = vi.mocked(logger);
 const mockCpSync = vi.mocked(cpSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
 
@@ -159,6 +161,25 @@ describe('install command — hook dispatch', () => {
     await expect(
       installCommand.parseAsync(['test-skill'], { from: 'user' }),
     ).resolves.toBeDefined();
+  });
+
+  it('does not expose filesystem paths when symlink scan rejects', async () => {
+    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockScanForSymlinks.mockRejectedValue(
+      new Error(
+        'Security: skill contains a symlink pointing outside its directory: ' +
+          '/real/path/skill/bad-link → /etc/passwd. Installation aborted.',
+      ),
+    );
+
+    // process.exit mock throws, so parseAsync rejects — swallow that
+    await installCommand.parseAsync(['test-skill'], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    const logged = mockLogger.error.mock.calls[0]?.[0] as string;
+    expect(logged).toBe('Skill rejected: symlink pointing outside skill directory detected');
+    expect(logged).not.toContain('/real/path');
+    expect(logged).not.toContain('/etc/passwd');
   });
 
   it('stops the spinner before calling requestConsent and restarts it after', async () => {
