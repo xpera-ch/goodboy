@@ -34,6 +34,7 @@ export interface RegistryAdapter {
   /**
    * Return the resolved registry path or remote base URL.
    * Used for display and diagnostic purposes only.
+   * May throw if GOODBOY_REGISTRY is set but invalid.
    */
   getRegistryLocation(): string;
 
