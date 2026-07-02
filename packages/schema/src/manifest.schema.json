@@ -2,10 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://goodboy.dev/schema/v1/manifest.schema.json",
   "title": "GoodBoy Skill Manifest",
-  "description": "Schema for a GoodBoy skill manifest file",
-  "type": "object",
-  "required": ["name", "version", "description", "author", "license", "entry", "language", "schema_version", "status"],
-  "additionalProperties": false,
+  "description": "Discriminated union on 'kind'. PassiveSkillManifest and ExecutableSkillManifest each carry additionalProperties: false over their own complete properties list, so each branch independently forbids the other branch's fields. This is not achieved via 'not: required' patterns, which only block a field from being required, not from being present.",
   "definitions": {
     "hookEntry": {
       "type": "object",
@@ -31,23 +28,6 @@
           }
         }
       }
-    }
-  },
-  "properties": {
-    "name": {
-      "type": "string",
-      "pattern": "^[a-z0-9-]+$",
-      "minLength": 1,
-      "maxLength": 128
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "maxLength": 32
-    },
-    "description": {
-      "type": "string",
-      "maxLength": 280
     },
     "author": {
       "type": "object",
@@ -71,31 +51,6 @@
         }
       }
     },
-    "license": {
-      "type": "string",
-      "maxLength": 64
-    },
-    "keywords": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "maxLength": 64
-      },
-      "maxItems": 10
-    },
-    "category": {
-      "type": "string",
-      "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
-    },
-    "readme": {
-      "type": "string",
-      "maxLength": 256
-    },
-    "homepage": {
-      "type": "string",
-      "format": "uri",
-      "maxLength": 2048
-    },
     "repository": {
       "type": "object",
       "additionalProperties": false,
@@ -110,40 +65,19 @@
         }
       }
     },
-    "changelog": {
-      "type": "string",
-      "format": "uri",
-      "maxLength": 2048
-    },
-    "entry": {
-      "type": "string",
-      "maxLength": 256
-    },
-    "language": {
-      "type": "string",
-      "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
-    },
-    "claude_code_version": {
-      "type": "string",
-      "maxLength": 32
-    },
-    "mcp_servers": {
-      "type": "array",
-      "maxItems": 20,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 64
-          },
-          "url": {
-            "type": "string",
-            "format": "uri",
-            "maxLength": 2048,
-            "pattern": "^https?://"
-          }
+    "mcpServerItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "pattern": "^https?://"
         }
       }
     },
@@ -161,19 +95,7 @@
         }
       }
     },
-    "os": {
-      "type": "array",
-      "maxItems": 3,
-      "items": {
-        "type": "string",
-        "enum": ["darwin", "linux", "win32"]
-      }
-    },
-    "schema_version": {
-      "type": "string",
-      "const": "1.0.0"
-    },
-    "dependencies": {
+    "dependencyMap": {
       "type": "object",
       "maxProperties": 100,
       "additionalProperties": {
@@ -181,48 +103,233 @@
         "maxLength": 64,
         "pattern": "^([~^]?\\d+\\.\\d+(\\.\\d+)?|\\*|latest)$"
       }
-    },
-    "devDependencies": {
-      "type": "object",
-      "maxProperties": 100,
-      "additionalProperties": {
-        "type": "string",
-        "maxLength": 64,
-        "pattern": "^([~^]?\\d+\\.\\d+(\\.\\d+)?|\\*|latest)$"
-      }
-    },
-    "permissions": {
-      "type": "array",
-      "maxItems": 5,
-      "items": {
-        "type": "string",
-        "enum": ["read_files", "write_files", "network", "shell", "env"]
-      }
-    },
-    "hooks": {
-      "type": "object",
-      "additionalProperties": false,
-      "maxProperties": 4,
-      "properties": {
-        "preinstall":  { "$ref": "#/definitions/hookEntry" },
-        "postinstall": { "$ref": "#/definitions/hookEntry" },
-        "preremove":   { "$ref": "#/definitions/hookEntry" },
-        "postremove":  { "$ref": "#/definitions/hookEntry" }
-      }
-    },
-    "status": {
-      "type": "string",
-      "enum": ["experimental", "stable", "deprecated"],
-      "default": "experimental"
-    },
-    "publisher": {
-      "type": "string",
-      "maxLength": 128
-    },
-    "visibility": {
-      "type": "string",
-      "enum": ["public", "private"],
-      "default": "private"
     }
-  }
+  },
+  "oneOf": [
+    {
+      "title": "PassiveSkillManifest",
+      "type": "object",
+      "required": ["kind", "name", "version", "description", "author", "license", "schema_version", "status", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "passive"
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "maxLength": 32
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 280
+        },
+        "author": {
+          "$ref": "#/definitions/author"
+        },
+        "license": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "maxItems": 10
+        },
+        "category": {
+          "type": "string",
+          "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
+        },
+        "readme": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "repository": {
+          "$ref": "#/definitions/repository"
+        },
+        "changelog": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "claude_code_version": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["experimental", "stable", "deprecated"],
+          "default": "experimental"
+        },
+        "publisher": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private"],
+          "default": "private"
+        }
+      }
+    },
+    {
+      "title": "ExecutableSkillManifest",
+      "type": "object",
+      "required": ["kind", "name", "version", "description", "author", "license", "schema_version", "status", "entry", "language", "hooks"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "executable"
+        },
+        "entry": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "language": {
+          "type": "string",
+          "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
+        },
+        "hooks": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 4,
+          "properties": {
+            "preinstall":  { "$ref": "#/definitions/hookEntry" },
+            "postinstall": { "$ref": "#/definitions/hookEntry" },
+            "preremove":   { "$ref": "#/definitions/hookEntry" },
+            "postremove":  { "$ref": "#/definitions/hookEntry" }
+          }
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "maxLength": 32
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 280
+        },
+        "author": {
+          "$ref": "#/definitions/author"
+        },
+        "license": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "maxItems": 10
+        },
+        "category": {
+          "type": "string",
+          "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
+        },
+        "readme": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "repository": {
+          "$ref": "#/definitions/repository"
+        },
+        "changelog": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "claude_code_version": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "mcp_servers": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/definitions/mcpServerItem"
+          }
+        },
+        "engines": {
+          "$ref": "#/definitions/engines"
+        },
+        "os": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "enum": ["darwin", "linux", "win32"]
+          }
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "dependencies": {
+          "$ref": "#/definitions/dependencyMap"
+        },
+        "devDependencies": {
+          "$ref": "#/definitions/dependencyMap"
+        },
+        "permissions": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "enum": ["read_files", "write_files", "network", "shell", "env"]
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["experimental", "stable", "deprecated"],
+          "default": "experimental"
+        },
+        "publisher": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private"],
+          "default": "private"
+        }
+      }
+    }
+  ]
 }
