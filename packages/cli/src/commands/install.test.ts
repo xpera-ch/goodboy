@@ -24,6 +24,7 @@ vi.mock('../lib/manifest.js');
 vi.mock('../lib/hooks.js');
 vi.mock('../lib/consent.js');
 vi.mock('../lib/registry.js');
+vi.mock('../lib/fs-security.js');
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
@@ -34,7 +35,7 @@ import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
 import { requestConsent } from '../lib/consent.js';
-import { scanForSymlinks } from '../lib/registry.js';
+import { scanForSymlinks } from '../lib/fs-security.js';
 import { installCommand } from './install.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);

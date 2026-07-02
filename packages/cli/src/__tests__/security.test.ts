@@ -26,7 +26,8 @@ import { statSync, readFileSync } from 'node:fs';
 import { readdir, readlink } from 'node:fs/promises';
 import { loadFixture } from '../__fixtures__/index.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
-import { resolveSkill, scanForSymlinks } from '../lib/registry.js';
+import { resolveSkill } from '../lib/registry.js';
+import { scanForSymlinks } from '../lib/fs-security.js';
 
 const mockStatSync = vi.mocked(statSync);
 const mockReadFileSync = vi.mocked(readFileSync);

@@ -19,8 +19,8 @@ import {
   getSkillsPath,
   resolveSkill,
   listInstalled,
-  scanForSymlinks,
 } from './registry.js';
+import { scanForSymlinks } from './fs-security.js';
 import { loadFixture } from '../__fixtures__/index.js';
 
 const mockExistsSync = vi.mocked(existsSync);

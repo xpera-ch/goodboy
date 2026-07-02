@@ -6,7 +6,7 @@ import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { runHooks } from '../lib/hooks.js';
 import { requestConsent } from '../lib/consent.js';
-import { scanForSymlinks } from '../lib/registry.js';
+import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger } from '../lib/logger.js';
 
 async function run(name: string): Promise<void> {
