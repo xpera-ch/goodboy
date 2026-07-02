@@ -6,6 +6,7 @@ import type { GoodBoyManifest, ExecutableSkillManifest } from '../types/index.js
 vi.mock('ora', () => ({
   default: vi.fn(() => ({
     start: vi.fn().mockReturnThis(),
+    stop: vi.fn().mockReturnThis(),
     succeed: vi.fn().mockReturnThis(),
     fail: vi.fn().mockReturnThis(),
     warn: vi.fn().mockReturnThis(),
@@ -27,6 +28,7 @@ vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
+import ora from 'ora';
 import { cpSync, mkdirSync } from 'node:fs';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
@@ -156,5 +158,32 @@ describe('install command — hook dispatch', () => {
     await expect(
       installCommand.parseAsync(['test-skill'], { from: 'user' }),
     ).resolves.toBeDefined();
+  });
+
+  it('stops the spinner before calling requestConsent and restarts it after', async () => {
+    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    await installCommand.parseAsync(['test-skill'], { from: 'user' });
+
+    type SpinnerMock = { stop: ReturnType<typeof vi.fn>; start: ReturnType<typeof vi.fn> };
+    const spinnerInstance = vi.mocked(ora).mock.results[0]?.value as SpinnerMock;
+
+    // invocationCallOrder is a Vitest global counter that increments with every mock call
+    // across all vi.fn() instances within a test. Comparing values across different mocks
+    // gives a strict happens-before ordering guarantee — a count-only check cannot do this.
+    //
+    // Expected sequence:
+    //   start[0]  (ora(...).start() chain at construction)
+    //   stop[0]   (before consent prompt)
+    //   consent[0](requestConsent called)
+    //   start[1]  (restart after consent granted)
+    const stopOrder    = spinnerInstance.stop.mock.invocationCallOrder[0]!;
+    const consentOrder = mockRequestConsent.mock.invocationCallOrder[0]!;
+    const restartOrder = spinnerInstance.start.mock.invocationCallOrder[1]!;
+
+    expect(stopOrder).toBeDefined();
+    expect(consentOrder).toBeDefined();
+    expect(restartOrder).toBeDefined();
+    expect(stopOrder).toBeLessThan(consentOrder);    // stop fires before consent is requested
+    expect(consentOrder).toBeLessThan(restartOrder); // restart fires only after consent resolves
   });
 });

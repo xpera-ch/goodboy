@@ -32,12 +32,20 @@ async function run(name: string): Promise<void> {
     throw err;
   }
 
-  // Consent gate — must run on the validated manifest, before any filesystem operations
+  // Warn if the registry mapped the CLI name to a skill with a different manifest name.
+  if (manifest.name !== name) {
+    logger.info(`Note: this skill's manifest declares itself as "${manifest.name}", installed as "${name}".`);
+  }
+
+  // Consent gate — stop spinner first so its animation doesn't overwrite the prompt text,
+  // then restart only if the user agrees to proceed.
+  spinner.stop();
   const consented = await requestConsent(manifest);
   if (!consented) {
     spinner.warn('Installation cancelled.');
     return;
   }
+  spinner.start(`Installing skill "${name}"…`);
 
   // Run preinstall hook (manifest validated above)
   if (manifest.kind === 'executable' && manifest.hooks?.preinstall !== undefined) {
