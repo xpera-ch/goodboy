@@ -7,19 +7,10 @@ const outDir = join(__dirname, "../packages/schema/generated/ts");
 const outFile = join(outDir, "index.d.ts");
 
 async function main() {
-  let ts = await compileFromFile(schemaPath, {
+  const ts = await compileFromFile(schemaPath, {
     bannerComment: "/* AUTO-GENERATED — do not edit by hand */",
+    ignoreMinAndMaxItems: true,
   });
-
-  // json-schema-to-typescript expands maxItems into verbose tuple unions;
-  // collapse them back to simple arrays since runtime validation handles the limit.
-  ts = ts.replace(
-    /( +)(\/\*\*\n +\* @maxItems \d+\n +\*\/\n +\w+\??:)((?:\n +\| [^\n]+)+);/g,
-    (_, indent, propHeader) => {
-      const propLine = propHeader.split("\n").pop()!.trim();
-      return `${indent}${propLine} string[];`;
-    }
-  );
 
   mkdirSync(outDir, { recursive: true });
   writeFileSync(outFile, ts);
