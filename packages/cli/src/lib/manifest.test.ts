@@ -551,6 +551,12 @@ describe('assertKindConstraints()', () => {
       .toThrow('passive skill contains executable-only field(s): permissions');
   });
 
+  it('throws for passive skill with permissions: [] (empty-but-present catches hasOwnProperty, independent of Ajv)', () => {
+    const data = { ...(loadFixture('valid-minimal') as Record<string, unknown>), permissions: [] } as unknown as GoodBoyManifest;
+    expect(() => assertKindConstraints(data))
+      .toThrow('passive skill contains executable-only field(s): permissions');
+  });
+
   it('throws for executable skill with content field present', () => {
     const data = { ...(loadFixture('valid-minimal-executable') as Record<string, unknown>), content: 'SKILL.md' } as unknown as GoodBoyManifest;
     expect(() => assertKindConstraints(data))
