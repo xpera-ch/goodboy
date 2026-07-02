@@ -160,6 +160,8 @@ describe('LocalRegistryAdapter.search()', () => {
     mockReadManifest.mockRejectedValue(new Error('not found'));
     const result = await adapter.search('bad');
     expect(result).toEqual([]);
+    // No not.toContain(path) check needed: readManifest/validateManifest errors are
+    // hardcoded static strings that never interpolate the resolved filesystem path.
     expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('"bad-skill"'));
   });
 
