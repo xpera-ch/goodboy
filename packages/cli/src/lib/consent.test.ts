@@ -74,6 +74,18 @@ describe('summarizePermissions()', () => {
     const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: ['network'] };
     expect(summarizePermissions(manifest)).toEqual(['Access the network']);
   });
+
+  it('throws when a permission value is not in the lookup table (simulates schema/type drift)', () => {
+    // Cast bypasses TypeScript to simulate a new enum value accepted by Ajv
+    // but not yet in the generated types or PERMISSION_LABELS.
+    const manifest = {
+      ...EXEC_BASE,
+      permissions: ['shell', 'exec_scripts'],
+    } as unknown as ExecutableSkillManifest;
+    expect(() => summarizePermissions(manifest)).toThrow(
+      'Unknown permission value in manifest: "exec_scripts"',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
