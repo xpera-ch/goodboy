@@ -42,10 +42,10 @@
   },
   "permissions": ["read_files"],
   "hooks": {
-    "preinstall": "scripts/run.sh",
-    "postinstall": "scripts/run.sh",
-    "preremove": "scripts/run.sh",
-    "postremove": "scripts/run.sh"
+    "preinstall":  { "script": "hooks/run.sh" },
+    "postinstall": { "script": "hooks/run.sh" },
+    "preremove":   { "script": "hooks/run.sh" },
+    "postremove":  { "script": "hooks/run.sh" }
   },
   "publisher": "test-publisher"
 }
