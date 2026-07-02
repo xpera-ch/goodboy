@@ -104,12 +104,12 @@ export function resolveHookPath(skillDir: string, hookRelativePath: string): str
 }
 
 export async function runHooks(
-  manifest: GoodBoyManifest,
+  manifest: Extract<GoodBoyManifest, { kind: 'executable' }>,
   hookNames: Array<'preinstall' | 'postinstall' | 'preremove' | 'postremove'>,
   context: HookContext,
 ): Promise<void> {
   for (const hookName of hookNames) {
-    const hookEntry = manifest.hooks?.[hookName];
+    const hookEntry = manifest.hooks[hookName];
     if (hookEntry !== undefined) {
       await runHook(hookName, hookEntry, context);
     }

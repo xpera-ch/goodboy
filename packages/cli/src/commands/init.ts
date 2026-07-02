@@ -14,7 +14,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME_LENGTH = 128;
 const MAX_DESCRIPTION_LENGTH = 280;
 
-type Language = NonNullable<GoodBoyManifest['language']>;
+type Language = NonNullable<Extract<GoodBoyManifest, { kind: 'executable' }>['language']>;
 type Category = NonNullable<GoodBoyManifest['category']>;
 
 function defaultEntry(language: Language): string {
@@ -101,6 +101,7 @@ async function run(): Promise<void> {
   })) as Language;
 
   const manifest: GoodBoyManifest = {
+    kind: 'executable',
     name: name.trim(),
     version: '0.1.0',
     description: description.trim(),
@@ -112,6 +113,7 @@ async function run(): Promise<void> {
     category,
     language,
     entry: defaultEntry(language),
+    hooks: {},
     schema_version: '1.0.0',
     status: 'experimental',
     visibility: 'private',

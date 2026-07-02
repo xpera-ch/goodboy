@@ -32,7 +32,7 @@ async function run(name: string): Promise<void> {
   }
 
   // Run preinstall hook (manifest validated above)
-  if (manifest.hooks?.preinstall !== undefined) {
+  if (manifest.kind === 'executable' && manifest.hooks?.preinstall !== undefined) {
     spinner.text = `Running preinstall hook for "${name}"…`;
     try {
       await runHooks(manifest, ['preinstall'], { skillName: name, skillPath });
@@ -87,7 +87,7 @@ async function run(name: string): Promise<void> {
   }
 
   // Run postinstall hook
-  if (manifest.hooks?.postinstall !== undefined) {
+  if (manifest.kind === 'executable' && manifest.hooks?.postinstall !== undefined) {
     spinner.text = `Running postinstall hook for "${name}"…`;
     try {
       await runHooks(manifest, ['postinstall'], { skillName: name, skillPath: destPath });
