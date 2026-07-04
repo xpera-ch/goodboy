@@ -1,10 +1,11 @@
 {
-  "name": "test-skill",
+  "name": "macos-skill",
   "version": "0.1.0",
-  "description": "Has an additional root-level property",
+  "description": "macOS only skill with Python scripts",
   "author": { "name": "Test Author" },
   "license": "MIT",
   "schema_version": "1.0.0",
   "status": "experimental",
-  "malicious": "value"
+  "os": ["darwin"],
+  "engines": { "python": ">=3.9" }
 }

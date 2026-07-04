@@ -1,8 +1,9 @@
 {
-  "name": "test-skill",
+  "name": "Invalid-Name",
   "version": "0.1.0",
-  "description": "Missing schema_version field",
+  "description": "Name contains uppercase letters",
   "author": { "name": "Test Author" },
   "license": "MIT",
+  "schema_version": "1.0.0",
   "status": "experimental"
 }

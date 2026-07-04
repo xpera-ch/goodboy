@@ -1,8 +1,9 @@
 {
-  "name": "test-skill",
+  "name": "invalid name",
   "version": "0.1.0",
-  "description": "Missing schema_version field",
+  "description": "Name contains spaces",
   "author": { "name": "Test Author" },
   "license": "MIT",
+  "schema_version": "1.0.0",
   "status": "experimental"
 }

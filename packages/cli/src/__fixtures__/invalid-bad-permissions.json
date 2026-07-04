@@ -1,10 +1,10 @@
 {
   "name": "test-skill",
   "version": "0.1.0",
-  "description": "Has an additional root-level property",
+  "description": "Permissions contains an invalid value",
   "author": { "name": "Test Author" },
   "license": "MIT",
   "schema_version": "1.0.0",
   "status": "experimental",
-  "malicious": "value"
+  "permissions": ["invented-permission"]
 }

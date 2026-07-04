@@ -1,8 +1,8 @@
 {
   "name": "test-skill",
   "version": "0.1.0",
-  "description": "Missing schema_version field",
+  "description": "Missing status field",
   "author": { "name": "Test Author" },
   "license": "MIT",
-  "status": "experimental"
+  "schema_version": "1.0.0"
 }

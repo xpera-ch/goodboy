@@ -1,12 +1,9 @@
 {
-  "kind": "executable",
-  "name": "test-skill",
+  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "version": "0.1.0",
-  "description": "Missing required entry field",
+  "description": "Name is 65 characters (maxLength is 64)",
   "author": { "name": "Test Author" },
   "license": "MIT",
-  "language": "typescript",
-  "hooks": {},
   "schema_version": "1.0.0",
   "status": "experimental"
 }

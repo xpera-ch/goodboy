@@ -1,8 +1,8 @@
 {
   "name": "test-skill",
   "version": "0.1.0",
-  "description": "A minimal test skill for unit testing",
-  "author": { "name": "Test Author" },
+  "description": "Author object has an additional property",
+  "author": { "name": "Test Author", "role": "admin" },
   "license": "MIT",
   "schema_version": "1.0.0",
   "status": "experimental"

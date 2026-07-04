@@ -1,6 +1,7 @@
 {
+  "name": "safe-skill",
   "version": "0.1.0",
-  "description": "Missing name field",
+  "description": "A skill with no elevated access claimed",
   "author": { "name": "Test Author" },
   "license": "MIT",
   "schema_version": "1.0.0",

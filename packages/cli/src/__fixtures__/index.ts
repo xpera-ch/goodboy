@@ -20,8 +20,6 @@ export function generateOversizedManifest(): string {
     description: 'x'.repeat(600 * 1024),
     author: { name: 'Test Author' },
     license: 'MIT',
-    entry: 'index.md',
-    language: 'typescript',
     schema_version: '1.0.0',
     status: 'experimental',
   };
