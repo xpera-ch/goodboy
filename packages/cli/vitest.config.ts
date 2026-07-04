@@ -21,10 +21,11 @@ export default defineConfig({
         functions: 80,
         branches: 80,
         statements: 80,
-        // Security-critical files require 100% coverage
-        'src/lib/hooks.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        // Security-critical and new registry files require 100% coverage
         'src/lib/manifest.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/registry.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/registry-entry.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/skill-validator.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },
