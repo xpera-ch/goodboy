@@ -5,6 +5,8 @@ import { initCommand } from './commands/init.js';
 import { installCommand } from './commands/install.js';
 import { listCommand } from './commands/list.js';
 import { searchCommand } from './commands/search.js';
+import { addCommand } from './commands/add.js';
+import { registryCommand } from './commands/registry-cmd.js';
 
 const _require = createRequire(import.meta.url);
 const pkg = _require('../package.json') as { version: string };
@@ -21,6 +23,8 @@ program.addCommand(initCommand);
 program.addCommand(installCommand);
 program.addCommand(listCommand);
 program.addCommand(searchCommand);
+program.addCommand(addCommand);
+program.addCommand(registryCommand);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   process.stderr.write(
