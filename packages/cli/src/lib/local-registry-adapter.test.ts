@@ -186,7 +186,7 @@ describe('LocalRegistryAdapter.search()', () => {
     mockReadManifest.mockResolvedValue(fixture);
     mockValidateManifest.mockReturnValue(fixture);
 
-    // valid-minimal has description "A minimal test skill"
+    // valid-minimal has description "A minimal test skill for unit testing"
     const result = await adapter.search('minimal');
     expect(result).toHaveLength(1);
   });
@@ -214,6 +214,19 @@ describe('LocalRegistryAdapter.search()', () => {
 
     // valid-complete has category: "code"
     const result = await adapter.search('code');
+    expect(result).toHaveLength(1);
+  });
+
+  it('returns matching skills by tag', async () => {
+    const fixture = loadFixture('valid-complete') as GoodBoyManifest;
+    mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
+    mockExistsSync.mockReturnValue(true);
+    mockReaddirSync.mockReturnValue([makeDirent('complete-skill', true)] as unknown as ReturnType<typeof readdirSync>);
+    mockReadManifest.mockResolvedValue(fixture);
+    mockValidateManifest.mockReturnValue(fixture);
+
+    // valid-complete has tags: ["testing", "workflow"]
+    const result = await adapter.search('testing');
     expect(result).toHaveLength(1);
   });
 

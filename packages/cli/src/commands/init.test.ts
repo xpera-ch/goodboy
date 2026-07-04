@@ -41,8 +41,8 @@ describe('init command — scaffolded manifest', () => {
     mockWriteManifest.mockResolvedValue(undefined);
   });
 
-  it('scaffolds a manifest that passes validateManifest, has kind executable, and omits email when blank', async () => {
-    // Exact call order from init.ts: name, description, authorName, authorEmail, category, license, language
+  it('scaffolds a manifest that passes validateManifest and omits email when blank', async () => {
+    // Exact call order from init.ts: name, description, authorName, authorEmail, license
     mockInput
       .mockResolvedValueOnce('my-skill')
       .mockResolvedValueOnce('A test skill')
@@ -50,15 +50,13 @@ describe('init command — scaffolded manifest', () => {
       .mockResolvedValueOnce('')    // blank email → key omitted from author object
       .mockResolvedValueOnce('MIT'); // license
     mockSelect
-      .mockResolvedValueOnce('code')
-      .mockResolvedValueOnce('typescript');
+      .mockResolvedValueOnce('code'); // category
 
     await initCommand.parseAsync([], { from: 'user' });
 
     expect(mockWriteManifest).toHaveBeenCalledOnce();
     const captured = mockWriteManifest.mock.calls[0]![1] as GoodBoyManifest;
     expect(() => validateManifest(captured)).not.toThrow();
-    expect(captured.kind).toBe('executable');
     expect(captured.author).not.toHaveProperty('email');
   });
 });

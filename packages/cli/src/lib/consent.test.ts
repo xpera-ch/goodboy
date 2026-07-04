@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GoodBoyManifest, ExecutableSkillManifest } from '../types/index.js';
+import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('@inquirer/prompts', () => ({ confirm: vi.fn() }));
 vi.mock('./logger.js', () => ({
@@ -11,28 +11,12 @@ import { summarizePermissions, requestConsent } from './consent.js';
 
 const mockConfirm = vi.mocked(confirm);
 
-const PASSIVE_MANIFEST: GoodBoyManifest = {
-  kind: 'passive',
+const MANIFEST: GoodBoyManifest = {
   name: 'test-skill',
   version: '0.1.0',
-  description: 'A passive skill',
+  description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  content: 'SKILL.md',
-  schema_version: '1.0.0',
-  status: 'experimental',
-};
-
-const EXEC_BASE: ExecutableSkillManifest = {
-  kind: 'executable',
-  name: 'test-skill',
-  version: '0.1.0',
-  description: 'An executable skill',
-  author: { name: 'Test' },
-  license: 'MIT',
-  entry: 'index.ts',
-  language: 'typescript',
-  hooks: {},
   schema_version: '1.0.0',
   status: 'experimental',
 };
@@ -42,23 +26,19 @@ const EXEC_BASE: ExecutableSkillManifest = {
 // ---------------------------------------------------------------------------
 
 describe('summarizePermissions()', () => {
-  it('returns [] for a passive manifest', () => {
-    expect(summarizePermissions(PASSIVE_MANIFEST)).toEqual([]);
+  it('returns [] when permissions field is absent', () => {
+    expect(summarizePermissions(MANIFEST)).toEqual([]);
   });
 
-  it('returns [] for an executable manifest with no permissions field', () => {
-    expect(summarizePermissions(EXEC_BASE)).toEqual([]);
-  });
-
-  it('returns [] for an executable manifest with permissions: []', () => {
-    const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: [] };
+  it('returns [] when permissions is an empty array', () => {
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: [] };
     expect(summarizePermissions(manifest)).toEqual([]);
   });
 
   it('returns all five lines in schema-declared order for a full permissions array', () => {
     // Input deliberately out of schema order to verify fixed output order
-    const manifest: ExecutableSkillManifest = {
-      ...EXEC_BASE,
+    const manifest: GoodBoyManifest = {
+      ...MANIFEST,
       permissions: ['env', 'shell', 'network', 'write_files', 'read_files'],
     };
     expect(summarizePermissions(manifest)).toEqual([
@@ -71,7 +51,7 @@ describe('summarizePermissions()', () => {
   });
 
   it('returns exactly one line for a single-permission array', () => {
-    const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: ['network'] };
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['network'] };
     expect(summarizePermissions(manifest)).toEqual(['Access the network']);
   });
 
@@ -79,9 +59,9 @@ describe('summarizePermissions()', () => {
     // Cast bypasses TypeScript to simulate a new enum value accepted by Ajv
     // but not yet in the generated types or PERMISSION_LABELS.
     const manifest = {
-      ...EXEC_BASE,
+      ...MANIFEST,
       permissions: ['shell', 'exec_scripts'],
-    } as unknown as ExecutableSkillManifest;
+    } as unknown as GoodBoyManifest;
     expect(() => summarizePermissions(manifest)).toThrow(
       'Unknown permission value in manifest: "exec_scripts"',
     );
@@ -98,28 +78,28 @@ describe('requestConsent()', () => {
   });
 
   it('returns true without calling confirm() when permission list is empty', async () => {
-    const result = await requestConsent(EXEC_BASE);
+    const result = await requestConsent(MANIFEST);
     expect(result).toBe(true);
     expect(mockConfirm).not.toHaveBeenCalled();
   });
 
   it('returns true when confirm() resolves true', async () => {
     mockConfirm.mockResolvedValue(true);
-    const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: ['shell'] };
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['shell'] };
     const result = await requestConsent(manifest);
     expect(result).toBe(true);
   });
 
   it('returns false when confirm() resolves false', async () => {
     mockConfirm.mockResolvedValue(false);
-    const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: ['shell'] };
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['shell'] };
     const result = await requestConsent(manifest);
     expect(result).toBe(false);
   });
 
   it('passes default: false to confirm()', async () => {
     mockConfirm.mockResolvedValue(true);
-    const manifest: ExecutableSkillManifest = { ...EXEC_BASE, permissions: ['env'] };
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['env'] };
     await requestConsent(manifest);
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ default: false }),

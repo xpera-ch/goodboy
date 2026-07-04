@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { GoodBoyManifest, ExecutableSkillManifest } from '../types/index.js';
+import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('ora', () => ({
   default: vi.fn(() => ({
@@ -21,7 +21,6 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('../lib/registry-adapter.js');
 vi.mock('../lib/manifest.js');
-vi.mock('../lib/hooks.js');
 vi.mock('../lib/consent.js');
 vi.mock('../lib/registry.js');
 vi.mock('../lib/fs-security.js');
@@ -33,7 +32,6 @@ import ora from 'ora';
 import { cpSync, mkdirSync } from 'node:fs';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
-import { runHooks } from '../lib/hooks.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger } from '../lib/logger.js';
@@ -42,7 +40,6 @@ import { installCommand } from './install.js';
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
-const mockRunHooks = vi.mocked(runHooks);
 const mockRequestConsent = vi.mocked(requestConsent);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
 const mockLogger = vi.mocked(logger);
@@ -52,33 +49,17 @@ const mockMkdirSync = vi.mocked(mkdirSync);
 const SKILL_PATH = '/fake/registry/test-skill';
 const SKILLS_DIR = join(homedir(), '.goodboy', 'skills');
 
-const PASSIVE_MANIFEST: GoodBoyManifest = {
-  kind: 'passive',
+const MANIFEST: GoodBoyManifest = {
   name: 'test-skill',
   version: '0.1.0',
-  description: 'A passive skill',
+  description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  content: 'SKILL.md',
   schema_version: '1.0.0',
   status: 'experimental',
 };
 
-const EXEC_BASE: ExecutableSkillManifest = {
-  kind: 'executable',
-  name: 'test-skill',
-  version: '0.1.0',
-  description: 'An executable skill',
-  author: { name: 'Test' },
-  license: 'MIT',
-  entry: 'index.ts',
-  language: 'typescript',
-  hooks: {},
-  schema_version: '1.0.0',
-  status: 'experimental',
-};
-
-describe('install command — hook dispatch', () => {
+describe('install command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -95,68 +76,26 @@ describe('install command — hook dispatch', () => {
 
     mockReadManifest.mockResolvedValue({});
     mockScanForSymlinks.mockResolvedValue(undefined);
-    mockRunHooks.mockResolvedValue(undefined);
     mockRequestConsent.mockResolvedValue(true);
   });
 
-  it('installs a passive skill without calling runHooks', async () => {
-    mockValidateManifest.mockReturnValue(PASSIVE_MANIFEST);
-    await installCommand.parseAsync(['test-skill'], { from: 'user' });
-    expect(mockRunHooks).not.toHaveBeenCalled();
-  });
-
-  it('runs preinstall hook for an executable skill', async () => {
-    const manifest: ExecutableSkillManifest = {
-      ...EXEC_BASE,
-      hooks: { preinstall: { script: 'hooks/setup.sh' } },
-    };
-    mockValidateManifest.mockReturnValue(manifest);
-    await installCommand.parseAsync(['test-skill'], { from: 'user' });
-    expect(mockRunHooks).toHaveBeenCalledWith(
-      manifest,
-      ['preinstall'],
-      expect.objectContaining({ skillName: 'test-skill', skillPath: SKILL_PATH }),
-    );
-  });
-
-  it('runs postinstall hook for an executable skill', async () => {
-    const manifest: ExecutableSkillManifest = {
-      ...EXEC_BASE,
-      hooks: { postinstall: { script: 'hooks/teardown.sh' } },
-    };
-    mockValidateManifest.mockReturnValue(manifest);
-    await installCommand.parseAsync(['test-skill'], { from: 'user' });
-    expect(mockRunHooks).toHaveBeenCalledWith(
-      manifest,
-      ['postinstall'],
-      expect.objectContaining({ skillName: 'test-skill', skillPath: join(SKILLS_DIR, 'test-skill') }),
-    );
-  });
-
-  it('installs an executable skill with no hooks without calling runHooks', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
-    await installCommand.parseAsync(['test-skill'], { from: 'user' });
-    expect(mockRunHooks).not.toHaveBeenCalled();
-  });
-
   it('passes the validated manifest to requestConsent', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockValidateManifest.mockReturnValue(MANIFEST);
     await installCommand.parseAsync(['test-skill'], { from: 'user' });
-    expect(mockRequestConsent).toHaveBeenCalledWith(EXEC_BASE);
+    expect(mockRequestConsent).toHaveBeenCalledWith(MANIFEST);
   });
 
   it('aborts with no filesystem writes when consent is declined', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockValidateManifest.mockReturnValue(MANIFEST);
     mockRequestConsent.mockResolvedValue(false);
     await installCommand.parseAsync(['test-skill'], { from: 'user' });
     expect(mockCpSync).not.toHaveBeenCalled();
     expect(mockMkdirSync).not.toHaveBeenCalled();
     expect(mockScanForSymlinks).not.toHaveBeenCalled();
-    expect(mockRunHooks).not.toHaveBeenCalled();
   });
 
   it('does not throw when consent is declined', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockValidateManifest.mockReturnValue(MANIFEST);
     mockRequestConsent.mockResolvedValue(false);
     await expect(
       installCommand.parseAsync(['test-skill'], { from: 'user' }),
@@ -164,7 +103,7 @@ describe('install command — hook dispatch', () => {
   });
 
   it('does not expose filesystem paths when symlink scan rejects', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockValidateManifest.mockReturnValue(MANIFEST);
     mockScanForSymlinks.mockRejectedValue(
       new Error(
         'Security: skill contains a symlink pointing outside its directory: ' +
@@ -183,7 +122,7 @@ describe('install command — hook dispatch', () => {
   });
 
   it('stops the spinner before calling requestConsent and restarts it after', async () => {
-    mockValidateManifest.mockReturnValue(EXEC_BASE);
+    mockValidateManifest.mockReturnValue(MANIFEST);
     await installCommand.parseAsync(['test-skill'], { from: 'user' });
 
     type SpinnerMock = { stop: ReturnType<typeof vi.fn>; start: ReturnType<typeof vi.fn> };
@@ -205,7 +144,7 @@ describe('install command — hook dispatch', () => {
     expect(stopOrder).toBeDefined();
     expect(consentOrder).toBeDefined();
     expect(restartOrder).toBeDefined();
-    expect(stopOrder).toBeLessThan(consentOrder);    // stop fires before consent is requested
-    expect(consentOrder).toBeLessThan(restartOrder); // restart fires only after consent resolves
+    expect(stopOrder).toBeLessThan(consentOrder);
+    expect(consentOrder).toBeLessThan(restartOrder);
   });
 });

@@ -24,8 +24,7 @@ vi.mock('node:fs/promises');
 
 import { statSync, readFileSync } from 'node:fs';
 import { readdir, readlink } from 'node:fs/promises';
-import { loadFixture } from '../__fixtures__/index.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest } from '../lib/manifest.js';
 import { resolveSkill } from '../lib/registry.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 
@@ -150,105 +149,6 @@ describe('security — manifest nesting depth', () => {
 
     await expect(readManifest('/skill/manifest.json'))
       .rejects.toThrow('nesting depth exceeds maximum allowed (10)');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Dependency value injection (HARDENING 3.4)
-// ---------------------------------------------------------------------------
-
-describe('security — dependency value injection', () => {
-  it('file:// dependency value is rejected by schema', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      dependencies: { 'evil': 'file:///local' },
-    };
-    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
-  });
-
-  it('http:// dependency value is rejected by schema', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      dependencies: { 'evil': 'http://evil.com/lib' },
-    };
-    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
-  });
-
-  it('git+ssh:// dependency value is rejected by schema', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      dependencies: { 'evil': 'git+ssh://github.com/foo' },
-    };
-    expect(() => validateManifest(manifest)).toThrow('Invalid manifest:');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// MCP server URL — private/loopback blocking (HARDENING 4.2)
-// ---------------------------------------------------------------------------
-
-describe('security — MCP server private/loopback URL blocking', () => {
-  it('localhost is blocked at runtime', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      mcp_servers: [{ name: 'local', url: 'https://localhost/rpc' }],
-    };
-    expect(() => validateManifest(manifest))
-      .toThrow('mcp_servers contains an invalid or disallowed URL');
-  });
-
-  it('127.0.0.1 is blocked at runtime', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      mcp_servers: [{ name: 'lo', url: 'http://127.0.0.1:9000/rpc' }],
-    };
-    expect(() => validateManifest(manifest))
-      .toThrow('mcp_servers contains an invalid or disallowed URL');
-  });
-
-  it('192.168.x.x is blocked at runtime', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      mcp_servers: [{ name: 'lan', url: 'https://192.168.0.1/rpc' }],
-    };
-    expect(() => validateManifest(manifest))
-      .toThrow('mcp_servers contains an invalid or disallowed URL');
-  });
-
-  it('10.x.x.x is blocked at runtime', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      mcp_servers: [{ name: 'priv', url: 'https://10.0.0.1/rpc' }],
-    };
-    expect(() => validateManifest(manifest))
-      .toThrow('mcp_servers contains an invalid or disallowed URL');
-  });
-
-  it('file:// MCP URL is blocked by schema', () => {
-    // file:// does not match ^https?:// pattern in schema
-    expect(() =>
-      validateManifest({
-        ...(loadFixture('valid-complete') as Record<string, unknown>),
-        mcp_servers: [{ name: 'f', url: 'file:///etc/passwd' }],
-      }),
-    ).toThrow('Invalid manifest:');
-  });
-
-  it('javascript: MCP URL is blocked by schema', () => {
-    expect(() =>
-      validateManifest({
-        ...(loadFixture('valid-complete') as Record<string, unknown>),
-        mcp_servers: [{ name: 'j', url: 'javascript:void(0)' }],
-      }),
-    ).toThrow('Invalid manifest:');
-  });
-
-  it('public HTTPS MCP URL is accepted', () => {
-    const manifest = {
-      ...(loadFixture('valid-complete') as Record<string, unknown>),
-      mcp_servers: [{ name: 'pub', url: 'https://api.example.com/rpc' }],
-    };
-    expect(() => validateManifest(manifest)).not.toThrow();
   });
 });
 
