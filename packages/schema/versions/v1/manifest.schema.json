@@ -1,180 +1,132 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://goodboy.dev/schema/v1/manifest.schema.json",
+  "$id": "https://goodboy.dev/schemas/manifest/1.0.0",
   "title": "GoodBoy Skill Manifest",
-  "description": "Schema for a GoodBoy skill manifest file",
   "type": "object",
-  "required": ["name", "version", "description", "author", "license", "entry", "language", "schema_version", "status"],
   "additionalProperties": false,
+  "required": ["name", "version", "description", "author", "license", "schema_version", "status"],
   "properties": {
     "name": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
       "minLength": 1,
-      "maxLength": 128
+      "maxLength": 64,
+      "description": "Must match the skill directory name exactly. Lowercase letters, numbers, and hyphens only."
     },
     "version": {
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "maxLength": 32,
+      "description": "Semantic version (semver) of this skill"
     },
     "description": {
       "type": "string",
-      "maxLength": 280
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "What this skill does and when to use it. Used for registry search and display."
     },
     "author": {
       "type": "object",
-      "required": ["name"],
       "additionalProperties": false,
+      "required": ["name"],
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string",
-          "format": "email"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        }
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
       }
     },
     "license": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 64,
+      "description": "SPDX license identifier e.g. MIT, Apache-2.0"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "GoodBoy manifest schema version. Always 1.0.0 for v1."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["experimental", "stable", "deprecated"],
+      "default": "experimental",
+      "description": "Maturity signal for registry display and filtering"
     },
     "keywords": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "maxItems": 10
+      "items": { "type": "string", "maxLength": 64 },
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Free-form search terms"
     },
     "category": {
       "type": "string",
-      "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
+      "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "security", "research", "other"],
+      "description": "Primary category for registry browsing"
     },
-    "readme": {
-      "type": "string"
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["code-review", "testing", "documentation", "git", "deployment", "security", "refactoring", "architecture", "debugging", "productivity", "writing", "data", "devops", "agent", "orchestration", "formatting", "analysis", "research", "workflow", "other"]
+      },
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "Controlled vocabulary for registry faceted search. Unlike keywords, tags are a fixed enumeration owned by GoodBoy."
     },
     "homepage": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "maxLength": 2048
     },
     "repository": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        }
+        "type": { "type": "string", "maxLength": 32 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
       }
     },
     "changelog": {
       "type": "string",
-      "format": "uri"
-    },
-    "entry": {
-      "type": "string"
-    },
-    "language": {
-      "type": "string",
-      "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
-    },
-    "claude_code_version": {
-      "type": "string"
-    },
-    "mcp_servers": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri"
-          }
-        }
-      }
-    },
-    "engines": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "node": {
-          "type": "string"
-        },
-        "python": {
-          "type": "string"
-        }
-      }
-    },
-    "os": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["darwin", "linux", "win32"]
-      }
-    },
-    "schema_version": {
-      "type": "string",
-      "const": "1.0.0"
-    },
-    "dependencies": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "devDependencies": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "permissions": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["read_files", "write_files", "network", "shell", "env"]
-      }
-    },
-    "hooks": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "preinstall": {
-          "type": "string"
-        },
-        "postinstall": {
-          "type": "string"
-        },
-        "preremove": {
-          "type": "string"
-        },
-        "postremove": {
-          "type": "string"
-        }
-      }
-    },
-    "status": {
-      "type": "string",
-      "enum": ["experimental", "stable", "deprecated"],
-      "default": "experimental"
+      "format": "uri",
+      "maxLength": 2048
     },
     "publisher": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 128,
+      "description": "Registry publisher handle. Set by registry on publish, not by skill author."
     },
     "visibility": {
       "type": "string",
       "enum": ["public", "private"],
-      "default": "private"
+      "default": "private",
+      "description": "Registry visibility. private until explicitly published."
+    },
+    "engines": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 4,
+      "properties": {
+        "node":   { "type": "string", "maxLength": 32 },
+        "python": { "type": "string", "maxLength": 32 },
+        "bash":   { "type": "string", "maxLength": 32 },
+        "deno":   { "type": "string", "maxLength": 32 }
+      },
+      "description": "Advisory. Runtime version requirements for scripts bundled in scripts/. Not enforced by GoodBoy — shown to user before install."
+    },
+    "os": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["darwin", "linux", "win32"] },
+      "maxItems": 3,
+      "uniqueItems": true,
+      "description": "Advisory. Operating systems this skill's scripts are compatible with. Not enforced — shown to user before install."
+    },
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["read_files", "write_files", "network", "shell", "env"] },
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "DECLARED INTENT ONLY — not enforced at runtime. Skill authors declare what their scripts intend to access. GoodBoy displays this to users before install as a trust signal. An empty array or omitted field means no elevated access is claimed."
     }
   }
 }

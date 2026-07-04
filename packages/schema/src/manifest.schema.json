@@ -1,336 +1,132 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://goodboy.dev/schema/v1/manifest.schema.json",
+  "$id": "https://goodboy.dev/schemas/manifest/1.0.0",
   "title": "GoodBoy Skill Manifest",
-  "description": "Discriminated union on 'kind'. PassiveSkillManifest and ExecutableSkillManifest each carry additionalProperties: false over their own complete properties list, so each branch independently forbids the other branch's fields. This is not achieved via 'not: required' patterns, which only block a field from being required, not from being present.",
-  "definitions": {
-    "hookEntry": {
-      "type": "object",
-      "description": "script is resolved and validated against the skill directory unconditionally before execution; args are static values passed directly to the script's argv and are never interpreted by a shell.",
-      "additionalProperties": false,
-      "required": ["script"],
-      "properties": {
-        "script": {
-          "type": "string",
-          "maxLength": 256,
-          "description": "Path must start with 'hooks/' and end with a non-empty extension. Rejection of dotfile-style names (hooks/.foo.sh), trailing dots (hooks/x.), and double slashes (hooks//x.sh) are incidental side effects of requiring non-empty path segments ([A-Za-z0-9_-]+) and a non-empty extension ([A-Za-z0-9]+) — they are not independently guarded. Any simplification of this pattern must re-verify those three cases against live Ajv before assuming they are still covered.",
-          "pattern": "^hooks/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
-        },
-        "args": {
-          "type": "array",
-          "maxItems": 20,
-          "description": "Static argv values. No whitespace, no shell metacharacters. Each element maps to one position in the script's argv; they are never joined or passed through a shell.",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[A-Za-z0-9_.:=/-]+$"
-          }
-        }
-      }
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "description", "author", "license", "schema_version", "status"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Must match the skill directory name exactly. Lowercase letters, numbers, and hyphens only."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "maxLength": 32,
+      "description": "Semantic version (semver) of this skill"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "What this skill does and when to use it. Used for registry search and display."
     },
     "author": {
       "type": "object",
-      "required": ["name"],
       "additionalProperties": false,
-      "maxProperties": 3,
+      "required": ["name"],
       "properties": {
-        "name": {
-          "type": "string",
-          "maxLength": 128
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "maxLength": 254
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        }
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
       }
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "SPDX license identifier e.g. MIT, Apache-2.0"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "GoodBoy manifest schema version. Always 1.0.0 for v1."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["experimental", "stable", "deprecated"],
+      "default": "experimental",
+      "description": "Maturity signal for registry display and filtering"
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 64 },
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Free-form search terms"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "security", "research", "other"],
+      "description": "Primary category for registry browsing"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["code-review", "testing", "documentation", "git", "deployment", "security", "refactoring", "architecture", "debugging", "productivity", "writing", "data", "devops", "agent", "orchestration", "formatting", "analysis", "research", "workflow", "other"]
+      },
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "Controlled vocabulary for registry faceted search. Unlike keywords, tags are a fixed enumeration owned by GoodBoy."
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
     },
     "repository": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        }
+        "type": { "type": "string", "maxLength": 32 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
       }
     },
-    "mcpServerItem": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string",
-          "maxLength": 64
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048,
-          "pattern": "^https?://"
-        }
-      }
+    "changelog": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
+    },
+    "publisher": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Registry publisher handle. Set by registry on publish, not by skill author."
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["public", "private"],
+      "default": "private",
+      "description": "Registry visibility. private until explicitly published."
     },
     "engines": {
       "type": "object",
       "additionalProperties": false,
+      "maxProperties": 4,
       "properties": {
-        "node": {
-          "type": "string",
-          "maxLength": 32
-        },
-        "python": {
-          "type": "string",
-          "maxLength": 32
-        }
-      }
+        "node":   { "type": "string", "maxLength": 32 },
+        "python": { "type": "string", "maxLength": 32 },
+        "bash":   { "type": "string", "maxLength": 32 },
+        "deno":   { "type": "string", "maxLength": 32 }
+      },
+      "description": "Advisory. Runtime version requirements for scripts bundled in scripts/. Not enforced by GoodBoy — shown to user before install."
     },
-    "dependencyMap": {
-      "type": "object",
-      "maxProperties": 100,
-      "additionalProperties": {
-        "type": "string",
-        "maxLength": 64,
-        "pattern": "^([~^]?\\d+\\.\\d+(\\.\\d+)?|\\*|latest)$"
-      }
-    }
-  },
-  "oneOf": [
-    {
-      "title": "PassiveSkillManifest",
-      "type": "object",
-      "required": ["kind", "name", "version", "description", "author", "license", "schema_version", "status", "content"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "passive"
-        },
-        "content": {
-          "type": "string",
-          "maxLength": 256
-        },
-        "name": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]+$",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "version": {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "maxLength": 32
-        },
-        "description": {
-          "type": "string",
-          "maxLength": 280
-        },
-        "author": {
-          "$ref": "#/definitions/author"
-        },
-        "license": {
-          "type": "string",
-          "maxLength": 64
-        },
-        "keywords": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 64
-          },
-          "maxItems": 10
-        },
-        "category": {
-          "type": "string",
-          "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
-        },
-        "readme": {
-          "type": "string",
-          "maxLength": 256
-        },
-        "homepage": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        },
-        "repository": {
-          "$ref": "#/definitions/repository"
-        },
-        "changelog": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        },
-        "claude_code_version": {
-          "type": "string",
-          "maxLength": 32
-        },
-        "schema_version": {
-          "type": "string",
-          "const": "1.0.0"
-        },
-        "status": {
-          "type": "string",
-          "enum": ["experimental", "stable", "deprecated"],
-          "default": "experimental"
-        },
-        "publisher": {
-          "type": "string",
-          "maxLength": 128
-        },
-        "visibility": {
-          "type": "string",
-          "enum": ["public", "private"],
-          "default": "private"
-        }
-      }
+    "os": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["darwin", "linux", "win32"] },
+      "maxItems": 3,
+      "uniqueItems": true,
+      "description": "Advisory. Operating systems this skill's scripts are compatible with. Not enforced — shown to user before install."
     },
-    {
-      "title": "ExecutableSkillManifest",
-      "type": "object",
-      "required": ["kind", "name", "version", "description", "author", "license", "schema_version", "status", "entry", "language", "hooks"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "executable"
-        },
-        "entry": {
-          "type": "string",
-          "maxLength": 256
-        },
-        "language": {
-          "type": "string",
-          "enum": ["typescript", "javascript", "python", "java", "go", "cpp", "csharp", "other"]
-        },
-        "hooks": {
-          "type": "object",
-          "additionalProperties": false,
-          "maxProperties": 4,
-          "properties": {
-            "preinstall":  { "$ref": "#/definitions/hookEntry" },
-            "postinstall": { "$ref": "#/definitions/hookEntry" },
-            "preremove":   { "$ref": "#/definitions/hookEntry" },
-            "postremove":  { "$ref": "#/definitions/hookEntry" }
-          }
-        },
-        "name": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]+$",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "version": {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "maxLength": 32
-        },
-        "description": {
-          "type": "string",
-          "maxLength": 280
-        },
-        "author": {
-          "$ref": "#/definitions/author"
-        },
-        "license": {
-          "type": "string",
-          "maxLength": 64
-        },
-        "keywords": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 64
-          },
-          "maxItems": 10
-        },
-        "category": {
-          "type": "string",
-          "enum": ["code", "writing", "data", "devops", "testing", "documentation", "productivity", "other"]
-        },
-        "readme": {
-          "type": "string",
-          "maxLength": 256
-        },
-        "homepage": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        },
-        "repository": {
-          "$ref": "#/definitions/repository"
-        },
-        "changelog": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
-        },
-        "claude_code_version": {
-          "type": "string",
-          "maxLength": 32
-        },
-        "mcp_servers": {
-          "type": "array",
-          "maxItems": 20,
-          "items": {
-            "$ref": "#/definitions/mcpServerItem"
-          }
-        },
-        "engines": {
-          "$ref": "#/definitions/engines"
-        },
-        "os": {
-          "type": "array",
-          "maxItems": 3,
-          "items": {
-            "type": "string",
-            "enum": ["darwin", "linux", "win32"]
-          }
-        },
-        "schema_version": {
-          "type": "string",
-          "const": "1.0.0"
-        },
-        "dependencies": {
-          "$ref": "#/definitions/dependencyMap"
-        },
-        "devDependencies": {
-          "$ref": "#/definitions/dependencyMap"
-        },
-        "permissions": {
-          "type": "array",
-          "maxItems": 5,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "enum": ["read_files", "write_files", "network", "shell", "env"]
-          }
-        },
-        "status": {
-          "type": "string",
-          "enum": ["experimental", "stable", "deprecated"],
-          "default": "experimental"
-        },
-        "publisher": {
-          "type": "string",
-          "maxLength": 128
-        },
-        "visibility": {
-          "type": "string",
-          "enum": ["public", "private"],
-          "default": "private"
-        }
-      }
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["read_files", "write_files", "network", "shell", "env"] },
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "DECLARED INTENT ONLY — not enforced at runtime. Skill authors declare what their scripts intend to access. GoodBoy displays this to users before install as a trust signal. An empty array or omitted field means no elevated access is claimed."
     }
-  ]
+  }
 }
