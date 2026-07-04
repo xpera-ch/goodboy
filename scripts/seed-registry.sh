@@ -5,13 +5,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SKILLS_SRC="${REPO_ROOT}/skills"
+SKILL_SOURCE="$HOME/.claude/skills/commit-creation"
 
-if [[ ! -d "${SKILLS_SRC}/commit-creation" ]]; then
-  echo "Error: ${SKILLS_SRC}/commit-creation not found." >&2
+if [[ ! -d "${SKILL_SOURCE}" ]]; then
+  echo "Error: ${SKILL_SOURCE} not found." >&2
   exit 1
 fi
 
 echo "Seeding commit-creation skill..."
-node "${REPO_ROOT}/packages/cli/dist/index.js" add "${SKILLS_SRC}/commit-creation"
+node "${REPO_ROOT}/packages/cli/dist/index.js" add "${SKILL_SOURCE}"
 echo "Done."

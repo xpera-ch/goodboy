@@ -1,8 +1,21 @@
 import { Command } from 'commander';
+import { existsSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import Table from 'cli-table3';
 import chalk from 'chalk';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
-import { logger } from '../lib/logger.js';
+import { readManifest, validateManifest } from '../lib/manifest.js';
+import { logger, sanitiseError } from '../lib/logger.js';
+import type { GoodBoyManifest } from '../types/index.js';
+
+type Scope = 'project' | 'global';
+
+interface SkillRow {
+  manifest: GoodBoyManifest;
+  scope: Scope;
+}
 
 function statusColor(status: string): string {
   switch (status) {
@@ -13,49 +26,94 @@ function statusColor(status: string): string {
   }
 }
 
-function visibilityColor(visibility: string): string {
-  return visibility === 'public' ? chalk.cyan(visibility) : chalk.gray(visibility);
+function scopeColor(scope: Scope): string {
+  return scope === 'project' ? chalk.cyan(scope) : chalk.magenta(scope);
 }
 
-async function run(): Promise<void> {
-  const registry = createRegistryAdapter();
-  const skills = await registry.listInstalled();
+async function readSkillsFromDir(
+  dir: string,
+  scope: Scope,
+): Promise<SkillRow[]> {
+  if (!existsSync(dir)) return [];
 
-  if (skills.length === 0) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const rows: SkillRow[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const manifestPath = join(dir, entry.name, 'manifest.json');
+    try {
+      const data = await readManifest(manifestPath);
+      const manifest = validateManifest(data);
+      rows.push({ manifest, scope });
+    } catch {
+      // silently skip unreadable/invalid skills
+    }
+  }
+
+  return rows;
+}
+
+interface ListOptions {
+  global?: boolean;
+  all?: boolean;
+}
+
+async function run(options: ListOptions): Promise<void> {
+  const cwd = process.cwd();
+  const rows: SkillRow[] = [];
+
+  const showProject = !options.global || options.all;
+  const showGlobal = options.global === true || options.all === true;
+
+  if (showProject) {
+    const projectSkillsPath = join(cwd, '.claude', 'skills');
+    rows.push(...(await readSkillsFromDir(projectSkillsPath, 'project')));
+  }
+
+  if (showGlobal) {
+    const registry = createRegistryAdapter();
+    const globalSkillsPath = registry.getSkillsLocation();
+    rows.push(...(await readSkillsFromDir(globalSkillsPath, 'global')));
+  }
+
+  if (rows.length === 0) {
     logger.info('No skills installed. Run `goodboy install <name>` to get started.');
     return;
   }
 
   const table = new Table({
-    head: ['Name', 'Version', 'Description', 'Status', 'Visibility'].map((h) =>
+    head: ['Name', 'Version', 'Description', 'Status', 'Scope'].map((h) =>
       chalk.bold(h),
     ),
-    colWidths: [20, 10, 40, 14, 12],
+    colWidths: [20, 10, 36, 14, 10],
     wordWrap: true,
     style: { head: [], border: [] },
   });
 
-  for (const skill of skills) {
+  for (const { manifest, scope } of rows) {
     table.push([
-      chalk.white(skill.name),
-      chalk.gray(skill.version),
-      skill.description,
-      statusColor(skill.status),
-      visibilityColor(skill.visibility ?? ''),
+      chalk.white(manifest.name),
+      chalk.gray(manifest.version),
+      manifest.description,
+      statusColor(manifest.status),
+      scopeColor(scope),
     ]);
   }
 
   process.stdout.write(table.toString() + '\n');
-  logger.info(`\n${skills.length} skill${skills.length === 1 ? '' : 's'} installed`);
+  logger.info(`\n${rows.length} skill${rows.length === 1 ? '' : 's'} installed`);
 }
 
 export const listCommand = new Command('list')
-  .description('List all installed skills')
-  .action(async () => {
+  .description('List installed skills')
+  .option('-g, --global', 'List only globally installed skills')
+  .option('-a, --all', 'List both project and global skills')
+  .action(async (options: ListOptions) => {
     try {
-      await run();
+      await run(options);
     } catch (err) {
-      logger.error(err instanceof Error ? err.message : String(err));
+      logger.error(sanitiseError(err));
       process.exit(1);
     }
   });

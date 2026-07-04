@@ -3,6 +3,8 @@ import { Command } from 'commander';
 import { createRequire } from 'node:module';
 import { initCommand } from './commands/init.js';
 import { installCommand } from './commands/install.js';
+import { upgradeCommand } from './commands/upgrade.js';
+import { uninstallCommand } from './commands/uninstall.js';
 import { listCommand } from './commands/list.js';
 import { searchCommand } from './commands/search.js';
 import { addCommand } from './commands/add.js';
@@ -21,6 +23,8 @@ program
 
 program.addCommand(initCommand);
 program.addCommand(installCommand);
+program.addCommand(upgradeCommand);
+program.addCommand(uninstallCommand);
 program.addCommand(listCommand);
 program.addCommand(searchCommand);
 program.addCommand(addCommand);

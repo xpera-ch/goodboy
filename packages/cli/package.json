@@ -12,7 +12,8 @@
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "link": "npm run build && npm link"
   },
   "dependencies": {
     "@goodboy/schema": "*",
