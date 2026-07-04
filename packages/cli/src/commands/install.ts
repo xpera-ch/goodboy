@@ -4,7 +4,6 @@ import { join, sep } from 'node:path';
 import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
-import { runHooks } from '../lib/hooks.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger } from '../lib/logger.js';
@@ -21,7 +20,6 @@ async function run(name: string): Promise<void> {
     throw err;
   }
 
-  // Read and validate manifest before executing any hooks
   const manifestPath = join(skillPath, 'manifest.json');
   let manifest;
   try {
@@ -47,19 +45,7 @@ async function run(name: string): Promise<void> {
   }
   spinner.start(`Installing skill "${name}"…`);
 
-  // Run preinstall hook (manifest validated above)
-  if (manifest.kind === 'executable' && manifest.hooks?.preinstall !== undefined) {
-    spinner.text = `Running preinstall hook for "${name}"…`;
-    try {
-      await runHooks(manifest, ['preinstall'], { skillName: name, skillPath });
-    } catch (err) {
-      spinner.fail('preinstall hook failed');
-      throw err;
-    }
-  }
-
   // Symlink scan: reject symlinks escaping the skill directory.
-  // Runs after preinstall so any hook-created symlinks are also caught.
   try {
     await scanForSymlinks(skillPath);
   } catch {
@@ -100,17 +86,6 @@ async function run(name: string): Promise<void> {
     throw new Error(
       `Could not install skill: ${err instanceof Error ? err.message : String(err)}`,
     );
-  }
-
-  // Run postinstall hook
-  if (manifest.kind === 'executable' && manifest.hooks?.postinstall !== undefined) {
-    spinner.text = `Running postinstall hook for "${name}"…`;
-    try {
-      await runHooks(manifest, ['postinstall'], { skillName: name, skillPath: destPath });
-    } catch (err) {
-      spinner.warn('postinstall hook failed (skill was installed)');
-      logger.warn(err instanceof Error ? err.message : String(err));
-    }
   }
 
   spinner.succeed(`Installed "${name}" (${manifest.version})`);

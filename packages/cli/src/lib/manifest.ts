@@ -41,40 +41,6 @@ function estimateNestingDepth(jsonString: string): number {
   return maxDepth;
 }
 
-const PRIVATE_IP_RE = [
-  /^localhost$/i,
-  /^127\./,
-  /^0\.0\.0\.0$/,
-  /^10\./,
-  /^172\.(1[6-9]|2[0-9]|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^::1$/,
-];
-
-function validateMcpServerUrl(url: string): void {
-  let parsed: URL;
-  /* c8 ignore start -- ajv "format: uri" + pattern "^https?://" make both the catch clause and
-     the protocol check unreachable through the public validateManifest() API */
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
-  }
-  /* c8 ignore stop */
-
-  // WHATWG URL keeps brackets for IPv6 (e.g. "[::1]") — strip them before matching.
-  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
-  for (const re of PRIVATE_IP_RE) {
-    if (re.test(hostname)) {
-      throw new Error(`mcp_servers contains an invalid or disallowed URL: ${url}`);
-    }
-  }
-}
-
 export async function readManifest(filePath: string): Promise<unknown> {
   const resolved = resolve(filePath);
 
@@ -109,31 +75,6 @@ export async function readManifest(filePath: string): Promise<unknown> {
   }
 }
 
-const EXEC_ONLY_FIELDS = [
-  'entry', 'language', 'mcp_servers', 'engines', 'os',
-  'dependencies', 'devDependencies', 'permissions', 'hooks',
-] as const;
-
-// Exported for direct testing so the check can be verified independently of Ajv.
-// validateManifest calls this after Ajv passes; callers of validateManifest get
-// the guarantee for free and must not duplicate it.
-export function assertKindConstraints(data: GoodBoyManifest): void {
-  if (data.kind === 'passive') {
-    const violations = EXEC_ONLY_FIELDS.filter(
-      (f) => Object.prototype.hasOwnProperty.call(data, f),
-    );
-    if (violations.length > 0) {
-      throw new Error(
-        `Invalid manifest: passive skill contains executable-only field(s): ${violations.join(', ')}`,
-      );
-    }
-  } else if (data.kind === 'executable') {
-    if (Object.prototype.hasOwnProperty.call(data, 'content')) {
-      throw new Error('Invalid manifest: executable skill contains passive-only field: content');
-    }
-  }
-}
-
 export function validateManifest(data: unknown): GoodBoyManifest {
   const validate = getValidator();
 
@@ -145,21 +86,7 @@ export function validateManifest(data: unknown): GoodBoyManifest {
     throw new Error(`Invalid manifest:\n${lines.join('\n')}`);
   }
 
-  const manifest = data as GoodBoyManifest;
-
-  assertKindConstraints(manifest);
-
-  // Runtime second pass: block private/loopback MCP server URLs that pass
-  // the schema pattern (^https?://) but point to internal infrastructure.
-  if (manifest.kind === 'executable' && Array.isArray(manifest.mcp_servers)) {
-    for (const server of manifest.mcp_servers) {
-      if (typeof server.url === 'string') {
-        validateMcpServerUrl(server.url);
-      }
-    }
-  }
-
-  return manifest;
+  return data as GoodBoyManifest;
 }
 
 export async function writeManifest(filePath: string, data: GoodBoyManifest): Promise<void> {

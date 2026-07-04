@@ -1,8 +1,8 @@
 import { confirm } from '@inquirer/prompts';
-import type { GoodBoyManifest, ExecutableSkillManifest } from '../types/index.js';
+import type { GoodBoyManifest } from '../types/index.js';
 import { logger } from './logger.js';
 
-type Permission = NonNullable<ExecutableSkillManifest['permissions']>[number];
+type Permission = NonNullable<GoodBoyManifest['permissions']>[number];
 
 // Exhaustiveness enforced at compile time: if the schema's permissions enum grows,
 // adding the missing key here becomes required to compile. The runtime guard in
@@ -22,7 +22,6 @@ const PERMISSION_ORDER: readonly Permission[] = [
 ];
 
 export function summarizePermissions(manifest: GoodBoyManifest): string[] {
-  if (manifest.kind === 'passive') return [];
   const perms = manifest.permissions ?? [];
 
   // Runtime backstop against schema/type drift: if the schema gains a new permission

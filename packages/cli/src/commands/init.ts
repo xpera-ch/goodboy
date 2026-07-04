@@ -9,25 +9,12 @@ import type { GoodBoyManifest } from '../types/index.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Schema enforces maxLength: 128 on name and maxLength: 280 on description.
+// Schema enforces maxLength: 64 on name and maxLength: 1024 on description.
 // These limits must stay in sync with manifest.schema.json.
-const MAX_NAME_LENGTH = 128;
-const MAX_DESCRIPTION_LENGTH = 280;
+const MAX_NAME_LENGTH = 64;
+const MAX_DESCRIPTION_LENGTH = 1024;
 
-type Language = NonNullable<Extract<GoodBoyManifest, { kind: 'executable' }>['language']>;
 type Category = NonNullable<GoodBoyManifest['category']>;
-
-function defaultEntry(language: Language): string {
-  switch (language) {
-    case 'python':     return 'index.py';
-    case 'go':         return 'main.go';
-    case 'java':       return 'Main.java';
-    case 'cpp':        return 'main.cpp';
-    case 'csharp':     return 'Program.cs';
-    case 'javascript': return 'index.js';
-    default:           return 'index.ts';
-  }
-}
 
 async function run(): Promise<void> {
   const name = await input({
@@ -80,28 +67,15 @@ async function run(): Promise<void> {
       { value: 'testing',       name: 'Testing' },
       { value: 'documentation', name: 'Documentation' },
       { value: 'productivity',  name: 'Productivity' },
+      { value: 'security',      name: 'Security' },
+      { value: 'research',      name: 'Research' },
       { value: 'other',         name: 'Other' },
     ],
   })) as Category;
 
   const license = await input({ message: 'License:', default: 'MIT' });
 
-  const language = (await select({
-    message: 'Language:',
-    choices: [
-      { value: 'typescript',  name: 'TypeScript' },
-      { value: 'javascript',  name: 'JavaScript' },
-      { value: 'python',      name: 'Python' },
-      { value: 'java',        name: 'Java' },
-      { value: 'go',          name: 'Go' },
-      { value: 'cpp',         name: 'C++' },
-      { value: 'csharp',      name: 'C#' },
-      { value: 'other',       name: 'Other' },
-    ],
-  })) as Language;
-
   const manifest: GoodBoyManifest = {
-    kind: 'executable',
     name: name.trim(),
     version: '0.1.0',
     description: description.trim(),
@@ -111,9 +85,6 @@ async function run(): Promise<void> {
     },
     license: license.trim() || 'MIT',
     category,
-    language,
-    entry: defaultEntry(language),
-    hooks: {},
     schema_version: '1.0.0',
     status: 'experimental',
     visibility: 'private',
