@@ -1,12 +1,14 @@
 import type { RegistryAdapter } from './registry-adapter.js';
-import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   getRegistryPath,
   getSkillsPath,
   resolveSkill,
   listInstalled,
+  listRegistry,
 } from './registry.js';
+import { resolveLatestVersion, resolveVersionPath } from './registry-entry.js';
+import type { RegistryEntry } from './registry-entry.js';
 import { readManifest, validateManifest } from './manifest.js';
 import { logger } from './logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
@@ -26,23 +28,33 @@ export class LocalRegistryAdapter implements RegistryAdapter {
     return listInstalled();
   }
 
+  listRegistry(): Promise<RegistryEntry[]> {
+    return listRegistry();
+  }
+
   async search(query: string): Promise<GoodBoyManifest[]> {
+    let entries: RegistryEntry[];
     let registryPath: string;
     try {
+      entries = await listRegistry();
       registryPath = getRegistryPath();
     } catch {
       return [];
     }
 
-    if (!existsSync(registryPath)) return [];
+    if (entries.length === 0) return [];
 
     const queryLower = query.toLowerCase();
-    const entries = readdirSync(registryPath, { withFileTypes: true });
     const results: GoodBoyManifest[] = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const manifestPath = join(registryPath, entry.name, 'manifest.json');
+      const latestVersion = resolveLatestVersion(entry);
+      if (!latestVersion) continue;
+
+      const skillDir = join(registryPath, entry.name);
+      const versionPath = resolveVersionPath(entry, latestVersion, skillDir);
+      const manifestPath = join(versionPath, 'manifest.json');
+
       try {
         const data = await readManifest(manifestPath);
         const manifest = validateManifest(data);

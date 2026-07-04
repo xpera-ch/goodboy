@@ -1,4 +1,5 @@
 import type { GoodBoyManifest } from '../types/index.js';
+import type { RegistryEntry } from './registry-entry.js';
 import { LocalRegistryAdapter } from './local-registry-adapter.js';
 
 /**
@@ -43,6 +44,12 @@ export interface RegistryAdapter {
    * Used for display and diagnostic purposes only.
    */
   getSkillsLocation(): string;
+
+  /**
+   * Return all entries in the local registry.
+   * Returns [] if the registry does not exist or cannot be read.
+   */
+  listRegistry(): Promise<RegistryEntry[]>;
 }
 
 /**
