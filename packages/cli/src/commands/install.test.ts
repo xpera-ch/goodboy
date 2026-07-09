@@ -42,6 +42,7 @@ vi.mock('../lib/agents.js', () => ({
 vi.mock('../lib/store.js', () => ({
   installToStore: vi.fn().mockResolvedValue('/mock/.goodboy/skills/test-skill'),
   getStorePath: vi.fn().mockReturnValue('/mock/.goodboy/skills'),
+  getGoodboyHome: vi.fn().mockReturnValue('/mock/.goodboy'),
   ensureStoreExists: vi.fn(),
   removeFromStore: vi.fn(),
 }));
@@ -223,10 +224,15 @@ describe('installNamed — global install', () => {
     });
   });
 
-  it('does not update goodboy.json/lock on global install', async () => {
+  it('updates the global goodboy.json/lock (in ~/.goodboy)', async () => {
     await installNamed('test-skill', GLOBAL_OPTS, CWD);
-    expect(mockAddSkillToManifest).not.toHaveBeenCalled();
-    expect(mockAddSkillToLock).not.toHaveBeenCalled();
+    expect(mockAddSkillToManifest).toHaveBeenCalledWith('/mock/.goodboy', 'test-skill', '0.1.0');
+    expect(mockAddSkillToLock).toHaveBeenCalledWith(
+      '/mock/.goodboy',
+      'test-skill',
+      '0.1.0',
+      '/mock/.goodboy/skills/test-skill',
+    );
   });
 });
 
@@ -242,10 +248,15 @@ describe('installNamed — no-commit', () => {
     expect(mockCpSync).toHaveBeenCalled();
   });
 
-  it('skips goodboy.json/lock updates', async () => {
+  it('still updates goodboy.json/lock (only the skill files are gitignored)', async () => {
     await installNamed('test-skill', NO_COMMIT_OPTS, CWD);
-    expect(mockAddSkillToManifest).not.toHaveBeenCalled();
-    expect(mockAddSkillToLock).not.toHaveBeenCalled();
+    expect(mockAddSkillToManifest).toHaveBeenCalledWith(CWD, 'test-skill', '0.1.0');
+    expect(mockAddSkillToLock).toHaveBeenCalledWith(
+      CWD,
+      'test-skill',
+      '0.1.0',
+      join(PROJECT_SKILLS, 'test-skill'),
+    );
   });
 });
 

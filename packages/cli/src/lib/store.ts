@@ -9,8 +9,12 @@ import { homedir } from 'node:os';
 import { scanForSymlinks } from './fs-security.js';
 import { SKILL_NAME_RE } from './validation.js';
 
+export function getGoodboyHome(): string {
+  return join(homedir(), '.goodboy');
+}
+
 export function getStorePath(): string {
-  return join(homedir(), '.goodboy', 'skills');
+  return join(getGoodboyHome(), 'skills');
 }
 
 export function ensureStoreExists(): void {

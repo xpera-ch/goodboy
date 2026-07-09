@@ -15,7 +15,7 @@ import {
   addSkillToLock,
 } from '../lib/goodboy-file.js';
 import { resolveAgentFlags, createAgentSymlinks } from '../lib/agents.js';
-import { installToStore } from '../lib/store.js';
+import { installToStore, getGoodboyHome } from '../lib/store.js';
 
 export interface InstallOptions {
   global?: boolean;
@@ -159,6 +159,10 @@ export async function installNamed(
     }
 
     resolvedPath = storePath;
+
+    const goodboyHome = getGoodboyHome();
+    await addSkillToManifest(goodboyHome, name, manifest.version);
+    await addSkillToLock(goodboyHome, name, manifest.version, resolvedPath);
   } else {
     try {
       resolvedPath = await installNamedProject(name, skillPath, cwd);
@@ -170,9 +174,7 @@ export async function installNamed(
     if (options.commit === false) {
       await ensureGitignoreEntry(cwd);
     }
-  }
 
-  if (options.commit !== false && !options.global) {
     await addSkillToManifest(cwd, name, manifest.version);
     await addSkillToLock(cwd, name, manifest.version, resolvedPath);
   }
@@ -216,7 +218,7 @@ export const installCommand = new Command('install')
   .description('Install a skill from the registry, or restore all from goodboy.json')
   .argument('[skill-name]', 'Skill to install (omit to restore from goodboy.json)')
   .option('-g, --global', 'Install to global store (~/.goodboy/skills/)')
-  .option('--no-commit', 'Skip goodboy.json/lock update; add .claude/skills/ to .gitignore')
+  .option('--no-commit', 'Add .claude/skills/ to .gitignore (goodboy.json/lock are still written)')
   .option('--claude-code', 'Link into ~/.claude/skills/ (default when -g and no agent flag)')
   .option('--codex', 'Link into ~/.codex/skills/')
   .option('--gemini', 'Link into ~/.gemini/skills/')
