@@ -13,7 +13,7 @@ import {
   addSkillToManifest,
   addSkillToLock,
 } from '../lib/goodboy-file.js';
-import { getStorePath } from '../lib/store.js';
+import { getStorePath, getGoodboyHome } from '../lib/store.js';
 
 interface UpgradeOptions {
   global?: boolean;
@@ -52,7 +52,8 @@ async function upgradeSkill(
     throw err;
   }
 
-  const lockedVersion = await getLockedVersion(cwd, name);
+  const lockDir = options.global ? getGoodboyHome() : cwd;
+  const lockedVersion = await getLockedVersion(lockDir, name);
   if (lockedVersion !== null && lockedVersion === manifest.version) {
     spinner.info(`"${name}" is already at the latest version (${manifest.version})`);
     return;
@@ -81,17 +82,16 @@ async function upgradeSkill(
     throw err;
   }
 
-  if (!options.global) {
-    await addSkillToManifest(cwd, name, manifest.version);
-    await addSkillToLock(cwd, name, manifest.version, destPath);
-  }
+  await addSkillToManifest(lockDir, name, manifest.version);
+  await addSkillToLock(lockDir, name, manifest.version, destPath);
 
   const from = lockedVersion !== null ? `${lockedVersion} → ` : '';
   spinner.succeed(`Upgraded "${name}" (${from}${manifest.version})`);
 }
 
 async function upgradeAll(options: UpgradeOptions, cwd: string): Promise<void> {
-  const goodboy = await readGoodBoyJson(cwd);
+  const dir = options.global ? getGoodboyHome() : cwd;
+  const goodboy = await readGoodBoyJson(dir);
   if (!goodboy) {
     throw new Error('No goodboy.json found in current directory.');
   }

@@ -9,7 +9,7 @@ import {
   removeSkillFromLock,
 } from '../lib/goodboy-file.js';
 import { removeAgentSymlinks, AGENT_SKILL_DIRS } from '../lib/agents.js';
-import { removeFromStore } from '../lib/store.js';
+import { removeFromStore, getGoodboyHome } from '../lib/store.js';
 
 interface UninstallOptions {
   global?: boolean;
@@ -33,6 +33,10 @@ async function uninstallSkill(
   if (options.global) {
     await removeAgentSymlinks(name, Object.keys(AGENT_SKILL_DIRS));
     removeFromStore(name);
+
+    const goodboyHome = getGoodboyHome();
+    await removeSkillFromManifest(goodboyHome, name);
+    await removeSkillFromLock(goodboyHome, name);
   } else {
     const destPath = join(getProjectSkillsPath(cwd), name);
     if (existsSync(destPath)) {

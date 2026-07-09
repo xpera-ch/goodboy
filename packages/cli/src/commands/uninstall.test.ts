@@ -27,6 +27,7 @@ vi.mock('../lib/agents.js', () => ({
 vi.mock('../lib/store.js', () => ({
   removeFromStore: vi.fn(),
   getStorePath: vi.fn().mockReturnValue('/mock/.goodboy/skills'),
+  getGoodboyHome: vi.fn().mockReturnValue('/mock/.goodboy'),
   installToStore: vi.fn(),
   ensureStoreExists: vi.fn(),
 }));
@@ -114,10 +115,10 @@ describe('uninstall command — global (-g)', () => {
     expect(mockRemoveFromStore).toHaveBeenCalledWith('my-skill');
   });
 
-  it('does not touch goodboy.json/lock on global uninstall', async () => {
+  it('removes skill from the global goodboy.json/lock (in ~/.goodboy)', async () => {
     await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
-    expect(mockRemoveSkillFromManifest).not.toHaveBeenCalled();
-    expect(mockRemoveSkillFromLock).not.toHaveBeenCalled();
+    expect(mockRemoveSkillFromManifest).toHaveBeenCalledWith('/mock/.goodboy', 'my-skill');
+    expect(mockRemoveSkillFromLock).toHaveBeenCalledWith('/mock/.goodboy', 'my-skill');
   });
 
   it('does not rmSync project files on global uninstall', async () => {
