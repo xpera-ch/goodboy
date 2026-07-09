@@ -16,11 +16,50 @@ GoodBoy lets you package reusable Claude Code skills into versioned, shareable u
 
 ```sh
 npm install -g @goodboy/cli
-goodboy init        # create manifest.json in the current directory
+goodboy init                    # create goodboy.json in the current directory
+goodboy skill create            # scaffold a new skill (manifest.json + SKILL.md)
 goodboy install <skill-name>
 goodboy list
 goodboy search <query>
 ```
+
+## Commands
+
+### Project setup
+
+| Command | Description |
+|---|---|
+| `goodboy init` | Initialise a project (creates `goodboy.json`) |
+| `goodboy init --registry <url>` | Initialise with a custom registry URL |
+
+### Skill management
+
+| Command | Description |
+|---|---|
+| `goodboy skill create` | Scaffold a new skill (`manifest.json`, `SKILL.md`, `scripts/`, `references/`, `assets/`) |
+| `goodboy add <path>` | Add a local skill directory to the registry |
+| `goodboy install <name>` | Install a skill from the registry |
+| `goodboy install` | Restore all skills from `goodboy.json` |
+| `goodboy install -g <name>` | Install a skill globally |
+| `goodboy upgrade [name]` | Upgrade one or all installed skills |
+| `goodboy uninstall <name>` | Remove an installed skill |
+
+### Discovery
+
+| Command | Description |
+|---|---|
+| `goodboy search <query>` | Search the registry |
+| `goodboy list` | List project skills |
+| `goodboy list -g` | List global skills |
+
+### Registry
+
+| Command | Description |
+|---|---|
+| `goodboy registry list` | Show registry contents |
+| `goodboy registry info <name>` | Show skill details |
+| `goodboy registry validate <name>` | Validate skill integrity |
+| `goodboy registry remove <name>` | Remove a skill from the registry |
 
 ## Security notice
 

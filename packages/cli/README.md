@@ -12,7 +12,8 @@ npm install -g @goodboy/cli
 
 | Command | Description |
 |---|---|
-| `goodboy init` | Initialise a new skill in the current directory |
+| `goodboy init` | Initialise GoodBoy in the current directory (creates `goodboy.json`) |
+| `goodboy skill create` | Create a new skill (`manifest.json`, `SKILL.md`, scaffold dirs) |
 | `goodboy install <name>` | Install a skill from the registry |
 | `goodboy list` | List installed skills |
 | `goodboy search <query>` | Search the public registry |
