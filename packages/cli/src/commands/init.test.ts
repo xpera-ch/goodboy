@@ -1,62 +1,100 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GoodBoyManifest } from '../types/index.js';
+import type { GoodBoyJson } from '../lib/goodboy-file.js';
 
-vi.mock('ora', () => ({
-  default: vi.fn(() => ({
-    start: vi.fn().mockReturnThis(),
-    succeed: vi.fn().mockReturnThis(),
-    fail: vi.fn().mockReturnThis(),
-    text: '',
-  })),
+vi.mock('../lib/goodboy-file.js', () => ({
+  readGoodBoyJson: vi.fn(),
+  writeGoodBoyJson: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@inquirer/prompts', () => ({
-  input: vi.fn(),
-  select: vi.fn(),
-}));
-vi.mock('../lib/manifest.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../lib/manifest.js')>();
-  return {
-    ...actual,
-    writeManifest: vi.fn().mockResolvedValue(undefined),
-  };
-});
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  sanitiseError: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
 }));
 
-import { input, select } from '@inquirer/prompts';
-import { validateManifest, writeManifest } from '../lib/manifest.js';
+import { readGoodBoyJson, writeGoodBoyJson } from '../lib/goodboy-file.js';
+import { logger } from '../lib/logger.js';
 import { initCommand } from './init.js';
 
-const mockInput = vi.mocked(input);
-const mockSelect = vi.mocked(select);
-const mockWriteManifest = vi.mocked(writeManifest);
+const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
+const mockWriteGoodBoyJson = vi.mocked(writeGoodBoyJson);
+const mockLogger = vi.mocked(logger);
 
-describe('init command — scaffolded manifest', () => {
+const CWD = process.cwd();
+
+describe('goodboy init', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called unexpectedly');
+      throw new Error('process.exit called');
     });
-    mockWriteManifest.mockResolvedValue(undefined);
+    mockReadGoodBoyJson.mockResolvedValue(null);
+    mockWriteGoodBoyJson.mockResolvedValue(undefined);
   });
 
-  it('scaffolds a manifest that passes validateManifest and omits email when blank', async () => {
-    // Exact call order from init.ts: name, description, authorName, authorEmail, license
-    mockInput
-      .mockResolvedValueOnce('my-skill')
-      .mockResolvedValueOnce('A test skill')
-      .mockResolvedValueOnce('Test Author')
-      .mockResolvedValueOnce('')    // blank email → key omitted from author object
-      .mockResolvedValueOnce('MIT'); // license
-    mockSelect
-      .mockResolvedValueOnce('code'); // category
-
+  it('creates goodboy.json in the current directory', async () => {
     await initCommand.parseAsync([], { from: 'user' });
+    expect(mockWriteGoodBoyJson).toHaveBeenCalledOnce();
+    expect(mockWriteGoodBoyJson.mock.calls[0]![0]).toBe(CWD);
+  });
 
-    expect(mockWriteManifest).toHaveBeenCalledOnce();
-    const captured = mockWriteManifest.mock.calls[0]![1] as GoodBoyManifest;
-    expect(() => validateManifest(captured)).not.toThrow();
-    expect(captured.author).not.toHaveProperty('email');
+  it('writes goodboy.json with schema "1.0.0"', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
+    expect(written.schema).toBe('1.0.0');
+  });
+
+  it('writes goodboy.json with an empty skills object', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
+    expect(written.skills).toEqual({});
+  });
+
+  it('does not set a registry field when --registry is not passed', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
+    expect(written).not.toHaveProperty('registry');
+  });
+
+  it('sets the registry field when --registry is passed', async () => {
+    await initCommand.parseAsync(['--registry', 'https://example.com'], { from: 'user' });
+    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
+    expect(written.registry).toBe('https://example.com');
+  });
+
+  it('exits cleanly with code 0 when goodboy.json already exists', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: {} });
+    await expect(initCommand.parseAsync([], { from: 'user' })).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(mockWriteGoodBoyJson).not.toHaveBeenCalled();
+  });
+
+  it('shows a warning when goodboy.json already exists', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: {} });
+    await expect(initCommand.parseAsync([], { from: 'user' })).rejects.toThrow();
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('already exists'),
+    );
+  });
+
+  it('shows the correct success message', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    expect(mockLogger.success).toHaveBeenCalledWith(
+      expect.stringContaining(CWD),
+    );
+  });
+
+  it('hints to run goodboy install', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.stringContaining('goodboy install'),
+    );
+  });
+
+  it('hints to run goodboy skill create', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.stringContaining('goodboy skill create'),
+    );
   });
 });

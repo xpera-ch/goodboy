@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { createRequire } from 'node:module';
 import { initCommand } from './commands/init.js';
+import { registerSkillCommand } from './commands/skill.js';
 import { installCommand } from './commands/install.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { uninstallCommand } from './commands/uninstall.js';
@@ -22,6 +23,7 @@ program
   .addHelpText('after', '\nDocs: https://github.com/xpera/goodboy');
 
 program.addCommand(initCommand);
+registerSkillCommand(program);
 program.addCommand(installCommand);
 program.addCommand(upgradeCommand);
 program.addCommand(uninstallCommand);
