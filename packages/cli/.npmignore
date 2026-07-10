@@ -1,0 +1,6 @@
+src/
+*.test.ts
+__fixtures__/
+tsconfig.json
+vitest.config.ts
+.gitignore
