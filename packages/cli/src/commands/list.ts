@@ -7,6 +7,7 @@ import Table from 'cli-table3';
 import chalk from 'chalk';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readGoodBoyJson } from '../lib/goodboy-file.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
@@ -67,8 +68,23 @@ async function run(options: ListOptions): Promise<void> {
   const showGlobal = options.global === true || options.all === true;
 
   if (showProject) {
-    const projectSkillsPath = join(cwd, '.claude', 'skills');
-    rows.push(...(await readSkillsFromDir(projectSkillsPath, 'project')));
+    const hasGoodBoyJson = (await readGoodBoyJson(cwd)) !== null;
+
+    if (!hasGoodBoyJson) {
+      if (options.all) {
+        logger.info('Project skills: no goodboy.json in this directory');
+      } else {
+        logger.warn('No goodboy.json found in current directory.');
+        logger.info("This doesn't look like a GoodBoy project.");
+        logger.info('');
+        logger.info("Run 'goodboy init' to initialise GoodBoy here.");
+        logger.info("Run 'goodboy list -g' to see globally installed skills.");
+        return;
+      }
+    } else {
+      const projectSkillsPath = join(cwd, '.claude', 'skills');
+      rows.push(...(await readSkillsFromDir(projectSkillsPath, 'project')));
+    }
   }
 
   if (showGlobal) {
