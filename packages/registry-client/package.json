@@ -1,11 +1,36 @@
 {
-  "name": "@goodboy/registry-client",
+  "name": "@goodboyjs/registry-client",
   "version": "0.1.0",
-  "description": "HTTP client for the GoodBoy public registry API",
+  "description": "HTTP client for the GoodBoy public registry API (Phase 3 stub)",
+  "keywords": [
+    "claude-code",
+    "agent-skills",
+    "goodboy",
+    "registry"
+  ],
+  "homepage": "https://goodboyjs.io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xpera-ch/goodboy.git",
+    "directory": "packages/registry-client"
+  },
+  "bugs": {
+    "url": "https://github.com/xpera-ch/goodboy/issues"
+  },
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

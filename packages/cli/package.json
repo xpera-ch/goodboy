@@ -1,14 +1,45 @@
 {
-  "name": "@goodboy/cli",
+  "name": "@goodboyjs/cli",
   "version": "0.1.0",
-  "description": "The GoodBoy CLI tool",
+  "description": "A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem",
+  "keywords": [
+    "claude-code",
+    "agent-skills",
+    "skill",
+    "registry",
+    "package-manager",
+    "ai",
+    "cli"
+  ],
+  "homepage": "https://goodboyjs.io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xpera-ch/goodboy.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/xpera-ch/goodboy/issues"
+  },
+  "license": "MIT",
   "type": "module",
   "bin": {
     "goodboy": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,7 +47,7 @@
     "link": "npm run build && npm link"
   },
   "dependencies": {
-    "@goodboy/schema": "*",
+    "@goodboyjs/schema": "*",
     "@inquirer/prompts": "^8.5.0",
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.1",

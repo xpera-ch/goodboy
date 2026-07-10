@@ -1,9 +1,37 @@
 {
-  "name": "@goodboy/schema",
+  "name": "@goodboyjs/schema",
   "version": "1.0.0",
-  "description": "GoodBoy skill manifest JSON Schema and generated type definitions",
+  "description": "GoodBoy skill manifest JSON Schema and generated TypeScript type definitions",
+  "keywords": [
+    "claude-code",
+    "agent-skills",
+    "skill",
+    "schema",
+    "manifest",
+    "json-schema"
+  ],
+  "homepage": "https://goodboyjs.io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xpera-ch/goodboy.git",
+    "directory": "packages/schema"
+  },
+  "bugs": {
+    "url": "https://github.com/xpera-ch/goodboy/issues"
+  },
+  "license": "MIT",
   "types": "./generated/ts/index.d.ts",
-  "files": ["src", "versions", "generated"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "files": [
+    "src/",
+    "versions/",
+    "generated/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "generate": "ts-node ../../scripts/generate-types.ts"
   },
