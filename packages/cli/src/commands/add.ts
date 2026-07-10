@@ -15,6 +15,14 @@ import {
 } from '../lib/registry-entry.js';
 import { logger } from '../lib/logger.js';
 
+/**
+ * Marks a failure branch that has already logged its own specific message
+ * (and, for validation failures, already printed the full issue list).
+ * The catch block below checks for this to avoid re-logging a second,
+ * misleading message before exiting.
+ */
+class HandledFailure extends Error {}
+
 export const addCommand = new Command('add')
   .description('Add a skill to the local registry')
   .argument('<skill-path>', 'Path to the skill directory')
@@ -28,7 +36,7 @@ export const addCommand = new Command('add')
       if (!existsSync(skillPath)) {
         spinner.fail();
         logger.error(`Skill path not found: "${skillPathArg}"`);
-        process.exit(1);
+        throw new HandledFailure();
       }
 
       const dirName = basename(skillPath);
@@ -38,7 +46,7 @@ export const addCommand = new Command('add')
         logger.error(
           `Invalid skill directory name "${dirName}": must match ^[a-z0-9-]+$`,
         );
-        process.exit(1);
+        throw new HandledFailure();
       }
 
       spinner.text = 'Validating skill directory...';
@@ -47,7 +55,7 @@ export const addCommand = new Command('add')
       if (!result.valid) {
         spinner.fail('Skill validation failed');
         formatValidationResult(result, dirName);
-        process.exit(1);
+        throw new HandledFailure();
       }
 
       if (result.issues.some((i) => i.severity === 'warning')) {
@@ -65,7 +73,7 @@ export const addCommand = new Command('add')
         logger.error(
           `Manifest name "${manifest.name}" does not match directory name "${dirName}"`,
         );
-        process.exit(1);
+        throw new HandledFailure();
       }
 
       const version = manifest.version;
@@ -87,7 +95,7 @@ export const addCommand = new Command('add')
           logger.error(
             `Version "${version}" of skill "${manifest.name}" already exists. Use --force to overwrite.`,
           );
-          process.exit(1);
+          throw new HandledFailure();
         }
         logger.warn(
           `Overwriting existing version "${version}" of skill "${manifest.name}".`,
@@ -110,11 +118,13 @@ export const addCommand = new Command('add')
 
       spinner.succeed(`Skill "${manifest.name}@${version}" added to registry`);
     } catch (err) {
-      spinner.fail();
-      if (err instanceof Error && err.message.toLowerCase().includes('symlink')) {
-        logger.error('Skill rejected: symlink pointing outside skill directory detected');
-      } else {
-        logger.error(err instanceof Error ? err.message : 'Unknown error');
+      if (!(err instanceof HandledFailure)) {
+        spinner.fail();
+        if (err instanceof Error && err.message.toLowerCase().includes('symlink')) {
+          logger.error('Skill rejected: symlink pointing outside skill directory detected');
+        } else {
+          logger.error(err instanceof Error ? err.message : 'Unknown error');
+        }
       }
       process.exit(1);
     }

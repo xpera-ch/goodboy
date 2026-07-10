@@ -103,11 +103,17 @@ describe('add command', () => {
     mockExistsSync.mockReturnValue(false);
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('not found'));
+    // Regression guard: an exit call inside this try block must not re-enter
+    // the same catch and log a second, misleading message (or exit twice).
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledTimes(1);
   });
 
   it('exits when the directory name is invalid', async () => {
     await addCommand.parseAsync(['/home/user/My_Skill'], { from: 'user' }).catch(() => {});
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Invalid skill directory name'));
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledTimes(1);
   });
 
   it('exits when skill validation fails', async () => {
@@ -117,6 +123,8 @@ describe('add command', () => {
     });
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
     expect(mockFormatValidationResult).toHaveBeenCalled();
+    expect(mockLogger.error).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledTimes(1);
   });
 
   it('shows warnings but continues when validation has only warnings', async () => {
@@ -135,6 +143,8 @@ describe('add command', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('does not match directory name'),
     );
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledTimes(1);
   });
 
   it('scans for symlinks before copying', async () => {
@@ -163,6 +173,8 @@ describe('add command', () => {
     });
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('already exists'));
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledTimes(1);
     expect(mockCpSync).not.toHaveBeenCalled();
   });
 
