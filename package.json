@@ -1,8 +1,8 @@
 {
   "name": "goodboy",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
-  "description": "A personal skill registry and intelligent dispatcher for Claude Code",
+  "description": "A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem",
   "workspaces": [
     "packages/cli",
     "packages/schema",

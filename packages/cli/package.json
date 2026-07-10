@@ -1,6 +1,6 @@
 {
   "name": "@goodboy/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "The GoodBoy CLI tool",
   "type": "module",
   "bin": {
