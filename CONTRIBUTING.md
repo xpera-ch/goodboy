@@ -19,7 +19,7 @@ scripts/
 ## Setup
 
 ```sh
-git clone https://github.com/<org>/goodboy
+git clone https://github.com/xpera-ch/goodboy
 cd goodboy
 npm install
 ```
@@ -61,18 +61,19 @@ The following files implement security-critical logic. Changes to them require e
 
 | File | Why it is sensitive |
 |---|---|
-| `packages/cli/src/lib/hooks.ts` | Executes user-provided hook commands. Any change here can affect whether shell injection is possible. |
 | `packages/cli/src/lib/manifest.ts` | Parses and validates untrusted JSON. Size limits, schema enforcement, and error handling must be preserved. |
-| `packages/cli/src/lib/registry.ts` | Performs all filesystem path construction. Path traversal guards and directory permission modes must be preserved. |
+| `packages/cli/src/lib/registry.ts` | Resolves the registry path (including the `GOODBOY_REGISTRY` override) and skill resolution used by every command. Path traversal guards must be preserved. |
+| `packages/cli/src/lib/store.ts` | Resolves the global skill store path (`~/.goodboy/skills/`). Path traversal guards (`assertWithinStore`) must be preserved. |
 | `packages/cli/src/lib/validation.ts` | Defines the canonical `SKILL_NAME_RE` regex used across the codebase. |
+| `packages/cli/src/commands/skill-open.ts` | Spawns `$EDITOR` (or an autodetected editor) as a subprocess — the one place GoodBoy launches an external process. Must never use `shell: true`, and must only ever pass the resolved `SKILL.md` path as an argument. |
 | `packages/schema/src/manifest.schema.json` | The JSON Schema used to validate all manifests. Adding `additionalProperties: true` to any object definition is a breaking security change. |
 
 ### Hard requirements for contributors
 
 The following constraints are not optional. A PR that violates any of them will not be merged regardless of its other merits:
 
-1. **Never use `exec()`, `spawn()` with `shell: true`, or `eval()`** anywhere in the codebase. Hook execution must always use `execFile()` with an explicit argv array.
-2. **Manifest validation must occur before hook execution.** The validated in-memory manifest object is the source of truth for hook commands, not a re-read from disk.
+1. **Never use `exec()`, `spawn()` with `shell: true`, or `eval()`** anywhere in the codebase. The one legitimate use of `spawn()` — opening an editor in `goodboy skill open` — must always pass an explicit argv array, never a shell string.
+2. **Untrusted manifest JSON must always go through `readManifest()`** (size limit, nesting-depth check) before `JSON.parse`. Never parse a `manifest.json` directly.
 3. **All skill names must be validated against `SKILL_NAME_RE`** (`^[a-z0-9-]+$`) before any filesystem operation. Do not construct paths from unvalidated strings.
 4. **All path operations on resolved paths must use `startsWith(base + sep)`** to guard against traversal. Never use user-supplied strings in path operations without prior validation.
 5. **`additionalProperties: false` must be set on every new object definition** added to `manifest.schema.json`.

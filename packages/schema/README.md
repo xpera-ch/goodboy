@@ -4,11 +4,11 @@ The canonical GoodBoy skill manifest schema and generated type definitions.
 
 ## Schema
 
-The manifest schema lives in `src/manifest.schema.json`. It is a JSON Schema draft-07 document that defines the shape of a `goodboy.json` skill manifest file.
+The manifest schema lives in `src/manifest.schema.json`. It is a JSON Schema draft-07 document that defines the shape of a skill's `manifest.json` — the registry metadata file GoodBoy manages (not to be confused with `goodboy.json`, the per-project file listing installed skills).
 
 ## Versions
 
-Immutable snapshots of each published schema version are stored under `versions/<version>/manifest.schema.json`. Once a version is published it is never modified.
+Immutable snapshots of each published schema major version are stored under `versions/v<N>/manifest.schema.json` (currently `versions/v1/`). Once a version is published it is never modified.
 
 ## Generated Types
 
