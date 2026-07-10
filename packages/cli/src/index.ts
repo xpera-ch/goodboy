@@ -20,7 +20,7 @@ program
   .name('goodboy')
   .description('Personal skill registry and dispatcher for Claude Code')
   .version(pkg.version, '-v, --version', 'Print version number')
-  .addHelpText('after', '\nDocs: https://github.com/xpera/goodboy');
+  .addHelpText('after', '\nDocs: https://github.com/xpera-ch/goodboy');
 
 program.addCommand(initCommand);
 registerSkillCommand(program);
