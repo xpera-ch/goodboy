@@ -29,7 +29,7 @@ GoodBoy installs skills into one of two scopes:
 ## Installation
 
 ```bash
-npm install -g @goodboy/cli
+npm install -g @goodboyjs/cli
 ```
 
 Requires Node.js 18 or higher.

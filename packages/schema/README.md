@@ -1,4 +1,4 @@
-# @goodboy/schema
+# @goodboyjs/schema
 
 The canonical GoodBoy skill manifest schema and generated type definitions.
 

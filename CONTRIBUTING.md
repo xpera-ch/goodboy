@@ -4,9 +4,9 @@
 
 ```
 packages/
-  cli/               @goodboy/cli — the goodboy binary
-  schema/            @goodboy/schema — manifest JSON Schema + TypeScript types
-  registry-client/   @goodboy/registry-client — Phase 3 registry HTTP client
+  cli/               @goodboyjs/cli — the goodboy binary
+  schema/            @goodboyjs/schema — manifest JSON Schema + TypeScript types
+  registry-client/   @goodboyjs/registry-client — Phase 3 registry HTTP client
 scripts/
   generate-types.ts  regenerates packages/schema/generated/ts/index.d.ts
 ```

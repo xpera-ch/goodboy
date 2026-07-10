@@ -4,9 +4,9 @@
 
 This policy covers the `goodboy` CLI tool and its packages:
 
-- `@goodboy/cli` — the `goodboy` binary
-- `@goodboy/schema` — the manifest schema and TypeScript types
-- `@goodboy/registry-client` — the registry HTTP client (Phase 3, not yet released)
+- `@goodboyjs/cli` — the `goodboy` binary
+- `@goodboyjs/schema` — the manifest schema and TypeScript types
+- `@goodboyjs/registry-client` — the registry HTTP client (Phase 3, not yet released)
 
 ## Reporting a Vulnerability
 

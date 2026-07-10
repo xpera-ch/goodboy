@@ -1,4 +1,4 @@
-# @goodboy/registry-client
+# @goodboyjs/registry-client
 
 HTTP client for the GoodBoy public registry API.
 
@@ -16,7 +16,7 @@ This package is the public-facing HTTP client that the CLI uses to interact with
 ## Usage
 
 ```typescript
-import { createRegistryClient } from '@goodboy/registry-client'
+import { createRegistryClient } from '@goodboyjs/registry-client'
 
 const client = createRegistryClient({ baseUrl: 'https://registry.goodboy.dev' })
 ```

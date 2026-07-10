@@ -17,7 +17,7 @@ function getValidator(): ReturnType<Ajv['compile']> {
   if (_validator) return _validator;
   const ajv = new Ajv({ strict: true, allErrors: true });
   addFormats(ajv);
-  const schema = _require('@goodboy/schema/src/manifest.schema.json') as Record<string, unknown>;
+  const schema = _require('@goodboyjs/schema/src/manifest.schema.json') as Record<string, unknown>;
   _validator = ajv.compile(schema);
   return _validator;
 }

@@ -1,4 +1,4 @@
-// @goodboy/registry-client
+// @goodboyjs/registry-client
 // HTTP client for the GoodBoy public registry API (Phase 3)
 // This package is a stub — full implementation ships with Phase 3
 

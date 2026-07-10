@@ -1,11 +1,11 @@
-# @goodboy/cli
+# @goodboyjs/cli
 
 The GoodBoy command-line interface — the `goodboy` binary.
 
 ## Installation
 
 ```sh
-npm install -g @goodboy/cli
+npm install -g @goodboyjs/cli
 ```
 
 ## Commands

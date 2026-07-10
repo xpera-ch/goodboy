@@ -7,7 +7,7 @@ import { LocalRegistryAdapter } from './local-registry-adapter.js';
  * and any registry implementation.
  *
  * Phase 1: implemented by LocalRegistryAdapter (git-based)
- * Phase 3: implemented by RemoteRegistryAdapter (@goodboy/registry-client)
+ * Phase 3: implemented by RemoteRegistryAdapter (@goodboyjs/registry-client)
  *
  * Commands must only import this interface — never a concrete adapter.
  * This ensures the Phase 3 swap requires zero changes to command code.
