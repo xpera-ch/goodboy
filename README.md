@@ -32,7 +32,7 @@ GoodBoy installs skills into one of two scopes:
 npm install -g @goodboyjs/cli
 ```
 
-Requires Node.js 18 or higher.
+Requires Node.js 20.12 or higher.
 
 ## Quick start
 

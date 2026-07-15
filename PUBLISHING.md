@@ -8,7 +8,7 @@ in GitHub Secrets.
 
 When a version tag (v*.*.*) is pushed to GitHub, the release
 workflow:
-1. Runs tests on Node.js 18, 20, and 22
+1. Runs tests on Node.js 20 and 22
 2. Builds all packages
 3. Publishes @goodboyjs/schema, @goodboyjs/registry-client,
    and @goodboyjs/cli to npm using OIDC authentication
