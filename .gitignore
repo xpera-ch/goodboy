@@ -7,3 +7,4 @@ packages/schema/generated/
 coverage/
 .env
 .DS_Store
+docs/
