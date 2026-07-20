@@ -5,7 +5,13 @@ import type { GoodBoyManifest } from '../types/index.js';
 vi.mock('node:fs');
 
 import { statSync, readFileSync, writeFileSync } from 'node:fs';
-import { readManifest, validateManifest, writeManifest } from './manifest.js';
+import {
+  readManifest,
+  validateManifest,
+  validateManifestDetailed,
+  writeManifest,
+  KNOWN_SCHEMA_VERSION,
+} from './manifest.js';
 import { loadFixture } from '../__fixtures__/index.js';
 
 const mockStatSync = vi.mocked(statSync);
@@ -316,6 +322,109 @@ describe('validateManifest()', () => {
     // Type-level regression guard: if permissions were a tuple union, this assignment would fail tsc.
     const p: GoodBoyManifest['permissions'] = ['read_files', 'network'];
     expect(p).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateManifestDetailed() — schema-version tolerance (S1)
+// ---------------------------------------------------------------------------
+
+describe('validateManifestDetailed() — schema-version tolerance', () => {
+  const BASE = loadFixture('valid-minimal') as Record<string, unknown>;
+
+  it('1.0.0 manifest returns no warnings', () => {
+    const result = validateManifestDetailed({ ...BASE });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('rejects a 1.0.0 manifest with an unknown top-level field (stamping enforcement)', () => {
+    const manifest = { ...BASE, extra_field: 'nope' };
+    expect(() => validateManifestDetailed(manifest)).toThrow('Invalid manifest:');
+  });
+
+  it('accepts a 1.5.0 manifest with an unknown top-level field, stripping it with a warning', () => {
+    const input = { ...BASE, schema_version: '1.5.0', future_field: 'unused' };
+    const result = validateManifestDetailed(input);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('schema 1.5.0');
+    expect(result.warnings[0]).toContain(KNOWN_SCHEMA_VERSION);
+    expect(result.manifest).not.toHaveProperty('future_field');
+    expect(input).toHaveProperty('future_field', 'unused'); // caller's object untouched
+  });
+
+  it('rejects a 1.5.0 manifest whose known fields are invalid', () => {
+    const input = { ...BASE, schema_version: '1.5.0', status: 'not-a-real-status' };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a 1.5.0 manifest with an unknown property nested inside a known object', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.5.0',
+      author: { name: 'Test', unexpected: 'nope' },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a 2.0.0 manifest with an upgrade-GoodBoy message', () => {
+    const input = { ...BASE, schema_version: '2.0.0' };
+    expect(() => validateManifestDetailed(input)).toThrow(
+      'manifest declares schema 2.0.0; this version of GoodBoy supports 1.x manifests. Upgrade GoodBoy to use this skill.',
+    );
+  });
+
+  it('rejects a 0.9.0 manifest without suggesting a GoodBoy upgrade (wrong direction)', () => {
+    const input = { ...BASE, schema_version: '0.9.0' };
+    let error: Error | undefined;
+    try {
+      validateManifestDetailed(input);
+      expect.fail('should have thrown');
+    } catch (err) {
+      error = err as Error;
+    }
+    expect(error.message).toBe(
+      'manifest declares schema 0.9.0; this version of GoodBoy supports 1.x manifests.',
+    );
+    expect(error.message).not.toContain('Upgrade GoodBoy');
+  });
+
+  it('rejects a manifest with a missing schema_version (falls through to standard failure)', () => {
+    const input = { ...BASE };
+    delete input['schema_version'];
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a manifest with a non-string schema_version without crashing', () => {
+    const input = { ...BASE, schema_version: 100 };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a manifest with a malformed schema_version string ("1.0")', () => {
+    const input = { ...BASE, schema_version: '1.0' };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects a manifest with a malformed schema_version string ("abc")', () => {
+    const input = { ...BASE, schema_version: 'abc' };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('accepts a patch-only bump (1.0.7) via the strict path when otherwise valid', () => {
+    const input = { ...BASE, schema_version: '1.0.7' };
+    const result = validateManifestDetailed(input);
+    expect(result.warnings).toEqual([]);
+    expect(result.manifest.schema_version).toBe('1.0.7');
+  });
+
+  it('KNOWN_SCHEMA_VERSION itself validates cleanly against the shipped schema', () => {
+    const input = { ...BASE, schema_version: KNOWN_SCHEMA_VERSION };
+    expect(() => validateManifestDetailed(input)).not.toThrow();
+  });
+
+  it('validateManifest() (thin wrapper) still returns just the manifest, discarding warnings', () => {
+    const input = { ...BASE, schema_version: '1.5.0', future_field: 'unused' };
+    const manifest = validateManifest(input);
+    expect(manifest).not.toHaveProperty('future_field');
   });
 });
 
