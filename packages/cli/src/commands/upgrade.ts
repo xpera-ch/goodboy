@@ -3,7 +3,7 @@ import { cpSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, validateManifestDetailed } from '../lib/manifest.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
@@ -15,7 +15,7 @@ import {
 } from '../lib/goodboy-file.js';
 import { getStorePath, getGoodboyHome } from '../lib/store.js';
 
-interface UpgradeOptions {
+export interface UpgradeOptions {
   global?: boolean;
 }
 
@@ -23,7 +23,7 @@ function getProjectSkillsPath(cwd: string): string {
   return join(cwd, '.claude', 'skills');
 }
 
-async function upgradeSkill(
+export async function upgradeSkill(
   name: string,
   options: UpgradeOptions,
   cwd: string,
@@ -46,7 +46,11 @@ async function upgradeSkill(
   let manifest;
   try {
     const data = await readManifest(join(skillPath, 'manifest.json'));
-    manifest = validateManifest(data);
+    const detailed = validateManifestDetailed(data);
+    manifest = detailed.manifest;
+    for (const warning of detailed.warnings) {
+      logger.warn(warning);
+    }
   } catch (err) {
     spinner.fail('Manifest validation failed');
     throw err;
@@ -89,7 +93,7 @@ async function upgradeSkill(
   spinner.succeed(`Upgraded "${name}" (${from}${manifest.version})`);
 }
 
-async function upgradeAll(options: UpgradeOptions, cwd: string): Promise<void> {
+export async function upgradeAll(options: UpgradeOptions, cwd: string): Promise<void> {
   const dir = options.global ? getGoodboyHome() : cwd;
   const goodboy = await readGoodBoyJson(dir);
   if (!goodboy) {

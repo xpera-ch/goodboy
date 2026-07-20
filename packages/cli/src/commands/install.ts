@@ -4,7 +4,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, validateManifestDetailed } from '../lib/manifest.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger, sanitiseError } from '../lib/logger.js';
@@ -106,7 +106,11 @@ export async function installNamed(
   let manifest;
   try {
     const data = await readManifest(join(skillPath, 'manifest.json'));
-    manifest = validateManifest(data);
+    const detailed = validateManifestDetailed(data);
+    manifest = detailed.manifest;
+    for (const warning of detailed.warnings) {
+      logger.warn(warning);
+    }
   } catch (err) {
     spinner.fail('Manifest validation failed');
     throw err;

@@ -278,6 +278,19 @@ describe('validateSkillDirectory() — warnings', () => {
     const errors = result.issues.filter((i) => i.severity === 'error');
     expect(errors).toHaveLength(0);
   });
+
+  it('warns (not errors) when the manifest uses a tolerated newer-minor schema version', async () => {
+    const m = JSON.parse(BASE_MANIFEST);
+    m.schema_version = '1.5.0';
+    m.future_field = 'unused';
+    writeTmp('manifest.json', JSON.stringify(m));
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ severity: 'warning', message: expect.stringContaining('schema 1.5.0') }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { readManifest, validateManifest } from './manifest.js';
+import { readManifest, validateManifestDetailed } from './manifest.js';
+import type { ManifestValidationResult } from './manifest.js';
 import { logger } from './logger.js';
 
 export type ValidationSeverity = 'error' | 'warning';
@@ -54,7 +55,7 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
 
   // --- manifest.json checks ---
   const manifestPath = join(skillPath, 'manifest.json');
-  let manifest: ReturnType<typeof validateManifest> | null = null;
+  let manifest: ManifestValidationResult['manifest'] | null = null;
 
   if (!existsSync(manifestPath)) {
     issues.push({ severity: 'error', message: 'manifest.json not found' });
@@ -62,7 +63,11 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
     try {
       const raw = await readManifest(manifestPath);
       try {
-        manifest = validateManifest(raw);
+        const detailed = validateManifestDetailed(raw);
+        manifest = detailed.manifest;
+        for (const warning of detailed.warnings) {
+          issues.push({ severity: 'warning', message: warning });
+        }
       } catch (err) {
         /* c8 ignore next */
         const msg = err instanceof Error ? err.message : String(err);
