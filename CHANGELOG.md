@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-07-20
+
+Forward-compatibility patch: `manifest.json` validation now tolerates a manifest
+declaring a newer **minor** schema version than this CLI knows, stripping any
+unknown top-level fields and printing a warning instead of hard-rejecting the
+skill. A manifest declaring a newer **major** schema version is still rejected,
+with a message pointing at upgrading GoodBoy. This is preparatory work: it
+shrinks the population of strict-only installs before a future schema `1.1.0`
+(CLI `0.2.0`) introduces the `requires.secrets` manifest field.
+
+### Changed
+
+- `@goodboyjs/schema`: `schema_version` is now validated as `^1\.\d+\.\d+$` (semver-shaped, v1.x only) instead of a fixed `"1.0.0"` constant.
+- `@goodboyjs/cli`: `goodboy install`, `goodboy upgrade`, `goodboy add`, and `goodboy registry validate` print a warning for a tolerated newer-minor manifest instead of silently accepting or hard-rejecting it.
+
 ## [0.1.0] - 2026-07-10
 
 Initial public release.
