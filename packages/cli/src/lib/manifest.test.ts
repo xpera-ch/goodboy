@@ -429,6 +429,59 @@ describe('validateManifestDetailed() — schema-version tolerance', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateManifestDetailed() — schema_version length bound (security regression)
+//
+// schema_version has no length limit of its own consequence while it was a
+// `const`, but became an open-ended pattern match in the S1 tolerance work.
+// Without a bound, an overlong value gets interpolated verbatim into a thrown
+// error message or a tolerance warning (up to the 512KB manifest cap). These
+// tests pin the fix: a >32-char schema_version is diverted to strict Ajv
+// validation before any interpolation can occur, and Ajv's own maxLength
+// violation message never embeds the offending value.
+// ---------------------------------------------------------------------------
+
+describe('validateManifestDetailed() — schema_version length bound (security)', () => {
+  const BASE = loadFixture('valid-minimal') as Record<string, unknown>;
+
+  it('rejects a huge major segment with a bounded, non-embedding error message', () => {
+    const hugeDigits = '9'.repeat(400_000);
+    const input = { ...BASE, schema_version: `${hugeDigits}.0.0` };
+    let caught: Error | undefined;
+    try {
+      validateManifestDetailed(input);
+      expect.fail('should have thrown');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught.message).toContain('Invalid manifest:');
+    expect(caught.message).not.toContain(hugeDigits);
+    expect(caught.message.length).toBeLessThan(1024);
+  });
+
+  it('rejects a huge minor segment with a bounded, non-embedding error message (not a warning)', () => {
+    const hugeDigits = '9'.repeat(400_000);
+    const input = { ...BASE, schema_version: `1.${hugeDigits}.0` };
+    let caught: Error | undefined;
+    try {
+      validateManifestDetailed(input);
+      expect.fail('should have thrown');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught.message).toContain('Invalid manifest:');
+    expect(caught.message).not.toContain(hugeDigits);
+    expect(caught.message.length).toBeLessThan(1024);
+  });
+
+  it('diverts a >32-char but otherwise well-formed version (would have tolerated as newer-minor) to the strict path', () => {
+    const hugeMinor = '9'.repeat(40);
+    const input = { ...BASE, schema_version: `1.${hugeMinor}.0` };
+    expect(input.schema_version.length).toBeGreaterThan(32);
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // writeManifest()
 // ---------------------------------------------------------------------------
 

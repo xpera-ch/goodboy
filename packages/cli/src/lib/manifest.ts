@@ -41,7 +41,7 @@ function getValidator(): ReturnType<Ajv['compile']> {
 // unknown top-level fields from a newer-minor manifest before strict
 // validation — never to loosen validation of known fields.
 function getKnownTopLevelKeys(): Set<string> {
-  /* c8 ignore next -- the shipped schema always has a root "properties" key; ?? fallback is unreachable */
+  /* c8 ignore next -- the shipped schema always has a root "properties" key; ?? fallback is unreachable. Fail-closed if ever violated: an empty Set would strip every field, and every existing manifest test would fail immediately. */
   const properties = (getSchema()['properties'] ?? {}) as Record<string, unknown>;
   return new Set(Object.keys(properties));
 }
@@ -127,7 +127,11 @@ export function validateManifestDetailed(data: unknown): ManifestValidationResul
 
   if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
     const rawVersion = (data as Record<string, unknown>)['schema_version'];
-    if (typeof rawVersion === 'string') {
+    // The length gate (mirrors the schema's own maxLength: 32) must run before any
+    // interpolation of rawVersion into a message: an overlong value falls straight
+    // through to strict Ajv validation, which rejects it via maxLength without ever
+    // embedding the value in the error text.
+    if (typeof rawVersion === 'string' && rawVersion.length <= 32) {
       const match = SCHEMA_VERSION_PATTERN.exec(rawVersion);
       if (match) {
         const major = Number(match[1]);
