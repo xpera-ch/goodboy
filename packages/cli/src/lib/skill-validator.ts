@@ -5,7 +5,7 @@ import { readManifest, validateManifestDetailed } from './manifest.js';
 import type { ManifestValidationResult } from './manifest.js';
 import { logger } from './logger.js';
 
-export type ValidationSeverity = 'error' | 'warning';
+export type ValidationSeverity = 'error' | 'warning' | 'info';
 
 export interface ValidationIssue {
   severity: ValidationSeverity;
@@ -94,6 +94,13 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
     if (!manifest.tags || manifest.tags.length === 0) {
       issues.push({ severity: 'warning', message: 'manifest has no tags' });
     }
+    const secretCount = manifest.requires?.secrets.length ?? 0;
+    if (secretCount > 0) {
+      issues.push({
+        severity: 'info',
+        message: `declares ${secretCount} required secret${secretCount === 1 ? '' : 's'}`,
+      });
+    }
   }
 
   // --- SKILL.md checks ---
@@ -135,6 +142,7 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
 export function formatValidationResult(result: ValidationResult, skillName: string): void {
   const errors = result.issues.filter((i) => i.severity === 'error');
   const warnings = result.issues.filter((i) => i.severity === 'warning');
+  const infos = result.issues.filter((i) => i.severity === 'info');
 
   if (errors.length > 0) {
     logger.error(`Validation errors for "${skillName}":`);
@@ -147,5 +155,8 @@ export function formatValidationResult(result: ValidationResult, skillName: stri
     for (const issue of warnings) {
       logger.warn(`  • ${issue.message}`);
     }
+  }
+  for (const issue of infos) {
+    logger.success(issue.message);
   }
 }

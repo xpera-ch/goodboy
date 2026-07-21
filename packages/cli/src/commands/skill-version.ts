@@ -10,7 +10,7 @@ import {
   resolveVersionPath,
   addVersionToEntry,
 } from '../lib/registry-entry.js';
-import { readManifest, writeManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, writeManifest, validateManifest, FIELD_INTRODUCED_IN } from '../lib/manifest.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 
@@ -114,6 +114,11 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
     const rawManifest = await readManifest(manifestPath);
     const manifest = validateManifest(rawManifest);
     manifest.version = newVersion;
+    // Stamp the lowest schema version this manifest actually needs: an author
+    // who hand-added `requires` gets the correct stamp on their next version
+    // bump, rather than carrying a stale schema_version that would fail the
+    // feature-stamping gate in manifest.ts on the very next validation.
+    manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
     await writeManifest(manifestPath, manifest);
 
     const updatedEntry = addVersionToEntry(entry, newVersion, join('versions', newVersion));

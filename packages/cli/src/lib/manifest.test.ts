@@ -11,6 +11,7 @@ import {
   validateManifestDetailed,
   writeManifest,
   KNOWN_SCHEMA_VERSION,
+  FIELD_INTRODUCED_IN,
 } from './manifest.js';
 import { loadFixture } from '../__fixtures__/index.js';
 
@@ -417,6 +418,10 @@ describe('validateManifestDetailed() — schema-version tolerance', () => {
   });
 
   it('KNOWN_SCHEMA_VERSION itself validates cleanly against the shipped schema', () => {
+    // Pinned, not just referenced: guards against the constant and the schema
+    // drifting apart silently (e.g. the schema gains a field but the constant
+    // is left at the old value, or vice versa).
+    expect(KNOWN_SCHEMA_VERSION).toBe('1.1.0');
     const input = { ...BASE, schema_version: KNOWN_SCHEMA_VERSION };
     expect(() => validateManifestDetailed(input)).not.toThrow();
   });
@@ -478,6 +483,187 @@ describe('validateManifestDetailed() — schema_version length bound (security)'
     const input = { ...BASE, schema_version: `1.${hugeMinor}.0` };
     expect(input.schema_version.length).toBeGreaterThan(32);
     expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateManifestDetailed() — requires.secrets (S2)
+// ---------------------------------------------------------------------------
+
+describe('validateManifestDetailed() — requires.secrets (S2)', () => {
+  const BASE = loadFixture('valid-minimal') as Record<string, unknown>;
+
+  it('accepts requires.secrets at schema_version 1.1.0 with no warnings', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] },
+    };
+    const result = validateManifestDetailed(input);
+    expect(result.warnings).toEqual([]);
+    expect(result.manifest.requires).toEqual({ secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] });
+  });
+
+  it('rejects requires at schema_version 1.0.0 with the exact stamping remediation message', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.0.0',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow(
+      'manifest declares schema_version 1.0.0 but uses "requires", which needs 1.1.0.\n' +
+        'Set "schema_version": "1.1.0" in manifest.json.',
+    );
+  });
+
+  it('tolerant path: 1.2.0 with requires plus an unknown future field strips the unknown field, keeps and enforces requires', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.2.0',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+      future_field: 'unused',
+    };
+    const result = validateManifestDetailed(input);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('schema 1.2.0');
+    expect(result.manifest).not.toHaveProperty('future_field');
+    expect(result.manifest.requires).toEqual({ secrets: ['EXOSCALE_API_KEY'] });
+  });
+
+  it('tolerant path still genuinely validates requires, not just passes it through untouched', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.2.0',
+      permissions: ['env'],
+      requires: { secrets: [] }, // violates minItems: 1
+      future_field: 'unused',
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  const invalidSecretNames: Record<string, string> = {
+    'lowercase': 'exoscale_api_key',
+    'a leading digit': '1EXOSCALE_KEY',
+    'a space': 'EXOSCALE API KEY',
+    'an empty string': '',
+    'over 64 characters': 'A'.repeat(65),
+  };
+  for (const [label, name] of Object.entries(invalidSecretNames)) {
+    it(`rejects a secret name that is ${label}`, () => {
+      const input = {
+        ...BASE,
+        schema_version: '1.1.0',
+        permissions: ['env'],
+        requires: { secrets: [name] },
+      };
+      expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+    });
+  }
+
+  it('rejects an empty secrets array (minItems: 1)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: [] },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects 33 secret names (maxItems: 32)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: Array.from({ length: 33 }, (_, i) => `SECRET_${i}`) },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('accepts exactly 32 secret names (boundary)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: Array.from({ length: 32 }, (_, i) => `SECRET_${i}`) },
+    };
+    expect(() => validateManifestDetailed(input)).not.toThrow();
+  });
+
+  it('rejects duplicate secret names (uniqueItems)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: ['DUPE', 'DUPE'] },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects requires: {} (secrets is required within requires)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: {},
+    };
+    expect(() => validateManifestDetailed(input)).toThrow('Invalid manifest:');
+  });
+
+  it('rejects requires.secrets present without "env" in permissions, with the exact remediation message', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    };
+    expect(() => validateManifestDetailed(input)).toThrow(
+      'manifest declares requires.secrets but "permissions" does not include "env".\n' +
+        'Secrets are delivered as environment variables; add "env" to permissions.',
+    );
+  });
+
+  it('accepts requires.secrets present with "env" among other permissions', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.1.0',
+      permissions: ['read_files', 'env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    };
+    expect(() => validateManifestDetailed(input)).not.toThrow();
+  });
+
+  it('accepts "env" in permissions without requires.secrets (consistency rule not triggered)', () => {
+    const input = {
+      ...BASE,
+      schema_version: '1.0.0',
+      permissions: ['env'],
+    };
+    expect(() => validateManifestDetailed(input)).not.toThrow();
+  });
+
+  it('FIELD_INTRODUCED_IN.requires matches KNOWN_SCHEMA_VERSION (single source of truth reused by skill-version stamping)', () => {
+    expect(FIELD_INTRODUCED_IN['requires']).toBe('1.1.0');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateManifestDetailed() — backward compatibility (S2 must not disturb S1)
+// ---------------------------------------------------------------------------
+
+describe('validateManifestDetailed() — backward compatibility across the S2 bump', () => {
+  it('every existing 1.0.0 fixture without requires still validates with zero warnings', () => {
+    const fixtureNames = [
+      'valid-minimal', 'valid-complete', 'valid-deprecated',
+      'valid-no-permissions', 'valid-with-os-constraint',
+    ];
+    for (const name of fixtureNames) {
+      const result = validateManifestDetailed(loadFixture(name));
+      expect(result.warnings).toEqual([]);
+      expect(result.manifest).not.toHaveProperty('requires');
+    }
   });
 });
 

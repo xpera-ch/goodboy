@@ -294,6 +294,84 @@ describe('validateSkillDirectory() — warnings', () => {
 });
 
 // ---------------------------------------------------------------------------
+// requires.secrets (S2)
+// ---------------------------------------------------------------------------
+
+describe('validateSkillDirectory() — requires.secrets (S2)', () => {
+  it('passes with an info issue when a skill declares required secrets', async () => {
+    const m = {
+      name: 'test-skill',
+      version: '1.0.0',
+      description: 'A well-described skill for testing purposes',
+      author: { name: 'Test Author' },
+      license: 'MIT',
+      schema_version: '1.1.0',
+      status: 'experimental',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] },
+    };
+    writeTmp('manifest.json', JSON.stringify(m));
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ severity: 'info', message: 'declares 2 required secrets' }),
+    );
+  });
+
+  it('singularizes the info message for exactly one declared secret', async () => {
+    const m = {
+      name: 'test-skill',
+      version: '1.0.0',
+      description: 'A well-described skill for testing purposes',
+      author: { name: 'Test Author' },
+      license: 'MIT',
+      schema_version: '1.1.0',
+      status: 'experimental',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    };
+    writeTmp('manifest.json', JSON.stringify(m));
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ severity: 'info', message: 'declares 1 required secret' }),
+    );
+  });
+
+  it('fails with the stamping remediation message for a 1.0.0 manifest that uses requires', async () => {
+    const m = {
+      name: 'test-skill',
+      version: '1.0.0',
+      description: 'A well-described skill for testing purposes',
+      author: { name: 'Test Author' },
+      license: 'MIT',
+      schema_version: '1.0.0',
+      status: 'experimental',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    };
+    writeTmp('manifest.json', JSON.stringify(m));
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.valid).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('which needs 1.1.0'),
+      }),
+    );
+  });
+
+  it('does not add an info issue for a manifest without requires', async () => {
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.issues.some((i) => i.severity === 'info')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // formatValidationResult()
 // ---------------------------------------------------------------------------
 
@@ -330,5 +408,14 @@ describe('formatValidationResult()', () => {
     formatValidationResult(result, 'test-skill');
     expect(mockLogger.error).not.toHaveBeenCalled();
     expect(mockLogger.warn).not.toHaveBeenCalled();
+  });
+
+  it('calls logger.success for each info issue', () => {
+    const result: ValidationResult = {
+      valid: true,
+      issues: [{ severity: 'info', message: 'declares 2 required secrets' }],
+    };
+    formatValidationResult(result, 'test-skill');
+    expect(mockLogger.success).toHaveBeenCalledWith('declares 2 required secrets');
   });
 });

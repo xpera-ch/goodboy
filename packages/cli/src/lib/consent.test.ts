@@ -7,9 +7,11 @@ vi.mock('./logger.js', () => ({
 }));
 
 import { confirm } from '@inquirer/prompts';
+import { logger } from './logger.js';
 import { summarizePermissions, requestConsent } from './consent.js';
 
 const mockConfirm = vi.mocked(confirm);
+const mockLogger = vi.mocked(logger);
 
 const MANIFEST: GoodBoyManifest = {
   name: 'test-skill',
@@ -104,5 +106,41 @@ describe('requestConsent()', () => {
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ default: false }),
     );
+  });
+
+  it('shows required secret names, exact strings, alongside permissions', async () => {
+    mockConfirm.mockResolvedValue(true);
+    const manifest: GoodBoyManifest = {
+      ...MANIFEST,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] },
+    };
+    await requestConsent(manifest);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Required secrets (names only — never resolved or read during install):',
+    );
+    expect(mockLogger.info).toHaveBeenCalledWith('  • EXOSCALE_API_KEY');
+    expect(mockLogger.info).toHaveBeenCalledWith('  • EXOSCALE_API_SECRET');
+  });
+
+  it('does not show a secrets section for a manifest without requires', async () => {
+    mockConfirm.mockResolvedValue(true);
+    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['shell'] };
+    await requestConsent(manifest);
+    const infoLines = mockLogger.info.mock.calls.map((c) => String(c[0]));
+    expect(infoLines.some((line) => line.includes('Required secrets'))).toBe(false);
+  });
+
+  it('prompts when secrets are declared even if permissions is empty (condition is explicit, not inferred from the permissions/secrets consistency rule)', async () => {
+    mockConfirm.mockResolvedValue(true);
+    const manifest = {
+      ...MANIFEST,
+      permissions: [],
+      requires: { secrets: ['SOME_SECRET'] },
+    } as GoodBoyManifest;
+    const result = await requestConsent(manifest);
+    expect(mockConfirm).toHaveBeenCalled();
+    expect(result).toBe(true);
   });
 });

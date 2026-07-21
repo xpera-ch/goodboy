@@ -16,7 +16,19 @@ const MAX_NESTING_DEPTH = 10;
  * declaring a newer minor are tolerated (unknown top-level fields stripped,
  * with a warning); a newer major is rejected. See validateManifestDetailed().
  */
-export const KNOWN_SCHEMA_VERSION = '1.0.0';
+export const KNOWN_SCHEMA_VERSION = '1.1.0';
+
+// Feature-driven stamping: a top-level field may only be used by a manifest
+// that declares a schema_version at or above the version that introduced it.
+// Without this, a manifest stamped e.g. "1.0.0" that uses a field only the
+// known schema (now on a later minor) recognizes would validate successfully
+// under Ajv — but an older, tolerant CLI that has never heard of the field
+// would reject it with a confusing additionalProperties error. Enforced here,
+// in code, because remediation text like this needs to name the exact field
+// and the exact version to stamp — not something Ajv's own error shapes give us.
+export const FIELD_INTRODUCED_IN: Record<string, string> = {
+  requires: '1.1.0',
+};
 
 const SCHEMA_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
@@ -52,6 +64,56 @@ function throwValidationError(validate: ReturnType<Ajv['compile']>): never {
     (e) => `  ${e.instancePath || '(root)'}: ${e.message ?? 'validation failed'}`,
   );
   throw new Error(`Invalid manifest:\n${lines.join('\n')}`);
+}
+
+function parseSemverTriple(version: string): [number, number, number] | null {
+  const match = SCHEMA_VERSION_PATTERN.exec(version);
+  /* c8 ignore next -- both call sites only ever pass an already-valid version string; null is a defensive return, not a reachable case */
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function isVersionAtLeast(declared: [number, number, number], required: [number, number, number]): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (declared[i]! !== required[i]!) return declared[i]! > required[i]!;
+  }
+  return true;
+}
+
+// Runs after a manifest has already passed Ajv validation (so schema_version
+// is guaranteed to match the schema's own pattern). Rejects a manifest that
+// uses a field its declared schema_version predates.
+function assertFeatureStamping(manifest: GoodBoyManifest): void {
+  const declared = parseSemverTriple(manifest.schema_version);
+  /* c8 ignore next -- schema_version already satisfied Ajv's own pattern check by this point, so it always parses */
+  if (!declared) return;
+  for (const key of Object.keys(manifest)) {
+    const introducedIn = FIELD_INTRODUCED_IN[key];
+    if (!introducedIn) continue;
+    const required = parseSemverTriple(introducedIn)!;
+    if (!isVersionAtLeast(declared, required)) {
+      throw new Error(
+        `manifest declares schema_version ${manifest.schema_version} but uses "${key}", which needs ${introducedIn}.\n` +
+          `Set "schema_version": "${introducedIn}" in manifest.json.`,
+      );
+    }
+  }
+}
+
+// Hard-error consistency rule (concept doc §7.1): requires.secrets is only
+// ever visible to a skill-installing user via the "env" permission on a
+// tolerant older CLI that doesn't know about `requires` at all — so the two
+// fields must never disagree. Fail closed rather than silently trusting one.
+function assertPermissionsConsistency(manifest: GoodBoyManifest): void {
+  const secrets = manifest.requires?.secrets;
+  if (!secrets || secrets.length === 0) return;
+  const permissions = manifest.permissions ?? [];
+  if (!permissions.includes('env')) {
+    throw new Error(
+      'manifest declares requires.secrets but "permissions" does not include "env".\n' +
+        'Secrets are delivered as environment variables; add "env" to permissions.',
+    );
+  }
 }
 
 // Heuristic nesting depth check: counts opening brackets/braces.
@@ -151,8 +213,11 @@ export function validateManifestDetailed(data: unknown): ManifestValidationResul
             if (known.has(key)) stripped[key] = value;
           }
           if (!validate(stripped)) throwValidationError(validate);
+          const manifest = stripped as unknown as GoodBoyManifest;
+          assertFeatureStamping(manifest);
+          assertPermissionsConsistency(manifest);
           return {
-            manifest: stripped as unknown as GoodBoyManifest,
+            manifest,
             warnings: [
               `manifest uses schema ${rawVersion}; this GoodBoy CLI knows ${KNOWN_SCHEMA_VERSION}. Unknown fields were ignored — upgrade GoodBoy to use them.`,
             ],
@@ -166,7 +231,10 @@ export function validateManifestDetailed(data: unknown): ManifestValidationResul
   }
 
   if (!validate(data)) throwValidationError(validate);
-  return { manifest: data as GoodBoyManifest, warnings: [] };
+  const manifest = data as GoodBoyManifest;
+  assertFeatureStamping(manifest);
+  assertPermissionsConsistency(manifest);
+  return { manifest, warnings: [] };
 }
 
 export function validateManifest(data: unknown): GoodBoyManifest {

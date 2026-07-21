@@ -4,6 +4,47 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-07-21
+
+Skills can now declare logical secret requirements: `manifest.json` supports
+a new `requires.secrets` field (schema `1.1.0`) listing the environment-variable-style
+names a skill needs at runtime. This is declared intent only — GoodBoy validates
+and displays these names; it never resolves, injects, or reads them, and never
+executes the skill.
+
+Two rules are enforced to keep this reliable:
+
+- **Feature-driven stamping**: a manifest may only use a field its declared
+  `schema_version` actually introduced. A manifest using `requires` but stamped
+  below `1.1.0` is rejected with a message naming the exact version to set —
+  this prevents a manifest from silently validating on this CLI while a
+  tolerant 0.1.1 install rejects it with a confusing generic error.
+- **Permissions consistency (hard error)**: `requires.secrets` must be
+  accompanied by `"env"` in `permissions`. Older, tolerant CLIs that don't
+  know about `requires` at all still see `permissions` — so it must always be
+  a reliable signal on its own.
+
+Declared secrets are now shown (names only, never values) in the install/upgrade
+consent prompt and in `goodboy skill validate` output. `goodboy skill version --bump`
+recomputes the `schema_version` stamp on every new version it creates, so a
+manifest that hand-added `requires` gets corrected automatically.
+
+Compatibility: manifests using `requires.secrets` need CLI ≥ 0.1.1 to install
+(tolerated with a warning, field invisible) and ≥ 0.2.0 to see and validate
+the declaration.
+
+### Added
+
+- `manifest.json`: new optional `requires.secrets` field (schema `1.1.0`) — an array of 1–32 unique, environment-variable-style logical secret names.
+- `goodboy skill validate` / `goodboy add`: an info line (`✓ declares N required secrets`) when a manifest declares secrets and validates cleanly.
+- Install/upgrade consent prompt: a "Required secrets" section listing declared names alongside permissions.
+
+### Changed
+
+- `@goodboyjs/schema` → `1.1.0`.
+- `manifest.ts`: `KNOWN_SCHEMA_VERSION` → `1.1.0`; new feature-stamping and permissions-consistency checks run after schema validation, on every validation path (strict and tolerant).
+- `goodboy skill version --bump` recomputes `schema_version` on the manifest it writes: `1.1.0` if `requires` is present, `1.0.0` otherwise.
+
 ## [0.1.1] - 2026-07-20
 
 Forward-compatibility patch: `manifest.json` validation now tolerates a manifest

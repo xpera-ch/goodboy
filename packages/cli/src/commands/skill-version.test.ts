@@ -233,4 +233,27 @@ describe('goodboy skill version --bump', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Invalid skill name'));
     expect(mockCp).not.toHaveBeenCalled();
   });
+
+  it('stamps schema_version 1.1.0 on the written manifest when it declares requires', async () => {
+    mockReadManifest.mockResolvedValue({
+      ...MANIFEST,
+      schema_version: '1.1.0',
+      permissions: ['env'],
+      requires: { secrets: ['EXOSCALE_API_KEY'] },
+    });
+    await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
+    expect(mockWriteManifest).toHaveBeenCalledWith(
+      join(SKILL_DIR, 'versions', '1.0.1', 'manifest.json'),
+      expect.objectContaining({ schema_version: '1.1.0' }),
+    );
+  });
+
+  it('normalizes schema_version to 1.0.0 on bump when the manifest has no requires, even if it previously declared a newer tolerated version', async () => {
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0' });
+    await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
+    expect(mockWriteManifest).toHaveBeenCalledWith(
+      join(SKILL_DIR, 'versions', '1.0.1', 'manifest.json'),
+      expect.objectContaining({ schema_version: '1.0.0' }),
+    );
+  });
 });
