@@ -71,14 +71,35 @@ jobs:
       - name: Build all packages
         run: npm run build
 
+      # Each publish step skips versions that are already on npm, so a tag can
+      # release any subset of packages (no lockstep versioning) and a failed
+      # workflow can be re-run safely without publish conflicts.
       - name: Publish @goodboyjs/schema
-        run: npm publish --workspace packages/schema --access public --provenance
+        run: |
+          VERSION=$(node -p "require('./packages/schema/package.json').version")
+          if npm view "@goodboyjs/schema@$VERSION" version >/dev/null 2>&1; then
+            echo "@goodboyjs/schema@$VERSION already published — skipping"
+          else
+            npm publish --workspace packages/schema --access public --provenance
+          fi
 
       - name: Publish @goodboyjs/registry-client
-        run: npm publish --workspace packages/registry-client --access public --provenance
+        run: |
+          VERSION=$(node -p "require('./packages/registry-client/package.json').version")
+          if npm view "@goodboyjs/registry-client@$VERSION" version >/dev/null 2>&1; then
+            echo "@goodboyjs/registry-client@$VERSION already published — skipping"
+          else
+            npm publish --workspace packages/registry-client --access public --provenance
+          fi
 
       - name: Publish @goodboyjs/cli
-        run: npm publish --workspace packages/cli --access public --provenance
+        run: |
+          VERSION=$(node -p "require('./packages/cli/package.json').version")
+          if npm view "@goodboyjs/cli@$VERSION" version >/dev/null 2>&1; then
+            echo "@goodboyjs/cli@$VERSION already published — skipping"
+          else
+            npm publish --workspace packages/cli --access public --provenance
+          fi
 
   release:
     name: Create GitHub Release
