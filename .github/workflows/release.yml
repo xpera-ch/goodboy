@@ -74,13 +74,19 @@ jobs:
       # Each publish step skips versions that are already on npm, so a tag can
       # release any subset of packages (no lockstep versioning) and a failed
       # workflow can be re-run safely without publish conflicts.
+      #
+      # NOTE: --provenance is intentionally absent while this repository is
+      # private (npm provenance requires a public source repo — it writes to
+      # Sigstore's public transparency log). When the repo goes public
+      # (see docs/go-public-checklist.md), re-add --provenance to all three
+      # publish commands below.
       - name: Publish @goodboyjs/schema
         run: |
           VERSION=$(node -p "require('./packages/schema/package.json').version")
           if npm view "@goodboyjs/schema@$VERSION" version >/dev/null 2>&1; then
             echo "@goodboyjs/schema@$VERSION already published — skipping"
           else
-            npm publish --workspace packages/schema --access public --provenance
+            npm publish --workspace packages/schema --access public
           fi
 
       - name: Publish @goodboyjs/registry-client
@@ -89,7 +95,7 @@ jobs:
           if npm view "@goodboyjs/registry-client@$VERSION" version >/dev/null 2>&1; then
             echo "@goodboyjs/registry-client@$VERSION already published — skipping"
           else
-            npm publish --workspace packages/registry-client --access public --provenance
+            npm publish --workspace packages/registry-client --access public
           fi
 
       - name: Publish @goodboyjs/cli
@@ -98,7 +104,7 @@ jobs:
           if npm view "@goodboyjs/cli@$VERSION" version >/dev/null 2>&1; then
             echo "@goodboyjs/cli@$VERSION already published — skipping"
           else
-            npm publish --workspace packages/cli --access public --provenance
+            npm publish --workspace packages/cli --access public
           fi
 
   release:
