@@ -58,7 +58,7 @@ export const addCommand = new Command('add')
         throw new HandledFailure();
       }
 
-      if (result.issues.some((i) => i.severity === 'warning')) {
+      if (result.issues.some((i) => i.severity === 'warning' || i.severity === 'info')) {
         spinner.stop();
         formatValidationResult(result, dirName);
         spinner.start('Continuing...');

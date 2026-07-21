@@ -137,6 +137,16 @@ describe('add command', () => {
     expect(mockCpSync).toHaveBeenCalled();
   });
 
+  it('shows the info line for a warning-free skill with declared secrets, mirroring registry-validate behavior', async () => {
+    mockValidateSkillDirectory.mockResolvedValue({
+      valid: true,
+      issues: [{ severity: 'info', message: 'declares 1 required secret' }],
+    });
+    await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
+    expect(mockFormatValidationResult).toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalled();
+  });
+
   it('exits when manifest name does not match directory name', async () => {
     mockValidateManifest.mockReturnValue({ ...MANIFEST, name: 'different-skill' });
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});

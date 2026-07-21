@@ -25,9 +25,18 @@ Two rules are enforced to keep this reliable:
   a reliable signal on its own.
 
 Declared secrets are now shown (names only, never values) in the install/upgrade
-consent prompt and in `goodboy skill validate` output. `goodboy skill version --bump`
-recomputes the `schema_version` stamp on every new version it creates, so a
-manifest that hand-added `requires` gets corrected automatically.
+consent prompt and in `goodboy skill validate` / `goodboy add` output. `goodboy
+skill version --bump` normalizes `schema_version` to its minimum needed value
+on every new version it creates — `1.1.0` if the manifest uses `requires`,
+`1.0.0` otherwise — but only for a manifest that already validates strictly.
+It refuses to bump (no files written) a manifest whose `schema_version` is
+newer than this CLI knows: bumping such a manifest would silently strip fields
+this CLI doesn't recognize and silently downgrade the stamp, with no warning
+ever shown, since the bump path is the one place a validated manifest gets
+written back to disk. A manifest that hand-adds `requires` without bumping
+`schema_version` is not auto-corrected either — that already fails validation
+with a message naming the exact version to set; it requires a manual edit,
+by design.
 
 Compatibility: manifests using `requires.secrets` need CLI ≥ 0.1.1 to install
 (tolerated with a warning, field invisible) and ≥ 0.2.0 to see and validate
@@ -43,7 +52,7 @@ the declaration.
 
 - `@goodboyjs/schema` → `1.1.0`.
 - `manifest.ts`: `KNOWN_SCHEMA_VERSION` → `1.1.0`; new feature-stamping and permissions-consistency checks run after schema validation, on every validation path (strict and tolerant).
-- `goodboy skill version --bump` recomputes `schema_version` on the manifest it writes: `1.1.0` if `requires` is present, `1.0.0` otherwise.
+- `goodboy skill version --bump` normalizes `schema_version` on a strictly-valid manifest it writes: `1.1.0` if `requires` is present, `1.0.0` otherwise. Refuses to bump (no write) a manifest with unresolved tolerance warnings, to avoid silently discarding fields or downgrading the stamp.
 
 ## [0.1.1] - 2026-07-20
 

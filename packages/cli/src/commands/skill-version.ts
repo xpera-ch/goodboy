@@ -10,7 +10,13 @@ import {
   resolveVersionPath,
   addVersionToEntry,
 } from '../lib/registry-entry.js';
-import { readManifest, writeManifest, validateManifest, FIELD_INTRODUCED_IN } from '../lib/manifest.js';
+import {
+  readManifest,
+  writeManifest,
+  validateManifestDetailed,
+  FIELD_INTRODUCED_IN,
+  KNOWN_SCHEMA_VERSION,
+} from '../lib/manifest.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 
@@ -112,12 +118,36 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
 
     const manifestPath = join(newVersionDir, 'manifest.json');
     const rawManifest = await readManifest(manifestPath);
-    const manifest = validateManifest(rawManifest);
+    const { manifest, warnings } = validateManifestDetailed(rawManifest);
+
+    // Refuse rather than persist a lossy write. S1's tolerant path returns a
+    // manifest with unknown top-level fields already stripped and the warning
+    // about it discarded by the thin validateManifest() wrapper — "stripped
+    // fields are invisible downstream" is a safe guarantee for read-only
+    // consumers (list, skill-status, ...), but this is the one path that
+    // WRITES a validated manifest back to disk. Persisting the stripped
+    // object here would silently delete fields a newer-minor manifest
+    // declared and silently downgrade its schema_version, with no warning
+    // ever surfaced to the author. Fail closed instead: require a real
+    // GoodBoy upgrade before this skill can be bumped.
+    if (warnings.length > 0) {
+      throw new Error(
+        `${skillName}/manifest.json declares schema_version ${manifest.schema_version}, which is newer than ` +
+          `this GoodBoy CLI knows (${KNOWN_SCHEMA_VERSION}). Upgrade GoodBoy to bump this skill — bumping now ` +
+          `would discard fields this version does not understand.`,
+      );
+    }
+
     manifest.version = newVersion;
-    // Stamp the lowest schema version this manifest actually needs: an author
-    // who hand-added `requires` gets the correct stamp on their next version
-    // bump, rather than carrying a stale schema_version that would fail the
-    // feature-stamping gate in manifest.ts on the very next validation.
+    // Stamp the lowest schema version this manifest actually needs. This only
+    // ever runs on a manifest that already validated strictly (no warnings,
+    // checked above) — it normalizes an already-valid, possibly over-stamped
+    // manifest down to its minimum (e.g. requires present but stamped higher
+    // than 1.1.0 -> 1.1.0; requires absent -> 1.0.0). It does NOT rescue an
+    // under-stamped, invalid manifest (schema_version below what a field it
+    // uses requires) — that already failed earlier, in manifest.ts's own
+    // feature-stamping gate, before this function was ever called; fixing it
+    // requires a manual schema_version edit, by design.
     manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
     await writeManifest(manifestPath, manifest);
 

@@ -248,12 +248,25 @@ describe('goodboy skill version --bump', () => {
     );
   });
 
-  it('normalizes schema_version to 1.0.0 on bump when the manifest has no requires, even if it previously declared a newer tolerated version', async () => {
-    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0' });
+  it('normalizes schema_version to 1.0.0 on bump for a strictly-valid, over-stamped manifest with no requires', async () => {
+    // 1.1.0 is within the known range (no tolerance warning) but is more than
+    // this manifest actually needs, since it declares no `requires`.
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.1.0' });
     await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
     expect(mockWriteManifest).toHaveBeenCalledWith(
       join(SKILL_DIR, 'versions', '1.0.1', 'manifest.json'),
       expect.objectContaining({ schema_version: '1.0.0' }),
     );
+  });
+
+  it('refuses to bump a newer-minor (tolerated) manifest: throws, writeManifest never called', async () => {
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0', future_field: 'unused' });
+    await expect(
+      buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('which is newer than this GoodBoy CLI knows'),
+    );
+    expect(mockWriteManifest).not.toHaveBeenCalled();
   });
 });
