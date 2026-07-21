@@ -14,6 +14,7 @@ vi.mock('ora', () => ({
 }));
 vi.mock('node:fs/promises', () => ({
   cp: vi.fn().mockResolvedValue(undefined),
+  rm: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../lib/registry.js', () => ({
   getRegistryPath: vi.fn().mockReturnValue('/mock/registry'),
@@ -39,13 +40,14 @@ vi.mock('../lib/logger.js', () => ({
   sanitiseError: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
 }));
 
-import { cp } from 'node:fs/promises';
+import { cp, rm } from 'node:fs/promises';
 import { readRegistryEntry, writeRegistryEntry } from '../lib/registry-entry.js';
 import { readManifest, writeManifest } from '../lib/manifest.js';
 import { logger } from '../lib/logger.js';
 import { bumpVersion, registerSkillVersion } from './skill-version.js';
 
 const mockCp = vi.mocked(cp);
+const mockRm = vi.mocked(rm);
 const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
 const mockWriteRegistryEntry = vi.mocked(writeRegistryEntry);
 const mockReadManifest = vi.mocked(readManifest);
@@ -155,6 +157,7 @@ describe('goodboy skill version --bump', () => {
     mockWriteManifest.mockResolvedValue(undefined);
     mockWriteRegistryEntry.mockResolvedValue(undefined);
     mockCp.mockResolvedValue(undefined);
+    mockRm.mockResolvedValue(undefined);
   });
 
   it('creates new version directory in registry', async () => {
@@ -272,6 +275,8 @@ describe('goodboy skill version --bump', () => {
     // directory is left behind. Not just "writeManifest wasn't called".
     expect(mockCp).not.toHaveBeenCalled();
     expect(mockWriteManifest).not.toHaveBeenCalled();
+    // Nothing was ever created, so the cleanup path never runs either.
+    expect(mockRm).not.toHaveBeenCalled();
   });
 
   it('reads the manifest from the SOURCE version directory, before any copy exists', async () => {
@@ -282,5 +287,55 @@ describe('goodboy skill version --bump', () => {
     expect(mockReadManifest).toHaveBeenCalledWith(
       join(SKILL_DIR, 'versions', '1.0.0', 'manifest.json'),
     );
+  });
+
+  describe('cleanup on failure after the copy', () => {
+    it('writeManifest rejecting: removes newVersionDir, propagates the ORIGINAL error (not a cleanup error)', async () => {
+      mockWriteManifest.mockRejectedValue(new Error('Cannot write manifest.json: check directory permissions'));
+      await expect(
+        buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+      ).rejects.toThrow('process.exit called');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Cannot write manifest.json'),
+      );
+      expect(mockRm).toHaveBeenCalledWith(
+        join(SKILL_DIR, 'versions', '1.0.1'),
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+    });
+
+    it('writeRegistryEntry rejecting: removes newVersionDir, propagates the ORIGINAL error', async () => {
+      mockWriteRegistryEntry.mockRejectedValue(new Error('ENOSPC: no space left on device'));
+      await expect(
+        buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+      ).rejects.toThrow('process.exit called');
+      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('ENOSPC'));
+      expect(mockRm).toHaveBeenCalledWith(
+        join(SKILL_DIR, 'versions', '1.0.1'),
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+    });
+
+    it('cleanup (rm) itself rejecting: the ORIGINAL write error still propagates, not the cleanup error', async () => {
+      mockWriteManifest.mockRejectedValue(new Error('original write failure'));
+      mockRm.mockRejectedValue(new Error('EACCES: permission denied removing directory'));
+      await expect(
+        buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+      ).rejects.toThrow('process.exit called');
+      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('original write failure'));
+      expect(mockLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('EACCES'),
+      );
+      // The cleanup failure is only ever logged as a warning, never surfaces
+      // as the command's own error.
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to clean up'),
+      );
+    });
+
+    it('happy-path bump: rm is never called when nothing fails', async () => {
+      await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
+      expect(mockRm).not.toHaveBeenCalled();
+    });
   });
 });

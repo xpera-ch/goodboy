@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { cp } from 'node:fs/promises';
+import { cp, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import ora from 'ora';
 import { getRegistryPath } from '../lib/registry.js';
@@ -140,24 +140,51 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
       );
     }
 
-    await cp(sourceVersionDir, newVersionDir, { recursive: true });
+    // Everything from here on mutates the filesystem. The "already exists"
+    // check above (entry.versions[newVersion]) already guarantees no
+    // registered version lives at newVersionDir, so anything found there from
+    // this point is either created by this call's own cp() or is debris from
+    // an earlier failed attempt at this exact, still-unregistered version
+    // number — never content worth protecting. That makes cleanup on failure
+    // safe unconditionally, with no extra existence guard needed beyond the
+    // registry check that already ran.
+    try {
+      await cp(sourceVersionDir, newVersionDir, { recursive: true });
 
-    const manifestPath = join(newVersionDir, 'manifest.json');
-    manifest.version = newVersion;
-    // Stamp the lowest schema version this manifest actually needs. This only
-    // ever runs on a manifest that already validated strictly (no warnings,
-    // checked above) — it normalizes an already-valid, possibly over-stamped
-    // manifest down to its minimum (e.g. requires present but stamped higher
-    // than 1.1.0 -> 1.1.0; requires absent -> 1.0.0). It does NOT rescue an
-    // under-stamped, invalid manifest (schema_version below what a field it
-    // uses requires) — that already failed above, in manifest.ts's own
-    // feature-stamping gate, before this function even reached the copy step;
-    // fixing it requires a manual schema_version edit, by design.
-    manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
-    await writeManifest(manifestPath, manifest);
+      const manifestPath = join(newVersionDir, 'manifest.json');
+      manifest.version = newVersion;
+      // Stamp the lowest schema version this manifest actually needs. This only
+      // ever runs on a manifest that already validated strictly (no warnings,
+      // checked above) — it normalizes an already-valid, possibly over-stamped
+      // manifest down to its minimum (e.g. requires present but stamped higher
+      // than 1.1.0 -> 1.1.0; requires absent -> 1.0.0). It does NOT rescue an
+      // under-stamped, invalid manifest (schema_version below what a field it
+      // uses requires) — that already failed above, in manifest.ts's own
+      // feature-stamping gate, before this function even reached the copy step;
+      // fixing it requires a manual schema_version edit, by design.
+      manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
+      await writeManifest(manifestPath, manifest);
 
-    const updatedEntry = addVersionToEntry(entry, newVersion, join('versions', newVersion));
-    await writeRegistryEntry(skillDir, updatedEntry);
+      const updatedEntry = addVersionToEntry(entry, newVersion, join('versions', newVersion));
+      await writeRegistryEntry(skillDir, updatedEntry);
+    } catch (writeErr) {
+      // The copy (or a write after it) failed partway through. Remove whatever
+      // landed at newVersionDir so a failed bump never leaves an orphaned,
+      // unregistered versions/<newVersion>/ directory behind. Re-assert the
+      // path is still inside skillDir immediately before removing it — never
+      // remove anything outside that boundary. A cleanup failure must never
+      // replace or hide the real error: it's caught in its own try/catch and
+      // only logged, and the ORIGINAL write error is always what propagates.
+      try {
+        assertWithin(newVersionDir, skillDir, 'new version path');
+        await rm(newVersionDir, { recursive: true, force: true });
+      } catch (cleanupErr) {
+        logger.warn(
+          `Failed to clean up "${newVersionDir}" after a failed bump: ${sanitiseError(cleanupErr)}`,
+        );
+      }
+      throw writeErr;
+    }
 
     spinner.succeed();
   } catch (err) {
