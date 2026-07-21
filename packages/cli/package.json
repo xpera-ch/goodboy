@@ -1,6 +1,6 @@
 {
   "name": "@goodboyjs/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem",
   "keywords": [
     "claude-code",

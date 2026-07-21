@@ -54,7 +54,7 @@ vi.mock('../lib/logger.js', () => ({
 import ora from 'ora';
 import { cpSync, mkdirSync, existsSync } from 'node:fs';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, validateManifestDetailed } from '../lib/manifest.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { logger } from '../lib/logger.js';
@@ -70,7 +70,7 @@ import type { InstallOptions } from './install.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
 const mockReadManifest = vi.mocked(readManifest);
-const mockValidateManifest = vi.mocked(validateManifest);
+const mockValidateManifestDetailed = vi.mocked(validateManifestDetailed);
 const mockRequestConsent = vi.mocked(requestConsent);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
 const mockLogger = vi.mocked(logger);
@@ -116,7 +116,7 @@ beforeEach(() => {
   mockExistsSync.mockReturnValue(false);
   mockCreateRegistryAdapter.mockReturnValue(mockAdapter());
   mockReadManifest.mockResolvedValue({});
-  mockValidateManifest.mockReturnValue(MANIFEST);
+  mockValidateManifestDetailed.mockReturnValue({ manifest: MANIFEST, warnings: [] });
   mockScanForSymlinks.mockResolvedValue(undefined);
   mockRequestConsent.mockResolvedValue(true);
   mockResolveAgentFlags.mockReturnValue(['claude-code']);
@@ -188,6 +188,20 @@ describe('installNamed — project install', () => {
       'Invalid skill name',
     );
     expect(mockCreateRegistryAdapter).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning when the manifest uses a tolerated newer-minor schema version', async () => {
+    mockValidateManifestDetailed.mockReturnValue({
+      manifest: MANIFEST,
+      warnings: ['manifest uses schema 1.5.0; this GoodBoy CLI knows 1.0.0. Unknown fields were ignored — upgrade GoodBoy to use them.'],
+    });
+    await installNamed('test-skill', DEFAULT_OPTS, CWD);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('schema 1.5.0'));
+  });
+
+  it('does not warn when the manifest has no tolerance warnings', async () => {
+    await installNamed('test-skill', DEFAULT_OPTS, CWD);
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   it('stops spinner before consent and restarts after', async () => {

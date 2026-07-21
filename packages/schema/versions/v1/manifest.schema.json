@@ -42,8 +42,9 @@
     },
     "schema_version": {
       "type": "string",
-      "const": "1.0.0",
-      "description": "GoodBoy manifest schema version. Always 1.0.0 for v1."
+      "pattern": "^1\\.\\d+\\.\\d+$",
+      "maxLength": 32,
+      "description": "GoodBoy manifest schema version, semver-shaped (v1.x only). CLIs tolerate a newer minor than they know, stripping unknown top-level fields with a warning; a newer major is rejected. See manifest.ts."
     },
     "status": {
       "type": "string",
