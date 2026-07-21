@@ -259,7 +259,7 @@ describe('goodboy skill version --bump', () => {
     );
   });
 
-  it('refuses to bump a newer-minor (tolerated) manifest: throws, writeManifest never called', async () => {
+  it('refuses to bump a newer-minor (tolerated) manifest: validates before acting, no directory ever created', async () => {
     mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0', future_field: 'unused' });
     await expect(
       buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
@@ -267,6 +267,20 @@ describe('goodboy skill version --bump', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('which is newer than this GoodBoy CLI knows'),
     );
+    // Proves validate-then-act ordering: cp() — the only thing that would
+    // create versions/<newVersion>/ on disk — never ran, so no orphaned
+    // directory is left behind. Not just "writeManifest wasn't called".
+    expect(mockCp).not.toHaveBeenCalled();
     expect(mockWriteManifest).not.toHaveBeenCalled();
+  });
+
+  it('reads the manifest from the SOURCE version directory, before any copy exists', async () => {
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0' });
+    await expect(
+      buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+    expect(mockReadManifest).toHaveBeenCalledWith(
+      join(SKILL_DIR, 'versions', '1.0.0', 'manifest.json'),
+    );
   });
 });

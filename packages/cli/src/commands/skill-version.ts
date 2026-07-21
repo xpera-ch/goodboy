@@ -114,10 +114,12 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
   const spinner = ora(`Creating ${skillName}@${newVersion}...`).start();
 
   try {
-    await cp(sourceVersionDir, newVersionDir, { recursive: true });
-
-    const manifestPath = join(newVersionDir, 'manifest.json');
-    const rawManifest = await readManifest(manifestPath);
+    // Validate-then-act: read the SOURCE manifest (byte-identical to what cp()
+    // would copy below) and decide whether this bump is even allowed BEFORE
+    // creating anything on disk. A refusal here leaves no orphaned
+    // versions/<newVersion>/ directory behind — nothing has been written yet.
+    const sourceManifestPath = join(sourceVersionDir, 'manifest.json');
+    const rawManifest = await readManifest(sourceManifestPath);
     const { manifest, warnings } = validateManifestDetailed(rawManifest);
 
     // Refuse rather than persist a lossy write. S1's tolerant path returns a
@@ -138,6 +140,9 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
       );
     }
 
+    await cp(sourceVersionDir, newVersionDir, { recursive: true });
+
+    const manifestPath = join(newVersionDir, 'manifest.json');
     manifest.version = newVersion;
     // Stamp the lowest schema version this manifest actually needs. This only
     // ever runs on a manifest that already validated strictly (no warnings,
@@ -145,9 +150,9 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
     // manifest down to its minimum (e.g. requires present but stamped higher
     // than 1.1.0 -> 1.1.0; requires absent -> 1.0.0). It does NOT rescue an
     // under-stamped, invalid manifest (schema_version below what a field it
-    // uses requires) — that already failed earlier, in manifest.ts's own
-    // feature-stamping gate, before this function was ever called; fixing it
-    // requires a manual schema_version edit, by design.
+    // uses requires) — that already failed above, in manifest.ts's own
+    // feature-stamping gate, before this function even reached the copy step;
+    // fixing it requires a manual schema_version edit, by design.
     manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
     await writeManifest(manifestPath, manifest);
 
