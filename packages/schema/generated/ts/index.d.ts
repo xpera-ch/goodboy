@@ -112,4 +112,16 @@ export interface GoodBoySkillManifest {
    * @maxItems 5
    */
   permissions?: ("read_files" | "write_files" | "network" | "shell" | "env")[];
+  /**
+   * Logical runtime requirements. Introduced in schema 1.1.0; manifests using this field must declare schema_version >= 1.1.0.
+   */
+  requires?: {
+    /**
+     * Logical secret names (environment-variable style) this skill requires at runtime. DECLARED INTENT ONLY — GoodBoy validates and displays these; it never resolves or injects them during install, and never executes the skill.
+     *
+     * @minItems 1
+     * @maxItems 32
+     */
+    secrets: string[];
+  };
 }

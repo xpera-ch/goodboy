@@ -128,6 +128,26 @@
       "maxItems": 5,
       "uniqueItems": true,
       "description": "DECLARED INTENT ONLY — not enforced at runtime. Skill authors declare what their scripts intend to access. GoodBoy displays this to users before install as a trust signal. An empty array or omitted field means no elevated access is claimed."
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secrets"],
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$",
+            "maxLength": 64
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "description": "Logical secret names (environment-variable style) this skill requires at runtime. DECLARED INTENT ONLY — GoodBoy validates and displays these; it never resolves or injects them during install, and never executes the skill."
+        }
+      },
+      "description": "Logical runtime requirements. Introduced in schema 1.1.0; manifests using this field must declare schema_version >= 1.1.0."
     }
   }
 }
