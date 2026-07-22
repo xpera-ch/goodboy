@@ -40,6 +40,7 @@ export function bumpVersion(version: string, level: BumpLevel): string {
 function assertWithin(target: string, base: string, label: string): void {
   const resolvedTarget = resolve(target);
   const resolvedBase = resolve(base);
+  /* c8 ignore next 3 -- defense-in-depth, unreachable via every call site in this file: skillName always already matched SKILL_NAME_RE (^[a-z0-9-]+$, no separators) before either caller runs, and bumpVersion() only ever emits digit-and-dot (or "NaN") strings, so join() can never escape its base here */
   if (!resolvedTarget.startsWith(resolvedBase + sep)) {
     throw new Error(`Refused: ${label} escapes the expected directory`);
   }

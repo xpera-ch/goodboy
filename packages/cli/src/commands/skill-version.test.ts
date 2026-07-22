@@ -144,6 +144,29 @@ describe('goodboy skill version (no --bump)', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('not found in registry'));
     expect(process.exit).toHaveBeenCalledWith(1);
   });
+
+  it('sorts by minor and patch when major (and minor) are tied, not just by major', async () => {
+    // makeEntry() alone only ever compares differing majors (1 vs 0), which
+    // short-circuits the "bMaj - aMaj || bMin - aMin || bPat - aPat" sort
+    // comparator on its first term. These versions force every fallback: a
+    // pair with equal majors (falls through to minor) and a pair with equal
+    // major AND minor (falls all the way through to patch).
+    mockReadRegistryEntry.mockResolvedValue({
+      name: 'my-skill',
+      latest: '1.1.1',
+      versions: {
+        '1.0.0': { path: 'versions/1.0.0', addedAt: '2026-01-01T00:00:00.000Z', yanked: false },
+        '1.1.0': { path: 'versions/1.1.0', addedAt: '2026-02-01T00:00:00.000Z', yanked: false },
+        '1.1.1': { path: 'versions/1.1.1', addedAt: '2026-03-01T00:00:00.000Z', yanked: false },
+      },
+    });
+    await buildProgram().parseAsync(['version', 'my-skill'], { from: 'user' });
+    const infoCalls = mockLogger.info.mock.calls.map((c) => String(c[0]));
+    const order = infoCalls
+      .map((l) => /^  (\d+\.\d+\.\d+)/.exec(l)?.[1])
+      .filter((v): v is string => Boolean(v));
+    expect(order).toEqual(['1.1.1', '1.1.0', '1.0.0']);
+  });
 });
 
 describe('goodboy skill version --bump', () => {
@@ -202,6 +225,29 @@ describe('goodboy skill version --bump', () => {
       buildProgram().parseAsync(['version', 'my-skill', '--bump', 'wat'], { from: 'user' }),
     ).rejects.toThrow('process.exit called');
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Invalid bump level'));
+    expect(mockCp).not.toHaveBeenCalled();
+  });
+
+  it('rejects --bump when the skill is not found in the registry (createNewVersion\'s own check, not showVersionInfo\'s)', async () => {
+    mockReadRegistryEntry.mockResolvedValue(null);
+    await expect(
+      buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('not found in registry'));
+    expect(mockCp).not.toHaveBeenCalled();
+  });
+
+  it('rejects --bump when every version is yanked (no installable version to bump from)', async () => {
+    const entry = makeEntry();
+    entry.versions['1.0.0']!.yanked = true;
+    entry.versions['0.9.0']!.yanked = true;
+    mockReadRegistryEntry.mockResolvedValue(entry);
+    await expect(
+      buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('No installable version found (all versions are yanked)'),
+    );
     expect(mockCp).not.toHaveBeenCalled();
   });
 
