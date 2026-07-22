@@ -44,7 +44,7 @@ import { cp, rm } from 'node:fs/promises';
 import { readRegistryEntry, writeRegistryEntry } from '../lib/registry-entry.js';
 import { readManifest, writeManifest } from '../lib/manifest.js';
 import { logger } from '../lib/logger.js';
-import { bumpVersion, registerSkillVersion } from './skill-version.js';
+import { bumpVersion, assertWithin, registerSkillVersion } from './skill-version.js';
 
 const mockCp = vi.mocked(cp);
 const mockRm = vi.mocked(rm);
@@ -102,6 +102,36 @@ describe('bumpVersion()', () => {
   });
   it('major bump resets minor and patch: 1.2.3 → 2.0.0', () => {
     expect(bumpVersion('1.2.3', 'major')).toBe('2.0.0');
+  });
+});
+
+describe('assertWithin()', () => {
+  it('does not throw when target is inside base', () => {
+    expect(() => assertWithin('/a/skills/my-skill', '/a/skills', 'test path')).not.toThrow();
+  });
+
+  it('throws with the exact message when target escapes base via ../', () => {
+    expect(() => assertWithin('/a/skills/../evil', '/a/skills', 'test path')).toThrow(
+      'Refused: test path escapes the expected directory',
+    );
+  });
+
+  it('throws when target is a sibling directory outside base entirely', () => {
+    expect(() => assertWithin('/a/other-dir', '/a/skills', 'test path')).toThrow(
+      'Refused: test path escapes the expected directory',
+    );
+  });
+
+  it('throws on a prefix-match-without-separator: base "/a/skills" vs target "/a/skills-evil"', () => {
+    // Proves the `+ sep` in the startsWith check: without it, "/a/skills-evil"
+    // would falsely pass since it textually starts with "/a/skills".
+    expect(() => assertWithin('/a/skills-evil', '/a/skills', 'test path')).toThrow(
+      'Refused: test path escapes the expected directory',
+    );
+  });
+
+  it('does not throw when target equals base plus a nested subpath exactly', () => {
+    expect(() => assertWithin('/a/skills/my-skill/versions/1.0.0', '/a/skills', 'test path')).not.toThrow();
   });
 });
 
