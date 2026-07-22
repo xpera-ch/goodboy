@@ -12,7 +12,24 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/types/**',
         'src/index.ts',
-        'src/commands/**',
+        // src/commands/skill-version.ts is intentionally NOT listed here — it
+        // now contains security-relevant cleanup logic and is held to 100%
+        // coverage below, like the security-critical lib files. The rest of
+        // src/commands/ remains excluded; un-excluding another command file
+        // is a separate decision (each will surface its own pre-existing gaps).
+        'src/commands/add.ts',
+        'src/commands/init.ts',
+        'src/commands/install.ts',
+        'src/commands/list.ts',
+        'src/commands/registry-cmd.ts',
+        'src/commands/search.ts',
+        'src/commands/skill-create.ts',
+        'src/commands/skill-diff.ts',
+        'src/commands/skill-open.ts',
+        'src/commands/skill-status.ts',
+        'src/commands/skill.ts',
+        'src/commands/uninstall.ts',
+        'src/commands/upgrade.ts',
         'src/__fixtures__/**',
         'src/lib/logger.ts',
       ],
@@ -29,6 +46,7 @@ export default defineConfig({
         'src/lib/goodboy-file.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/agents.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/store.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/skill-version.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },
