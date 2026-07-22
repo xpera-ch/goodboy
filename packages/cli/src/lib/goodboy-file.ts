@@ -96,6 +96,7 @@ export async function addSkillToLock(
   skillName: string,
   version: string,
   resolvedPath: string,
+  integrity: string,
 ): Promise<void> {
   const existing = await readGoodBoyLock(dir);
   const lock: GoodBoyLock = existing ?? {
@@ -103,7 +104,7 @@ export async function addSkillToLock(
     generated: new Date().toISOString(),
     skills: {},
   };
-  lock.skills[skillName] = { version, resolved: resolvedPath };
+  lock.skills[skillName] = { version, resolved: resolvedPath, integrity };
   await writeGoodBoyLock(dir, lock);
 }
 

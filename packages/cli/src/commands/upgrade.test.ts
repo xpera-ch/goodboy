@@ -30,6 +30,9 @@ vi.mock('../lib/store.js', () => ({
   getStorePath: vi.fn().mockReturnValue('/mock/.goodboy/skills'),
   getGoodboyHome: vi.fn().mockReturnValue('/mock/.goodboy'),
 }));
+vi.mock('../lib/integrity.js', () => ({
+  computeSkillIntegrity: vi.fn().mockResolvedValue('sha256-mockintegrity=='),
+}));
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   sanitiseError: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
@@ -46,6 +49,7 @@ import {
   addSkillToManifest,
   addSkillToLock,
 } from '../lib/goodboy-file.js';
+import { computeSkillIntegrity } from '../lib/integrity.js';
 import { upgradeSkill, upgradeAll, upgradeCommand } from './upgrade.js';
 import type { UpgradeOptions } from './upgrade.js';
 
@@ -60,6 +64,7 @@ const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
 const mockGetLockedVersion = vi.mocked(getLockedVersion);
 const mockAddSkillToManifest = vi.mocked(addSkillToManifest);
 const mockAddSkillToLock = vi.mocked(addSkillToLock);
+const mockComputeSkillIntegrity = vi.mocked(computeSkillIntegrity);
 
 const SKILL_PATH = '/fake/registry/test-skill';
 const CWD = '/test/project';
@@ -98,6 +103,7 @@ beforeEach(() => {
   mockGetLockedVersion.mockResolvedValue(null);
   mockAddSkillToManifest.mockResolvedValue(undefined);
   mockAddSkillToLock.mockResolvedValue(undefined);
+  mockComputeSkillIntegrity.mockResolvedValue('sha256-mockintegrity==');
 });
 
 // ---------------------------------------------------------------------------
@@ -121,7 +127,13 @@ describe('upgradeSkill — project scope', () => {
       'test-skill',
       '0.2.0',
       join(PROJECT_SKILLS, 'test-skill'),
+      'sha256-mockintegrity==',
     );
+  });
+
+  it('computes integrity from the upgraded destination path', async () => {
+    await upgradeSkill('test-skill', DEFAULT_OPTS, CWD);
+    expect(mockComputeSkillIntegrity).toHaveBeenCalledWith(join(PROJECT_SKILLS, 'test-skill'));
   });
 
   it('skips the upgrade when already at the latest locked version', async () => {
@@ -196,6 +208,7 @@ describe('upgradeSkill — global scope', () => {
       'test-skill',
       '0.2.0',
       '/mock/.goodboy/skills/test-skill',
+      'sha256-mockintegrity==',
     );
   });
 });

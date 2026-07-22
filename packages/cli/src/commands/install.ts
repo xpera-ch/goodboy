@@ -7,6 +7,7 @@ import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifestDetailed } from '../lib/manifest.js';
 import { requestConsent } from '../lib/consent.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
+import { computeSkillIntegrity } from '../lib/integrity.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import {
@@ -164,9 +165,10 @@ export async function installNamed(
 
     resolvedPath = storePath;
 
+    const integrity = await computeSkillIntegrity(resolvedPath);
     const goodboyHome = getGoodboyHome();
     await addSkillToManifest(goodboyHome, name, manifest.version);
-    await addSkillToLock(goodboyHome, name, manifest.version, resolvedPath);
+    await addSkillToLock(goodboyHome, name, manifest.version, resolvedPath, integrity);
   } else {
     try {
       resolvedPath = await installNamedProject(name, skillPath, cwd);
@@ -179,8 +181,9 @@ export async function installNamed(
       await ensureGitignoreEntry(cwd);
     }
 
+    const integrity = await computeSkillIntegrity(resolvedPath);
     await addSkillToManifest(cwd, name, manifest.version);
-    await addSkillToLock(cwd, name, manifest.version, resolvedPath);
+    await addSkillToLock(cwd, name, manifest.version, resolvedPath, integrity);
   }
 
   spinner.succeed(`Installed "${name}" (${manifest.version})`);

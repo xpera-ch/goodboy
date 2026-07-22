@@ -47,6 +47,7 @@ export default defineConfig({
         'src/lib/agents.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/store.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/skill-version.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/integrity.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

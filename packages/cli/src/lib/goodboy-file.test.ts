@@ -176,13 +176,14 @@ describe('addSkillToLock', () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockRejectedValue(enoent);
     (mockWriteFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    await addSkillToLock(DIR, 'new-skill', '1.2.3', '/store/new-skill');
+    await addSkillToLock(DIR, 'new-skill', '1.2.3', '/store/new-skill', 'sha256-abc123==');
 
     const [, content] = (mockWriteFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string];
     const parsed = JSON.parse(content) as GoodBoyLock;
     expect(parsed.skills['new-skill']).toEqual({
       version: '1.2.3',
       resolved: '/store/new-skill',
+      integrity: 'sha256-abc123==',
     });
   });
 
@@ -190,12 +191,16 @@ describe('addSkillToLock', () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(VALID_LOCK));
     (mockWriteFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    await addSkillToLock(DIR, 'extra', '0.5.0', '/store/extra');
+    await addSkillToLock(DIR, 'extra', '0.5.0', '/store/extra', 'sha256-def456==');
 
     const [, content] = (mockWriteFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string];
     const parsed = JSON.parse(content) as GoodBoyLock;
     expect(parsed.skills['my-skill']).toBeDefined();
-    expect(parsed.skills['extra']).toEqual({ version: '0.5.0', resolved: '/store/extra' });
+    expect(parsed.skills['extra']).toEqual({
+      version: '0.5.0',
+      resolved: '/store/extra',
+      integrity: 'sha256-def456==',
+    });
   });
 });
 

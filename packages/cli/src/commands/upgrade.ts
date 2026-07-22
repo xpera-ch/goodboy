@@ -5,6 +5,7 @@ import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest, validateManifestDetailed } from '../lib/manifest.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
+import { computeSkillIntegrity } from '../lib/integrity.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import {
@@ -86,8 +87,9 @@ export async function upgradeSkill(
     throw err;
   }
 
+  const integrity = await computeSkillIntegrity(destPath);
   await addSkillToManifest(lockDir, name, manifest.version);
-  await addSkillToLock(lockDir, name, manifest.version, destPath);
+  await addSkillToLock(lockDir, name, manifest.version, destPath, integrity);
 
   const from = lockedVersion !== null ? `${lockedVersion} → ` : '';
   spinner.succeed(`Upgraded "${name}" (${from}${manifest.version})`);

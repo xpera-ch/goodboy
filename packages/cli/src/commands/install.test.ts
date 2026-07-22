@@ -34,6 +34,9 @@ vi.mock('../lib/goodboy-file.js', () => ({
   removeSkillFromManifest: vi.fn().mockResolvedValue(undefined),
   removeSkillFromLock: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../lib/integrity.js', () => ({
+  computeSkillIntegrity: vi.fn().mockResolvedValue('sha256-mockintegrity=='),
+}));
 vi.mock('../lib/agents.js', () => ({
   resolveAgentFlags: vi.fn().mockReturnValue(['claude-code']),
   createAgentSymlinks: vi.fn().mockResolvedValue(undefined),
@@ -64,6 +67,7 @@ import {
   addSkillToLock,
 } from '../lib/goodboy-file.js';
 import { installToStore } from '../lib/store.js';
+import { computeSkillIntegrity } from '../lib/integrity.js';
 import { resolveAgentFlags, createAgentSymlinks } from '../lib/agents.js';
 import { installNamed, installFromManifest, installCommand } from './install.js';
 import type { InstallOptions } from './install.js';
@@ -80,6 +84,7 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
 const mockAddSkillToManifest = vi.mocked(addSkillToManifest);
 const mockAddSkillToLock = vi.mocked(addSkillToLock);
+const mockComputeSkillIntegrity = vi.mocked(computeSkillIntegrity);
 const mockInstallToStore = vi.mocked(installToStore);
 const mockCreateAgentSymlinks = vi.mocked(createAgentSymlinks);
 const mockResolveAgentFlags = vi.mocked(resolveAgentFlags);
@@ -121,6 +126,7 @@ beforeEach(() => {
   mockRequestConsent.mockResolvedValue(true);
   mockResolveAgentFlags.mockReturnValue(['claude-code']);
   mockInstallToStore.mockResolvedValue('/mock/.goodboy/skills/test-skill');
+  mockComputeSkillIntegrity.mockResolvedValue('sha256-mockintegrity==');
   mockAddSkillToManifest.mockResolvedValue(undefined);
   mockAddSkillToLock.mockResolvedValue(undefined);
 });
@@ -160,7 +166,13 @@ describe('installNamed — project install', () => {
       'test-skill',
       '0.1.0',
       join(PROJECT_SKILLS, 'test-skill'),
+      'sha256-mockintegrity==',
     );
+  });
+
+  it('computes integrity from the installed destination path', async () => {
+    await installNamed('test-skill', DEFAULT_OPTS, CWD);
+    expect(mockComputeSkillIntegrity).toHaveBeenCalledWith(join(PROJECT_SKILLS, 'test-skill'));
   });
 
   it('aborts with no filesystem writes when consent is declined', async () => {
@@ -246,6 +258,7 @@ describe('installNamed — global install', () => {
       'test-skill',
       '0.1.0',
       '/mock/.goodboy/skills/test-skill',
+      'sha256-mockintegrity==',
     );
   });
 });
@@ -270,6 +283,7 @@ describe('installNamed — no-commit', () => {
       'test-skill',
       '0.1.0',
       join(PROJECT_SKILLS, 'test-skill'),
+      'sha256-mockintegrity==',
     );
   });
 });
