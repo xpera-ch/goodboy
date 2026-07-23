@@ -145,17 +145,29 @@ anything that's drifted).
   re-confirmation rather than acting on it — noted previously as a pattern
   worth preserving, not relaxing.
 
-## Current constraint: no direct code changes from Claude
+## Current constraint: no direct code changes from chat/Cowork sessions
 
-As of 2026-07-23, Claude does not edit or commit source/test code in this
-repo directly (`packages/*/src/**`, etc.), regardless of how small or
+As of 2026-07-23, a **Cowork session or a claude.ai/chat-style
+conversation** does not edit or commit source/test code in this repo
+directly (`packages/*/src/**`, etc.), regardless of how small or
 well-verified the change seems. Instead: draft the implementation as a
-`phase-prompt`-style prompt, Bruno reviews it, runs it himself via Claude
-Code CLI, and reports results back. This is a trust-rebuilding measure,
-not a permanent architectural rule — Bruno may lift it once trust is
-restored; don't assume it's lifted without him saying so. Documentation
-and planning files (`docs/`, this file) are not covered by this constraint
-unless he says otherwise.
+`phase-prompt`-style prompt and stop — Bruno reviews it and executes it
+himself via **Claude Code CLI**, then reports results back.
+
+**This constraint does not apply to Claude Code CLI itself when Bruno has
+explicitly run it to execute a reviewed prompt.** That's the sanctioned
+path this whole workflow exists for, not a loophole — Claude Code CLI
+should implement the prompt directly and should not pause to ask whether
+it's allowed to change code, or treat this section as applying to itself.
+The restriction is about *which surface originates a code change*
+(conversational planning vs. a deliberately-invoked CLI run against an
+already-reviewed prompt), not about code changes being forbidden outright.
+
+This is a trust-rebuilding measure, not a permanent architectural rule —
+Bruno may lift it (including for Cowork/chat) once trust is restored;
+don't assume it's lifted without him saying so. Documentation and planning
+files (`docs/`, this file) are exempt from this constraint regardless of
+which surface is used.
 
 ## Standard workflow (not optional)
 
