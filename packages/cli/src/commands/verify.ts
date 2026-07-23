@@ -70,6 +70,8 @@ export async function runVerify(skillName: string | undefined, options: VerifyOp
     }
   }
 
+  const lock = await readGoodBoyLock(manifestDir);
+
   const rows: VerifyRow[] = [];
   for (const name of names) {
     if (!SKILL_NAME_RE.test(name)) {
@@ -88,7 +90,6 @@ export async function runVerify(skillName: string | undefined, options: VerifyOp
       continue;
     }
 
-    const lock = await readGoodBoyLock(manifestDir);
     const lockEntry = lock?.skills[name] ?? null;
     const state = await verifySkillIntegrity(installedDir, lockEntry);
     rows.push({ name, version: lockEntry?.version ?? null, state });

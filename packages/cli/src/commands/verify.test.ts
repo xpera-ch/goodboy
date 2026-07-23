@@ -191,6 +191,28 @@ describe('runVerify', () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it('without a skill name, reads goodboy.lock exactly once no matter how many skills are checked', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({
+      schema: '1.0.0',
+      skills: { 'skill-a': '^1.0.0', 'skill-b': '^1.0.0', 'skill-c': '^1.0.0' },
+    });
+    mockExistsSync.mockReturnValue(true);
+    mockReadGoodBoyLock.mockResolvedValue({
+      schema: '1.0.0',
+      generated: '2026-01-01T00:00:00.000Z',
+      skills: {
+        'skill-a': { version: '1.0.0', resolved: 'x', integrity: 'sha256-a==' },
+        'skill-b': { version: '1.0.0', resolved: 'x', integrity: 'sha256-b==' },
+        'skill-c': { version: '1.0.0', resolved: 'x', integrity: 'sha256-c==' },
+      },
+    });
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
+
+    await runVerify(undefined, {});
+
+    expect(mockReadGoodBoyLock).toHaveBeenCalledTimes(1);
+  });
+
   it('without a skill name, skips (and warns about) an invalid name found in goodboy.json', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'Bad_Name!': '^1.0.0' } });
 
