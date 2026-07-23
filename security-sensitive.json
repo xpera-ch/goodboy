@@ -117,6 +117,32 @@
       ]
     },
     {
+      "pattern": "packages/cli/src/lib/errors.ts",
+      "reason": "Shared GoodBoyError base for the secrets feature (D4). Not itself an enforcement boundary, but its no-toJSON design is what keeps `cause` from leaking through default logging/serialization.",
+      "invariants": [
+        "No toJSON/toString override is ever added that flattens `cause` into logged/serialized output — Node's own Error already keeps `cause` non-enumerable; adding a custom serializer would silently reopen that",
+        "safeMetadata is caller-attested safe-to-log data; this module never scrubs it, so callers are responsible for what they put there"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/process.ts",
+      "reason": "Shared subprocess runner for the secrets feature (D4) — runCapture (execFile) and runInherit (spawn). Not yet called by any command, but is the second place (after skill-open.ts) GoodBoy will ever launch an external process.",
+      "invariants": [
+        "shell: false is hard-coded in both runCapture and runInherit — never a caller-configurable option",
+        "runCapture's output cap (1 MiB) always results in an explicit truncated:true result, never an uncaught/opaque buffer error",
+        "A timeout or AbortSignal cancellation is reported cleanly (timedOut/aborted flags), never leaves a hung child process"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/redact.ts",
+      "reason": "The mechanism the secrets feature's \"committed files/logs never contain secret material\" invariant depends on. Wired into logger.ts and sanitiseError — every CLI log/error path.",
+      "invariants": [
+        "A registered value is matched as a literal substring (split/join) — never compiled into a RegExp",
+        "Values are replaced longest-first so a registered value that is a substring of another registered value never fragments the longer one's redaction",
+        "redact() is a no-op (returns input unchanged) whenever nothing is registered — existing callers see zero behavior change until something actually registers a value"
+      ]
+    },
+    {
       "pattern": "packages/schema/src/manifest.schema.json",
       "reason": "The JSON Schema used to validate every manifest.",
       "invariants": [
