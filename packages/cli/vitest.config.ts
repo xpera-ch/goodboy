@@ -12,11 +12,12 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/types/**',
         'src/index.ts',
-        // src/commands/skill-version.ts is intentionally NOT listed here — it
-        // now contains security-relevant cleanup logic and is held to 100%
-        // coverage below, like the security-critical lib files. The rest of
-        // src/commands/ remains excluded; un-excluding another command file
-        // is a separate decision (each will surface its own pre-existing gaps).
+        // src/commands/skill-version.ts, verify.ts, and skill-status.ts are
+        // intentionally NOT listed here — they contain security-relevant
+        // cleanup/tamper-detection logic and are held to 100% coverage below,
+        // like the security-critical lib files. The rest of src/commands/
+        // remains excluded; un-excluding another command file is a separate
+        // decision (each will surface its own pre-existing gaps).
         'src/commands/add.ts',
         'src/commands/init.ts',
         'src/commands/install.ts',
@@ -48,6 +49,9 @@ export default defineConfig({
         'src/lib/store.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/skill-version.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/integrity.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/verify.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/verify.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/skill-status.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },
