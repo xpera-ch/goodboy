@@ -145,6 +145,18 @@ anything that's drifted).
   re-confirmation rather than acting on it — noted previously as a pattern
   worth preserving, not relaxing.
 
+## Current constraint: no direct code changes from Claude
+
+As of 2026-07-23, Claude does not edit or commit source/test code in this
+repo directly (`packages/*/src/**`, etc.), regardless of how small or
+well-verified the change seems. Instead: draft the implementation as a
+`phase-prompt`-style prompt, Bruno reviews it, runs it himself via Claude
+Code CLI, and reports results back. This is a trust-rebuilding measure,
+not a permanent architectural rule — Bruno may lift it once trust is
+restored; don't assume it's lifted without him saying so. Documentation
+and planning files (`docs/`, this file) are not covered by this constraint
+unless he says otherwise.
+
 ## Standard workflow (not optional)
 
 These four skills are the required way of working in this repo, not
