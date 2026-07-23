@@ -117,13 +117,16 @@ describe('computeSkillIntegrity()', () => {
     await expect(computeSkillIntegrity(dirA)).resolves.toMatch(/^sha256-/);
   });
 
-  it('a file and a symlink at different paths with colliding string content do not collide', async () => {
-    // Same "content" string, but one is a real file and the other is a
-    // symlink target string -- the entry-type marker must keep these apart.
-    writeSkill(dirA, { 'a.txt': 'SKILL.md' });
-    writeFileSync(join(dirA, 'target-for-b'), 'unused');
-    writeSkill(dirB, { 'a.txt': 'SKILL.md' });
-    symlinkSync('SKILL.md', join(dirB, 'b-link'));
+  it('a file and a symlink at the SAME path with colliding content/target do not collide', async () => {
+    // Tightly isolated: one entry per directory, same relative path ("link"),
+    // same string ("target.md") -- once as real file content, once as a
+    // symlink's target. Nothing else differs, so this can only pass if the
+    // entry-type marker itself is doing the work. (A prior version of this
+    // test compared two directories that also differed in an unrelated
+    // second entry, which meant it could pass even if the type marker were
+    // broken -- the directories would still differ for an unrelated reason.)
+    writeFileSync(join(dirA, 'link'), 'target.md');
+    symlinkSync('target.md', join(dirB, 'link')); // dangling is fine: readlink never dereferences
     expect(await computeSkillIntegrity(dirA)).not.toBe(await computeSkillIntegrity(dirB));
   });
 
