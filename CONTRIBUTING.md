@@ -63,8 +63,15 @@ The following files implement security-critical logic. Changes to them require e
 |---|---|
 | `packages/cli/src/lib/manifest.ts` | Parses and validates untrusted JSON. Size limits, schema enforcement, and error handling must be preserved. |
 | `packages/cli/src/lib/registry.ts` | Resolves the registry path (including the `GOODBOY_REGISTRY` override) and skill resolution used by every command. Path traversal guards must be preserved. |
+| `packages/cli/src/lib/registry-entry.ts` | Reads/writes `registry-entry.json`, the versioned record every install/upgrade relies on. Held to 100% test coverage. |
+| `packages/cli/src/lib/skill-validator.ts` | Validates an entire skill directory (manifest + SKILL.md + symlink scan) before it's trusted enough to add or install. |
+| `packages/cli/src/lib/goodboy-file.ts` | Reads/writes `goodboy.json`, the per-project manifest of installed skills. Skill names must be validated before being written or used in a path. |
+| `packages/cli/src/lib/agents.ts` | Symlinks installed skills into agent directories (`.claude/skills/`, `.codex/skills/`, etc.). Symlink targets must stay within the resolved store/registry path. |
 | `packages/cli/src/lib/store.ts` | Resolves the global skill store path (`~/.goodboy/skills/`). Path traversal guards (`assertWithinStore`) must be preserved. |
 | `packages/cli/src/lib/validation.ts` | Defines the canonical `SKILL_NAME_RE` regex used across the codebase. |
+| `packages/cli/src/lib/fs-security.ts` | Implements `scanForSymlinks`, the guard that rejects a skill directory containing a symlink pointing outside itself before it's added to the registry. |
+| `packages/cli/src/lib/integrity.ts` | Computes the SRI content-integrity hash recorded in `goodboy.lock` at install/upgrade time. The hash construction is versioned/frozen — changing it breaks every stored lock hash. |
+| `packages/cli/src/commands/skill-version.ts` | Bumps a registry skill's version, including cleanup of an orphaned version directory on a refused bump. Held to the same 100% coverage bar as the files above. |
 | `packages/cli/src/commands/skill-open.ts` | Spawns `$EDITOR` (or an autodetected editor) as a subprocess — the one place GoodBoy launches an external process. Must never use `shell: true`, and must only ever pass the resolved `SKILL.md` path as an argument. |
 | `packages/schema/src/manifest.schema.json` | The JSON Schema used to validate all manifests. Adding `additionalProperties: true` to any object definition is a breaking security change. |
 
