@@ -1,0 +1,105 @@
+{
+  "sensitive_files": [
+    {
+      "pattern": "packages/cli/src/lib/manifest.ts",
+      "reason": "Parses and validates untrusted skill-manifest JSON before anything else touches it.",
+      "invariants": [
+        "Untrusted JSON always goes through readManifest() (size limit + nesting-depth check) before JSON.parse — never parsed directly",
+        "Ajv instantiated with { strict: true, allErrors: true }"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/registry.ts",
+      "reason": "Resolves the registry path, including the GOODBOY_REGISTRY override, and skill resolution used by every command.",
+      "invariants": [
+        "GOODBOY_REGISTRY must be an absolute path with no path-traversal sequences",
+        "All resolved paths are checked with startsWith(base + sep) before use"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/registry-entry.ts",
+      "reason": "Reads/writes registry-entry.json, the versioned record every install/upgrade relies on. Held to 100% coverage as a security-critical file.",
+      "invariants": [
+        "No unvalidated data is written into registry-entry.json",
+        "Version/path fields are validated before use in filesystem operations"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/skill-validator.ts",
+      "reason": "Validates an entire skill directory (manifest + SKILL.md + symlink scan) before it's trusted enough to add or install.",
+      "invariants": [
+        "additionalProperties: false enforced on every schema object",
+        "Validation runs before any file is copied into the registry or a project"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/goodboy-file.ts",
+      "reason": "Reads/writes goodboy.json, the per-project manifest of installed skills.",
+      "invariants": [
+        "Skill names are validated against SKILL_NAME_RE before being written or used in a path"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/agents.ts",
+      "reason": "Symlinks installed skills into agent directories (.claude/skills/, .codex/skills/, etc.).",
+      "invariants": [
+        "Symlink targets stay within the resolved store/registry path",
+        "No symlink is created pointing outside its intended base directory"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/store.ts",
+      "reason": "Resolves the global skill store path (~/.goodboy/skills/).",
+      "invariants": [
+        "The assertWithinStore path-traversal guard is preserved on every store path operation"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/validation.ts",
+      "reason": "Defines the canonical SKILL_NAME_RE regex used across the codebase to validate skill names before any filesystem use.",
+      "invariants": [
+        "The regex stays anchored at both ends",
+        "No change loosens the character set without an explicit decision"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/fs-security.ts",
+      "reason": "Implements scanForSymlinks, the guard that rejects a skill directory containing a symlink pointing outside itself before it's added to the registry.",
+      "invariants": [
+        "Every symlink inside a candidate skill directory is resolved and checked against the directory's own boundary before add proceeds"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/lib/integrity.ts",
+      "reason": "Computes the SRI content-integrity hash recorded in goodboy.lock at install/upgrade time.",
+      "invariants": [
+        "The hash construction (digest-of-digests) is treated as versioned/frozen — any change is a breaking change to every stored lock hash",
+        "Symlinks are hashed by target string, never followed"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/skill-version.ts",
+      "reason": "Bumps a registry skill's version, including cleanup of an orphaned version directory on a refused bump — the one command file held to the same 100% bar as the lib/ security files.",
+      "invariants": [
+        "A refused or invalid bump never leaves a partially-written version directory behind",
+        "Validation runs before any version directory is created"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/skill-open.ts",
+      "reason": "Spawns $EDITOR (or an autodetected editor) as a subprocess — the one place GoodBoy launches an external process.",
+      "invariants": [
+        "Never uses shell: true",
+        "Only ever passes the resolved SKILL.md path as an argument, never a shell string"
+      ]
+    },
+    {
+      "pattern": "packages/schema/src/manifest.schema.json",
+      "reason": "The JSON Schema used to validate every manifest.",
+      "invariants": [
+        "additionalProperties: false on every object definition",
+        "Adding additionalProperties: true anywhere is treated as a breaking security change"
+      ]
+    }
+  ]
+}
