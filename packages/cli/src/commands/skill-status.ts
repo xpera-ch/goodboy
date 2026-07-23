@@ -1,13 +1,14 @@
 import { Command } from 'commander';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import Table from 'cli-table3';
 import chalk from 'chalk';
-import { readGoodBoyJson, getLockedVersion } from '../lib/goodboy-file.js';
+import { readGoodBoyJson, getLockedVersion, readGoodBoyLock } from '../lib/goodboy-file.js';
 import { getRegistryPath } from '../lib/registry.js';
-import { readRegistryEntry, resolveLatestVersion, resolveVersionPath } from '../lib/registry-entry.js';
+import { readRegistryEntry, resolveLatestVersion } from '../lib/registry-entry.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
+import { verifySkillIntegrity } from '../lib/verify.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 
@@ -15,7 +16,7 @@ interface SkillStatusOptions {
   global?: boolean;
 }
 
-type State = 'not installed' | 'upgrade available' | 'modified' | 'up to date';
+type State = 'not installed' | 'upgrade available' | 'modified' | 'not verified' | 'up to date';
 
 interface SkillStatusRow {
   name: string;
@@ -25,7 +26,11 @@ interface SkillStatusRow {
   state: State;
 }
 
-function assertWithin(target: string, base: string, label: string): void {
+// Exported for direct unit testing: SKILL_NAME_RE already blocks every
+// traversal character through the public API, so this guard's throw path is
+// otherwise unreachable in practice — tested directly rather than left
+// uncovered behind an ignore comment (see skill-version.ts's assertWithin).
+export function assertWithin(target: string, base: string, label: string): void {
   const resolvedTarget = resolve(target);
   const resolvedBase = resolve(base);
   if (!resolvedTarget.startsWith(resolvedBase + sep)) {
@@ -38,6 +43,7 @@ function stateColor(state: State): string {
     case 'up to date':        return chalk.green(state);
     case 'upgrade available': return chalk.cyan(state);
     case 'modified':          return chalk.yellow(state);
+    case 'not verified':      return chalk.gray(state);
     case 'not installed':     return chalk.red(state);
   }
 }
@@ -67,29 +73,23 @@ async function computeRow(
   const entry = await readRegistryEntry(skillDir);
   const registryLatest = entry ? resolveLatestVersion(entry) : null;
 
-  let drifted = false;
-  if (installedVersion !== null && entry && registryLatest !== null) {
-    const installedSkillMdPath = join(skillsBase, skillName, 'SKILL.md');
-    if (existsSync(installedSkillMdPath)) {
-      const versionDir = resolveVersionPath(entry, registryLatest, skillDir);
-      const registrySkillMdPath = join(versionDir, 'SKILL.md');
-      if (existsSync(registrySkillMdPath)) {
-        const installedContent = readFileSync(installedSkillMdPath, 'utf-8');
-        const registryContent = readFileSync(registrySkillMdPath, 'utf-8');
-        drifted = installedContent !== registryContent;
-      }
-    }
-  }
-
   let state: State;
   if (installedVersion === null) {
     state = 'not installed';
   } else if (registryLatest !== null && installedVersion !== registryLatest) {
     state = 'upgrade available';
-  } else if (drifted) {
-    state = 'modified';
   } else {
-    state = 'up to date';
+    const installedDir = join(skillsBase, skillName);
+    const lock = await readGoodBoyLock(manifestDir);
+    const lockEntry = lock?.skills[skillName] ?? null;
+    const verifyState = await verifySkillIntegrity(installedDir, lockEntry);
+    if (verifyState === 'mismatch') {
+      state = 'modified';
+    } else if (verifyState === 'not-verified') {
+      state = 'not verified';
+    } else {
+      state = 'up to date';
+    }
   }
 
   return { name: skillName, installedVersion, registryLatest, lockedVersion, state };

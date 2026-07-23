@@ -27,7 +27,6 @@ export default defineConfig({
         'src/commands/skill-create.ts',
         'src/commands/skill-diff.ts',
         'src/commands/skill-open.ts',
-        'src/commands/skill-status.ts',
         'src/commands/skill.ts',
         'src/commands/uninstall.ts',
         'src/commands/upgrade.ts',

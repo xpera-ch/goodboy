@@ -7,11 +7,11 @@ import type { RegistryEntry } from '../lib/registry-entry.js';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
-  readFileSync: vi.fn(),
 }));
 vi.mock('../lib/goodboy-file.js', () => ({
   readGoodBoyJson: vi.fn(),
   getLockedVersion: vi.fn().mockResolvedValue(null),
+  readGoodBoyLock: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../lib/registry.js', () => ({
   getRegistryPath: vi.fn().mockReturnValue('/mock/registry'),
@@ -30,29 +30,32 @@ vi.mock('../lib/manifest.js', async (importOriginal) => {
     readManifest: vi.fn(),
   };
 });
+vi.mock('../lib/verify.js', () => ({
+  verifySkillIntegrity: vi.fn(),
+}));
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   sanitiseError: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
 }));
 
-import { existsSync, readFileSync } from 'node:fs';
-import { readGoodBoyJson, getLockedVersion } from '../lib/goodboy-file.js';
+import { existsSync } from 'node:fs';
+import { readGoodBoyJson, getLockedVersion, readGoodBoyLock } from '../lib/goodboy-file.js';
 import { readRegistryEntry } from '../lib/registry-entry.js';
 import { readManifest } from '../lib/manifest.js';
+import { verifySkillIntegrity } from '../lib/verify.js';
 import { logger } from '../lib/logger.js';
-import { registerSkillStatus } from './skill-status.js';
+import { registerSkillStatus, assertWithin } from './skill-status.js';
 
 const mockExistsSync = vi.mocked(existsSync);
-const mockReadFileSync = vi.mocked(readFileSync);
 const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
 const mockGetLockedVersion = vi.mocked(getLockedVersion);
+const mockReadGoodBoyLock = vi.mocked(readGoodBoyLock);
 const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
 const mockReadManifest = vi.mocked(readManifest);
+const mockVerifySkillIntegrity = vi.mocked(verifySkillIntegrity);
 const mockLogger = vi.mocked(logger);
 
 const REGISTRY_PATH = '/mock/registry';
-const CWD = process.cwd();
-const SKILLS_BASE = join(CWD, '.claude', 'skills');
 const GLOBAL_SKILLS_BASE = join(homedir(), '.goodboy', 'skills');
 const GLOBAL_MANIFEST_DIR = join(homedir(), '.goodboy');
 
@@ -104,6 +107,8 @@ describe('goodboy skill status', () => {
     });
     mockExistsSync.mockReturnValue(false);
     mockGetLockedVersion.mockResolvedValue(null);
+    mockReadGoodBoyLock.mockResolvedValue(null);
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
   });
 
   function tableOutput(): string {
@@ -112,13 +117,10 @@ describe('goodboy skill status', () => {
 
   it('shows "up to date" for matching installed and registry', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-a': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-a', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-a', '1.0.0'));
-    mockReadFileSync.mockReturnValue('same content');
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
@@ -127,35 +129,42 @@ describe('goodboy skill status', () => {
 
   it('shows "upgrade available" when registry has newer version', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-b': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-b', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-b', '2.0.0'));
-    mockReadFileSync.mockReturnValue('irrelevant');
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
     expect(tableOutput()).toContain('upgrade available');
+    expect(mockVerifySkillIntegrity).not.toHaveBeenCalled();
   });
 
-  it('shows "modified" when installed SKILL.md differs from registry', async () => {
+  it('shows "modified" when the recomputed integrity hash mismatches the recorded one', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-c': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-c', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-c', '1.0.0'));
-    mockReadFileSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.startsWith(SKILLS_BASE) ? 'edited content' : 'original content';
-    });
+    mockVerifySkillIntegrity.mockResolvedValue('mismatch');
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
     expect(tableOutput()).toContain('modified');
+  });
+
+  it('shows "not verified" for a lock entry with no recorded integrity hash, distinct from "up to date" and "modified"', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-e': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockResolvedValue(manifestFor('skill-e', '1.0.0'));
+    mockReadRegistryEntry.mockResolvedValue(entryFor('skill-e', '1.0.0'));
+    mockVerifySkillIntegrity.mockResolvedValue('not-verified');
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    const output = tableOutput();
+    expect(output).toContain('not verified');
+    expect(mockLogger.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('Modified skills will lose changes'),
+    );
   });
 
   it('shows "not installed" when skill in goodboy.json but not installed', async () => {
@@ -170,16 +179,10 @@ describe('goodboy skill status', () => {
 
   it('shows warning when modified skills detected', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-c': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-c', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-c', '1.0.0'));
-    mockReadFileSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.startsWith(SKILLS_BASE) ? 'edited content' : 'original content';
-    });
+    mockVerifySkillIntegrity.mockResolvedValue('mismatch');
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
@@ -190,13 +193,9 @@ describe('goodboy skill status', () => {
 
   it('shows upgrade hint when upgrades available', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-b': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-b', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-b', '2.0.0'));
-    mockReadFileSync.mockReturnValue('irrelevant');
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
@@ -214,6 +213,35 @@ describe('goodboy skill status', () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
+  it('skips (and warns about) an invalid skill name found in goodboy.json', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({
+      schema: '1.0.0',
+      skills: { 'Bad_Name!': '^1.0.0', 'skill-a': '^1.0.0' },
+    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockResolvedValue(manifestFor('skill-a', '1.0.0'));
+    mockReadRegistryEntry.mockResolvedValue(entryFor('skill-a', '1.0.0'));
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping invalid skill name in goodboy.json: "Bad_Name!"'),
+    );
+    expect(tableOutput()).toContain('skill-a');
+  });
+
+  it('reports an unexpected failure via logger.error and exits non-zero', async () => {
+    mockReadGoodBoyJson.mockRejectedValue(new Error('goodboy.json contains invalid JSON'));
+
+    await buildProgram().parseAsync(['status'], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('goodboy.json contains invalid JSON'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
   it('handles empty skills in goodboy.json', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: {} });
 
@@ -223,20 +251,62 @@ describe('goodboy skill status', () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
+  it('treats a skill with a corrupt/invalid installed manifest as not installed', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-f': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockResolvedValue({ not: 'a valid manifest' });
+    mockReadRegistryEntry.mockResolvedValue(null);
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(tableOutput()).toContain('not installed');
+  });
+
+  it('still runs the integrity check (and shows "—" for Registry) when the skill has no matching registry entry', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-g': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockResolvedValue(manifestFor('skill-g', '1.0.0'));
+    mockReadRegistryEntry.mockResolvedValue(null);
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(mockVerifySkillIntegrity).toHaveBeenCalled();
+    const output = tableOutput();
+    expect(output).toContain('up to date');
+    expect(output).toContain('—');
+  });
+
   it('-g flag reads from global scope', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-a': '^1.0.0' } });
-    mockExistsSync.mockImplementation((p) => {
-      const path = String(p);
-      return path.includes('manifest.json') || path.includes('SKILL.md');
-    });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue(manifestFor('skill-a', '1.0.0'));
     mockReadRegistryEntry.mockResolvedValue(entryFor('skill-a', '1.0.0'));
-    mockReadFileSync.mockReturnValue('same content');
+    mockVerifySkillIntegrity.mockResolvedValue('verified');
 
     await buildProgram().parseAsync(['status', '--global'], { from: 'user' });
 
     expect(mockReadGoodBoyJson).toHaveBeenCalledWith(GLOBAL_MANIFEST_DIR);
     expect(mockGetLockedVersion).toHaveBeenCalledWith(GLOBAL_MANIFEST_DIR, 'skill-a');
+    expect(mockReadGoodBoyLock).toHaveBeenCalledWith(GLOBAL_MANIFEST_DIR);
     expect(mockExistsSync).toHaveBeenCalledWith(join(GLOBAL_SKILLS_BASE, 'skill-a', 'manifest.json'));
+  });
+});
+
+describe('assertWithin', () => {
+  it('does not throw when the target is inside the base directory', () => {
+    expect(() => assertWithin('/base/skills/skill-a', '/base/skills', 'skill path')).not.toThrow();
+  });
+
+  it('throws when the target escapes the base directory via ../', () => {
+    expect(() => assertWithin('/base/skills/../../etc', '/base/skills', 'skill path')).toThrow(
+      'Refused: skill path escapes the expected directory',
+    );
+  });
+
+  it('throws when the target is a sibling directory with a shared prefix', () => {
+    expect(() => assertWithin('/base/skills-evil', '/base/skills', 'skill path')).toThrow(
+      'Refused: skill path escapes the expected directory',
+    );
   });
 });
