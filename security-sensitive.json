@@ -86,6 +86,29 @@
       ]
     },
     {
+      "pattern": "packages/cli/src/lib/verify.ts",
+      "reason": "Recomputes an installed skill's content-integrity hash (via integrity.ts) and classifies it against goodboy.lock — the comparison that gives the recorded hash a meaning. Shared by `goodboy verify` and `goodboy skill status`.",
+      "invariants": [
+        "Never treats a missing/absent integrity field as a match — classified as its own not-verified state, never silently folded into verified",
+        "Never recomputes or reinterprets the hash construction itself — that stays owned by integrity.ts"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/verify.ts",
+      "reason": "The `goodboy verify` command — the fail-closed gate on top of verify.ts's classification. Held to the same 100% bar as the lib/ security files.",
+      "invariants": [
+        "Exits non-zero if any checked skill is in the mismatch state; a not-verified skill never affects the exit code",
+        "A named skill that isn't installed produces a clear error, never a false verified/mismatch result"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/skill-status.ts",
+      "reason": "Displays installed-skill drift, now via the same whole-tree integrity comparison verify.ts performs (previously only diffed SKILL.md, which could miss tampering in any other file). Informational only — no exit-code gate — but a false \"up to date\"/\"modified\" here is the same class of false confidence as a wrong goodboy verify result, so it's held to the same 100% bar.",
+      "invariants": [
+        "A not-verified skill is rendered distinctly from both \"up to date\" and \"modified\" — never folded into either"
+      ]
+    },
+    {
       "pattern": "packages/cli/src/commands/skill-open.ts",
       "reason": "Spawns $EDITOR (or an autodetected editor) as a subprocess — the one place GoodBoy launches an external process.",
       "invariants": [
