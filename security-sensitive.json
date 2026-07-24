@@ -221,6 +221,23 @@
         "Every other case (onepassword-cli, or a provider type that couldn't be determined) masks each path segment's content and any query string content, while the scheme prefix and segment count stay visible",
         "An undetermined provider type is masked exactly as conservatively as a known-sensitive one — never assumed safe to show in full"
       ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/from-skill.ts",
+      "reason": "Resolves an installed project skill's declared secrets by name (D5) — name-keyed against goodboy.json only, no path argument, no registry or global-scope fallback.",
+      "invariants": [
+        "Only ever resolves an installed PROJECT skill by name against goodboy.json's skills map — no raw path argument, no registry lookup, no global-scope fallback",
+        "A skill listed in goodboy.json whose manifest is missing/corrupt on disk surfaces a clear wrapped error, never an unhandled crash"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/secrets/validate.ts",
+      "reason": "The first command to call resolver.ts's resolveSecrets() and handle its aggregate failure metadata.",
+      "invariants": [
+        "Never calls .reveal() on a SecretValue or otherwise reads a resolved value — only success/failure per name is ever reported",
+        "A name that fails structural validation is never passed into resolveSecrets — only the structurally-valid subset is",
+        "Fail-closed: non-zero exit if any checked name has a structural problem or (with --resolve) failed to actually resolve"
+      ]
     }
   ]
 }

@@ -65,6 +65,8 @@ export default defineConfig({
         'src/commands/secrets/doctor.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/secrets/list.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/secrets/index.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/secrets/from-skill.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/secrets/validate.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

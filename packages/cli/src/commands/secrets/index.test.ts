@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { registerSecretsCommand } from './index.js';
 
 describe('registerSecretsCommand()', () => {
-  it('registers a "secrets" command with "doctor" and "list" subcommands', () => {
+  it('registers a "secrets" command with "doctor", "list", and "validate" subcommands', () => {
     const program = new Command();
     registerSecretsCommand(program);
 
@@ -13,5 +13,6 @@ describe('registerSecretsCommand()', () => {
     const subcommandNames = secrets!.commands.map((c) => c.name());
     expect(subcommandNames).toContain('doctor');
     expect(subcommandNames).toContain('list');
+    expect(subcommandNames).toContain('validate');
   });
 });
