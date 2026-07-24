@@ -11,6 +11,7 @@ import { searchCommand } from './commands/search.js';
 import { addCommand } from './commands/add.js';
 import { registryCommand } from './commands/registry-cmd.js';
 import { verifyCommand } from './commands/verify.js';
+import { registerSecretsCommand } from './commands/secrets/index.js';
 
 const _require = createRequire(import.meta.url);
 const pkg = _require('../package.json') as { version: string };
@@ -33,6 +34,7 @@ program.addCommand(searchCommand);
 program.addCommand(addCommand);
 program.addCommand(registryCommand);
 program.addCommand(verifyCommand);
+registerSecretsCommand(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   process.stderr.write(

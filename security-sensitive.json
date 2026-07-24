@@ -212,6 +212,15 @@
         "Failure aggregation never calls .reveal() on a SecretValue or otherwise carries a resolved value into an error message/safeMetadata — only names, provider instance names, and the underlying error objects",
         "Multi-failure reporting is deterministic in input order (relies on Promise.allSettled's own result ordering), never settlement order"
       ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/reference-masking.ts",
+      "reason": "The boundary that keeps vault/item/field/query content out of goodboy secrets list output.",
+      "invariants": [
+        "environment references pass through unchanged — they're variable names, not vault paths, so nothing to mask",
+        "Every other case (onepassword-cli, or a provider type that couldn't be determined) masks each path segment's content and any query string content, while the scheme prefix and segment count stay visible",
+        "An undetermined provider type is masked exactly as conservatively as a known-sensitive one — never assumed safe to show in full"
+      ]
     }
   ]
 }
