@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { cpSync, mkdirSync, existsSync, statSync } from 'node:fs';
-import { appendFile, readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import ora from 'ora';
 import { createRegistryAdapter } from '../lib/registry-adapter.js';
@@ -17,6 +16,7 @@ import {
 } from '../lib/goodboy-file.js';
 import { resolveAgentFlags, createAgentSymlinks } from '../lib/agents.js';
 import { installToStore, getGoodboyHome } from '../lib/store.js';
+import { ensureGitignoreEntry } from '../lib/gitignore.js';
 
 export interface InstallOptions {
   global?: boolean;
@@ -33,25 +33,6 @@ const PROJECT_SKILLS_DIR_MODE = 0o755;
 
 function getProjectSkillsPath(cwd: string): string {
   return join(cwd, '.claude', 'skills');
-}
-
-async function ensureGitignoreEntry(cwd: string): Promise<void> {
-  const gitignorePath = join(cwd, '.gitignore');
-  const entry = '.claude/skills/';
-
-  let existing = '';
-  try {
-    existing = await readFile(gitignorePath, 'utf-8');
-  } catch {
-    // .gitignore doesn't exist yet — will be created
-  }
-
-  const lines = existing.split('\n');
-  if (!lines.some((l) => l.trim() === entry)) {
-    const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
-    await appendFile(gitignorePath, `${prefix}${entry}\n`, 'utf-8');
-    logger.info(`Added "${entry}" to .gitignore`);
-  }
 }
 
 async function installNamedProject(
@@ -178,7 +159,7 @@ export async function installNamed(
     }
 
     if (options.commit === false) {
-      await ensureGitignoreEntry(cwd);
+      await ensureGitignoreEntry(cwd, '.claude/skills/');
     }
 
     const integrity = await computeSkillIntegrity(resolvedPath);

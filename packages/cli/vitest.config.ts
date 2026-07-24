@@ -54,6 +54,8 @@ export default defineConfig({
         'src/lib/errors.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/process.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/redact.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/secrets/config.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/gitignore.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

@@ -5,17 +5,22 @@ vi.mock('../lib/goodboy-file.js', () => ({
   readGoodBoyJson: vi.fn(),
   writeGoodBoyJson: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../lib/gitignore.js', () => ({
+  ensureGitignoreEntry: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   sanitiseError: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
 }));
 
 import { readGoodBoyJson, writeGoodBoyJson } from '../lib/goodboy-file.js';
+import { ensureGitignoreEntry } from '../lib/gitignore.js';
 import { logger } from '../lib/logger.js';
 import { initCommand } from './init.js';
 
 const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
 const mockWriteGoodBoyJson = vi.mocked(writeGoodBoyJson);
+const mockEnsureGitignoreEntry = vi.mocked(ensureGitignoreEntry);
 const mockLogger = vi.mocked(logger);
 
 const CWD = process.cwd();
@@ -96,5 +101,16 @@ describe('goodboy init', () => {
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.stringContaining('goodboy skill create'),
     );
+  });
+
+  it('adds the goodboy.local.json gitignore entry via the shared helper (§7.3: entry only, no file scaffold)', async () => {
+    await initCommand.parseAsync([], { from: 'user' });
+    expect(mockEnsureGitignoreEntry).toHaveBeenCalledWith(CWD, 'goodboy.local.json');
+  });
+
+  it('does not touch the gitignore entry when goodboy.json already exists (early exit)', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: {} });
+    await expect(initCommand.parseAsync([], { from: 'user' })).rejects.toThrow();
+    expect(mockEnsureGitignoreEntry).not.toHaveBeenCalled();
   });
 });

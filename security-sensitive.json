@@ -149,6 +149,24 @@
         "additionalProperties: false on every object definition",
         "Adding additionalProperties: true anywhere is treated as a breaking security change"
       ]
+    },
+    {
+      "pattern": "packages/schema/src/config.schema.json",
+      "reason": "The JSON Schema used to validate ~/.goodboy/config.json and <project>/goodboy.local.json — will eventually gate provider references and account identifiers for the secrets feature.",
+      "invariants": [
+        "additionalProperties: false on every object definition",
+        "secrets.providers is a closed oneOf over exactly the v1 provider types (D6) — widening it is a deliberate schema decision, not a drive-by addition",
+        "secrets.mappings[name].reference rejects control characters/newlines/null bytes as a defense-in-depth baseline, even though provider-specific reference format rules (e.g. op:// prefix) are intentionally NOT enforced here"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/config.ts",
+      "reason": "Loads, validates, and merges the two secrets-config files above via the Ajv singleton pattern. No provider/resolver logic yet, but this is the file that will hand validated provider references to the resolver in a later phase.",
+      "invariants": [
+        "Ajv instantiated with { strict: true, allErrors: true }, mirroring manifest.ts",
+        "A schema-invalid or malformed config file always throws a clear error naming the actual failure — never silently coerced or partially accepted",
+        "mergeConfig() replaces colliding provider/mapping entries wholesale (never a deep per-field merge) — a project-level entry fully overrides, it never partially blends with a user-level one of the same name"
+      ]
     }
   ]
 }

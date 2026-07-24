@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { readGoodBoyJson, writeGoodBoyJson, type GoodBoyJson } from '../lib/goodboy-file.js';
+import { ensureGitignoreEntry } from '../lib/gitignore.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 
 interface InitOptions {
@@ -28,6 +29,10 @@ export const initCommand = new Command('init')
 
     try {
       await writeGoodBoyJson(cwd, data);
+      // §7.3: init adds only the gitignore entry — it never scaffolds
+      // goodboy.local.json itself. That happens later, the first time a
+      // `goodboy secrets` command needs config and finds none.
+      await ensureGitignoreEntry(cwd, 'goodboy.local.json');
     } catch (err) {
       logger.error(sanitiseError(err));
       process.exit(1);
