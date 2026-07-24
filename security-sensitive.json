@@ -167,6 +167,30 @@
         "A schema-invalid or malformed config file always throws a clear error naming the actual failure — never silently coerced or partially accepted",
         "mergeConfig() replaces colliding provider/mapping entries wholesale (never a deep per-field merge) — a project-level entry fully overrides, it never partially blends with a user-level one of the same name"
       ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/types.ts",
+      "reason": "Defines SecretValue, the wrapper every resolved secret flows through — the accidental-disclosure boundary the whole secrets feature relies on.",
+      "invariants": [
+        "toString()/toJSON()/the util.inspect custom symbol always return REDACTED_MARKER — reveal() is the only accessor that ever returns the real value",
+        "Construction always calls registerSecret() (lib/redact.ts) — a SecretValue that isn't registered with the redactor defeats the whole mechanism"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/provider-registry.ts",
+      "reason": "Lazily constructs and caches SecretProvider instances by configured name — the concrete implementation of invariant 7 (lazy initialization: no non-secrets command ever touches provider code).",
+      "invariants": [
+        "A provider is never constructed until getProvider() is actually called for its instance name — no eager construction for every configured provider",
+        "\"not configured\" (E_PROVIDER_INSTANCE_NOT_CONFIGURED) and \"not implemented yet\" (E_PROVIDER_NOT_IMPLEMENTED) stay distinct error codes — never collapsed into one generic failure that could mask which case actually occurred"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/providers/environment.ts",
+      "reason": "The first real provider — reads process.env[reference] and is the point where a raw secret value first enters the system.",
+      "invariants": [
+        "resolve() only ever reads the single named variable — never logs or serializes process.env wholesale",
+        "A missing variable's error message names only the variable name (safe to log), never a value"
+      ]
     }
   ]
 }
