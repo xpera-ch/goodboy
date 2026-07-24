@@ -202,6 +202,16 @@
         "resolve()'s thrown error message may name the reference (locally configured, not a secret) but never includes raw stderr — stderr is carried in safeMetadata only",
         "The op:// prefix is validated before any subprocess is invoked — a malformed reference never reaches op at all"
       ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/resolver.ts",
+      "reason": "The seam where a requested secret name is decided against a provider instance, and where multi-failure messages are assembled from concurrent resolutions.",
+      "invariants": [
+        "Only the requested names are ever touched — never iterates config.secrets.mappings/providers wholesale (invariant 6)",
+        "An empty names array never calls registry.getProvider() at all (invariant 7)",
+        "Failure aggregation never calls .reveal() on a SecretValue or otherwise carries a resolved value into an error message/safeMetadata — only names, provider instance names, and the underlying error objects",
+        "Multi-failure reporting is deterministic in input order (relies on Promise.allSettled's own result ordering), never settlement order"
+      ]
     }
   ]
 }
