@@ -1,38 +1,31 @@
 import { GoodBoyError } from '../lib/errors.js';
 import type { SecretProvider } from './types.js';
-import type { SecretProviderConfig } from './config.js';
+import type { SecretProviderConfig, SecretProviderConfigOnePasswordCli } from './config.js';
 import { createEnvironmentProvider } from './providers/environment.js';
+import { createOnePasswordCliProvider } from './providers/onepassword-cli.js';
 
 type ProviderFactory = (config: SecretProviderConfig) => SecretProvider;
 
-// Exactly one entry today (D6: environment is the only implemented type).
-// Adding onepassword-cli here in S4c is meant to be a one-line addition to
-// this map, not a redesign — do not stub or partially implement it now.
+// D6's two v1 provider types. Adding a third here would be a schema change
+// (config.schema.json's closed oneOf) as much as a registry change — this
+// map is not meant to be an open extension point on its own.
 const PROVIDER_FACTORIES: Record<string, ProviderFactory> = {
   environment: () => createEnvironmentProvider(),
+  'onepassword-cli': (config) => createOnePasswordCliProvider(config as SecretProviderConfigOnePasswordCli),
 };
-
-// Provider types the schema already knows about but this build doesn't
-// implement yet. Kept distinct from PROVIDER_FACTORIES so "not implemented
-// yet" and "not configured at all" produce genuinely different, honest
-// error messages rather than collapsing into one generic failure.
-const KNOWN_BUT_NOT_IMPLEMENTED = new Set(['onepassword-cli']);
 
 function createProvider(config: SecretProviderConfig): SecretProvider {
   const factory = PROVIDER_FACTORIES[config.type];
   if (factory) return factory(config);
 
-  if (KNOWN_BUT_NOT_IMPLEMENTED.has(config.type)) {
-    throw new GoodBoyError(`Provider type "${config.type}" is not implemented yet in this build.`, {
-      code: 'E_PROVIDER_NOT_IMPLEMENTED',
-      safeMetadata: { type: config.type },
-    });
-  }
-
   // Reachable only if a caller bypasses config.schema.json's closed oneOf
   // (e.g. via an `as` cast) — config.type is a two-member union at the type
   // level and schema-validated at the JSON level for every real caller.
-  // Kept as a fail-closed guard rather than assumed away.
+  // Kept as a fail-closed guard rather than assumed away. (There is no
+  // longer a separate "known but not implemented" tier: S4b's environment
+  // and S4c's onepassword-cli are both real now, and D6 promises no third
+  // v1 provider — reintroduce that tier only if a future provider is
+  // actually designed and mid-implementation.)
   throw new GoodBoyError(`Unknown provider type: "${config.type}"`, {
     code: 'E_PROVIDER_UNKNOWN_TYPE',
     safeMetadata: { type: config.type },

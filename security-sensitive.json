@@ -181,7 +181,7 @@
       "reason": "Lazily constructs and caches SecretProvider instances by configured name — the concrete implementation of invariant 7 (lazy initialization: no non-secrets command ever touches provider code).",
       "invariants": [
         "A provider is never constructed until getProvider() is actually called for its instance name — no eager construction for every configured provider",
-        "\"not configured\" (E_PROVIDER_INSTANCE_NOT_CONFIGURED) and \"not implemented yet\" (E_PROVIDER_NOT_IMPLEMENTED) stay distinct error codes — never collapsed into one generic failure that could mask which case actually occurred"
+        "An instance name that isn't configured at all (E_PROVIDER_INSTANCE_NOT_CONFIGURED) and a provider type that bypasses the schema entirely (E_PROVIDER_UNKNOWN_TYPE) stay distinct, fail-closed error codes — never collapsed into one generic failure"
       ]
     },
     {

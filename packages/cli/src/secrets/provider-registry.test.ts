@@ -3,14 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('./providers/environment.js', () => ({
   createEnvironmentProvider: vi.fn(),
 }));
+vi.mock('./providers/onepassword-cli.js', () => ({
+  createOnePasswordCliProvider: vi.fn(),
+}));
 
 import { createEnvironmentProvider } from './providers/environment.js';
+import { createOnePasswordCliProvider } from './providers/onepassword-cli.js';
 import { createProviderRegistry } from './provider-registry.js';
 import { GoodBoyError } from '../lib/errors.js';
 import type { SecretProviderConfig } from './config.js';
 import type { SecretProvider } from './types.js';
 
 const mockCreateEnvironmentProvider = vi.mocked(createEnvironmentProvider);
+const mockCreateOnePasswordCliProvider = vi.mocked(createOnePasswordCliProvider);
 
 function fakeProvider(id: string): SecretProvider {
   return {
@@ -88,39 +93,27 @@ describe('createProviderRegistry()', () => {
     }
   });
 
-  it('throws a distinct "not implemented" error for an instance configured with type onepassword-cli', () => {
-    const registry = createProviderRegistry({ vault: { type: 'onepassword-cli' } });
+  it('getProvider() returns a real, working provider for a configured onepassword-cli instance (S4c: no longer stubbed)', () => {
+    const fake = fakeProvider('onepassword-cli');
+    mockCreateOnePasswordCliProvider.mockReturnValue(fake);
 
-    expect(() => registry.getProvider('vault')).toThrow(/not implemented/i);
-    try {
-      registry.getProvider('vault');
-    } catch (err) {
-      expect(err).toBeInstanceOf(GoodBoyError);
-      expect((err as GoodBoyError).code).toBe('E_PROVIDER_NOT_IMPLEMENTED');
-    }
+    const registry = createProviderRegistry({ vault: { type: 'onepassword-cli', account: 'team.1password.com' } });
+    expect(registry.getProvider('vault')).toBe(fake);
+    expect(mockCreateOnePasswordCliProvider).toHaveBeenCalledWith({
+      type: 'onepassword-cli',
+      account: 'team.1password.com',
+    });
     expect(mockCreateEnvironmentProvider).not.toHaveBeenCalled();
   });
 
-  it('"not configured" and "not implemented" are genuinely distinct error codes, not the same failure', () => {
+  it('constructs the onepassword-cli factory exactly once across repeated getProvider() calls (cached, same as environment)', () => {
+    mockCreateOnePasswordCliProvider.mockReturnValue(fakeProvider('onepassword-cli'));
     const registry = createProviderRegistry({ vault: { type: 'onepassword-cli' } });
 
-    let notConfiguredCode: string | undefined;
-    let notImplementedCode: string | undefined;
+    registry.getProvider('vault');
+    registry.getProvider('vault');
 
-    try {
-      registry.getProvider('missing');
-    } catch (err) {
-      notConfiguredCode = (err as GoodBoyError).code;
-    }
-    try {
-      registry.getProvider('vault');
-    } catch (err) {
-      notImplementedCode = (err as GoodBoyError).code;
-    }
-
-    expect(notConfiguredCode).toBe('E_PROVIDER_INSTANCE_NOT_CONFIGURED');
-    expect(notImplementedCode).toBe('E_PROVIDER_NOT_IMPLEMENTED');
-    expect(notConfiguredCode).not.toBe(notImplementedCode);
+    expect(mockCreateOnePasswordCliProvider).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed for a genuinely unknown provider type bypassing the schema (defense in depth)', () => {
