@@ -177,6 +177,12 @@ already have them:
 
 - **Every commit** goes through `commit-creation` — never hand-write a
   commit message directly.
+- **Implementation work from a phase-prompt stops after implementation and
+  verification, before any commit.** Report the diff and verification
+  output back and wait — completing verification is not itself
+  authorization to commit. Bruno reviews the actual changes first; only
+  after he explicitly confirms readiness does `commit-creation` run. This
+  applies regardless of how clean the diff or how green the tests are.
 - **Every implementation prompt** for a discrete phase of work is drafted
   with `phase-prompt` before implementation starts.
 - **Every phase boundary** (before merge/tag/release) is checked with
