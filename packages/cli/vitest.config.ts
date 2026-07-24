@@ -59,6 +59,7 @@ export default defineConfig({
         'src/secrets/types.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/secrets/provider-registry.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/secrets/providers/environment.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/secrets/providers/onepassword-cli.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

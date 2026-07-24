@@ -191,6 +191,17 @@
         "resolve() only ever reads the single named variable — never logs or serializes process.env wholesale",
         "A missing variable's error message names only the variable name (safe to log), never a value"
       ]
+    },
+    {
+      "pattern": "packages/cli/src/secrets/providers/onepassword-cli.ts",
+      "reason": "Shells out to the real op CLI via lib/process.ts's runCapture (never a shell) to resolve a reference into a SecretValue.",
+      "invariants": [
+        "op is always invoked via execFile with shell: false — never op run (that's S5's separate concern) and never a shell string",
+        "checkAvailability() never throws or rejects, even when op itself can't be invoked at all — it always resolves to a status",
+        "checkAvailability()'s detail is always a short, fixed phrase, never raw stderr echoed verbatim",
+        "resolve()'s thrown error message may name the reference (locally configured, not a secret) but never includes raw stderr — stderr is carried in safeMetadata only",
+        "The op:// prefix is validated before any subprocess is invoked — a malformed reference never reaches op at all"
+      ]
     }
   ]
 }
