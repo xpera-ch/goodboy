@@ -7,3 +7,4 @@ coverage/
 .env
 .DS_Store
 docs/prompts/
+.claude/skills/engineering-principles/
