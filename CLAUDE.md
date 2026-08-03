@@ -35,8 +35,18 @@ Living planning docs, in reading order for onboarding to current state:
   don't depend on that chat's storage. Flagged as needing Bruno's
   confirmation — treat as a recovered draft, not a locked record, until he's
   reviewed it.
-- `docs/prompts/` — gitignored, per-phase review/implementation prompts
-  (local working artifacts, not part of the tracked design record).
+- `docs/prompts/` — gitignored, per-phase implementation prompts (local
+  working artifacts, not part of the tracked design record).
+- `docs/reviews/` — gitignored, the real output of `adversarial-review` and
+  `security-impact` runs, one file per phase. Kept local rather than
+  committed because this repo is expected to go public eventually (see
+  `docs/go-public-checklist.md`) and a permanent public record of every
+  security probe/finding ever considered isn't worth publishing — see
+  `docs/reviews/README.md` for the full reasoning. Both of those skills are
+  currently unreliable when invoked from a Cowork/chat session (a Cowork
+  skill-upload packaging bug, not a GoodBoy issue — see
+  `docs/goodboy-skill-packaging-bug.md`) — run them via Claude Code CLI and
+  drop the report in this folder.
 
 ## Commands
 
