@@ -41,6 +41,33 @@ GoodBoy applies defence-in-depth across every trust boundary. Multiple independe
 | Skill requests elevated capabilities | `permissions` restricted to 5 known enum values | `requestConsent()` shows the declared permissions and requires explicit confirmation before install | — |
 | Unexpected/injected manifest fields | `additionalProperties: false` on every schema object | `ajv` instantiated with `{ strict: true, allErrors: true }` | — |
 
+## Secrets Feature Security Model
+
+`goodboy secrets` (`doctor`/`list`/`validate`) lets a skill declare the
+logical secret names it needs (`requires.secrets` in its manifest) and lets
+you map those names, in your own local config, to a provider that can
+resolve them. The design goal throughout: GoodBoy diagnoses whether your
+secret configuration works — it never becomes a place secret material
+passes through, sits, or gets logged.
+
+| Control | Where enforced |
+|---|---|
+| No secret value or provider reference (`op://vault/item/field` reveals infrastructure) is ever written to a committed file, cached, or persisted anywhere | `goodboy.json`/`goodboy.lock` are never extended with secrets data; the only secrets config files (`~/.goodboy/config.json`, `<project>/goodboy.local.json`) hold provider references, never resolved values; `goodboy init` gitignores `goodboy.local.json` automatically |
+| Every resolved value is wrapped before it can be touched | `secrets/types.ts`'s `SecretValue` — `toString()`/`toJSON()`/`util.inspect` all return a redacted marker; `reveal()` is the only accessor that returns the real value |
+| Any value that does get revealed is stripped from CLI output regardless | `lib/redact.ts`, wired into the logger and error sanitizer — registered values are matched as literal substrings (never a constructed `RegExp`) and replaced longest-match-first |
+| The `op` CLI is never invoked through a shell | `secrets/providers/onepassword-cli.ts` — always `execFile` with `shell: false`; the `op://` prefix is validated *before* any subprocess runs, so a malformed reference never reaches `op` at all; raw `stderr` is never echoed verbatim into a thrown error message |
+| Provider code only runs when actually needed | `secrets/provider-registry.ts` lazily constructs providers by instance name — a user who never configures secrets never triggers provider code, and no non-secrets command ever touches it |
+| Only the secrets you actually ask about are ever resolved | `secrets/resolver.ts` only touches requested names — never iterates configured mappings/providers wholesale |
+| `goodboy secrets list` never shows a usable reference | `secrets/reference-masking.ts` masks vault/item/field/query content; an unrecognized provider type is masked exactly as conservatively as a known-sensitive one |
+
+**There is no secret-injection or execution command.** An earlier design
+(`secrets exec`, wrapping a child process with resolved secrets as
+environment variables) was scoped but never built, and has since been cut
+from the roadmap entirely — see `docs/concept-secrets.md` decision D6. This
+means GoodBoy itself never passes a resolved secret value into any other
+process's environment; getting a value into your own shell or agent session
+is still up to you (e.g. `op read`, or your own `.env`/provider tooling).
+
 ## Phase 1 Known Limitations
 
 The following are **by design** for Phase 1 and are documented here, not as vulnerabilities, but as known constraints that users must understand before installing skills.
