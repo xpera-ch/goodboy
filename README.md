@@ -4,7 +4,7 @@ A personal skill registry and package manager for Claude Code and the Agent Skil
 
 [![CI](https://github.com/xpera-ch/goodboy/actions/workflows/ci.yml/badge.svg)](https://github.com/xpera-ch/goodboy/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](package.json)
+[![npm](https://img.shields.io/npm/v/@goodboyjs/cli.svg)](https://www.npmjs.com/package/@goodboyjs/cli)
 
 ## What is GoodBoy
 
@@ -101,6 +101,29 @@ goodboy search git
 | `goodboy registry info <name>` | Show skill details |
 | `goodboy registry validate <name>` | Validate skill integrity |
 | `goodboy registry remove <name>` | Remove a skill from the registry |
+
+### Secrets
+
+A skill's `manifest.json` can declare the logical secret names it needs at
+runtime (`requires.secrets`) — advisory metadata, shown at install time,
+never enforced. Separately, you map those names to a secret provider in your
+own config (`~/.goodboy/config.json` for user-level defaults,
+`<project>/goodboy.local.json` for project-level, gitignored). Two providers
+ship today: `environment` (reads a variable from your shell) and
+`onepassword-cli` (shells out to the real `op` CLI — never a shell string,
+never cached, never written to disk).
+
+| Command | Description |
+| --- | --- |
+| `goodboy secrets doctor` | Check configured providers for availability (e.g. is `op` installed and signed in) — never prints a value |
+| `goodboy secrets list` | List configured mappings: name, provider, masked reference — never a value |
+| `goodboy secrets validate [--resolve]` | Check mappings are structurally valid, and with `--resolve`, that they actually resolve |
+| `goodboy secrets validate --skill <name>` | Validate against an installed project skill's declared `requires.secrets` instead of local config |
+
+GoodBoy diagnoses and validates secret configuration; it does not inject
+secrets into anything. There is no `exec`/run wrapper — resolving a value
+still means reading it yourself (e.g. `op read`) or configuring your agent's
+own environment.
 
 ## Skill lifecycle
 
