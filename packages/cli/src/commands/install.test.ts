@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'node:path';
+import { appendFile } from 'node:fs/promises';
 import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('ora', () => ({
@@ -88,6 +89,7 @@ const mockComputeSkillIntegrity = vi.mocked(computeSkillIntegrity);
 const mockInstallToStore = vi.mocked(installToStore);
 const mockCreateAgentSymlinks = vi.mocked(createAgentSymlinks);
 const mockResolveAgentFlags = vi.mocked(resolveAgentFlags);
+const mockAppendFile = vi.mocked(appendFile);
 
 const SKILL_PATH = '/fake/registry/test-skill';
 const CWD = '/test/project';
@@ -261,6 +263,11 @@ describe('installNamed — global install', () => {
       'sha256-mockintegrity==',
     );
   });
+
+  it('never touches .gitignore, even with --no-commit', async () => {
+    await installNamed('test-skill', { ...GLOBAL_OPTS, commit: false }, CWD);
+    expect(mockAppendFile).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -285,6 +292,34 @@ describe('installNamed — no-commit', () => {
       join(PROJECT_SKILLS, 'test-skill'),
       'sha256-mockintegrity==',
     );
+  });
+
+  it('gitignores only the installed skill, not the whole skills directory', async () => {
+    await installNamed('test-skill', NO_COMMIT_OPTS, CWD);
+    expect(mockAppendFile).toHaveBeenCalledWith(
+      join(CWD, '.gitignore'),
+      expect.stringContaining('.claude/skills/test-skill/'),
+      'utf-8',
+    );
+    expect(mockAppendFile).not.toHaveBeenCalledWith(
+      join(CWD, '.gitignore'),
+      expect.stringMatching(/^\.claude\/skills\/\n$/),
+      'utf-8',
+    );
+  });
+
+  it('scopes the gitignore entry to the given name, not a fixed string', async () => {
+    await installNamed('another-skill', NO_COMMIT_OPTS, CWD);
+    expect(mockAppendFile).toHaveBeenCalledWith(
+      join(CWD, '.gitignore'),
+      expect.stringContaining('.claude/skills/another-skill/'),
+      'utf-8',
+    );
+  });
+
+  it('does not touch .gitignore on a normal (committed) install', async () => {
+    await installNamed('test-skill', DEFAULT_OPTS, CWD);
+    expect(mockAppendFile).not.toHaveBeenCalled();
   });
 });
 
