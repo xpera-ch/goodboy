@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import type { GoodBoyManifest } from '../types/index.js';
@@ -70,7 +70,12 @@ import {
 import { installToStore } from '../lib/store.js';
 import { computeSkillIntegrity } from '../lib/integrity.js';
 import { resolveAgentFlags, createAgentSymlinks } from '../lib/agents.js';
-import { installNamed, installFromManifest, installCommand } from './install.js';
+import {
+  installNamed,
+  installFromManifest,
+  installCommand,
+  assertAgentFlagsRequireGlobal,
+} from './install.js';
 import type { InstallOptions } from './install.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
@@ -360,6 +365,90 @@ describe('installFromManifest', () => {
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.stringContaining('No skills listed'),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertAgentFlagsRequireGlobal
+// ---------------------------------------------------------------------------
+
+describe('assertAgentFlagsRequireGlobal', () => {
+  it.each([
+    ['claudeCode', '--claude-code'],
+    ['codex', '--codex'],
+    ['gemini', '--gemini'],
+    ['allAgents', '--all-agents'],
+  ] as const)('rejects %s without -g, naming %s', (key, flag) => {
+    expect(() =>
+      assertAgentFlagsRequireGlobal({ [key]: true } as InstallOptions),
+    ).toThrow(flag);
+  });
+
+  it('states the fix in the error message', () => {
+    expect(() => assertAgentFlagsRequireGlobal({ codex: true })).toThrow(
+      '--codex only applies to global installs — add -g/--global, or drop this flag for a project install.',
+    );
+  });
+
+  it('names both flags in one error when two are passed together', () => {
+    expect(() =>
+      assertAgentFlagsRequireGlobal({ codex: true, gemini: true }),
+    ).toThrow('--codex, --gemini');
+  });
+
+  it.each([
+    ['claudeCode'],
+    ['codex'],
+    ['gemini'],
+    ['allAgents'],
+  ] as const)('allows %s combined with -g', (key) => {
+    expect(() =>
+      assertAgentFlagsRequireGlobal({ global: true, [key]: true } as InstallOptions),
+    ).not.toThrow();
+  });
+
+  it('allows no agent flags, no -g', () => {
+    expect(() => assertAgentFlagsRequireGlobal({})).not.toThrow();
+  });
+
+  it('allows no agent flags, with -g', () => {
+    expect(() => assertAgentFlagsRequireGlobal({ global: true })).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// installCommand — agent flags rejected before any side effects (integration)
+// ---------------------------------------------------------------------------
+
+describe('installCommand — agent flags require -g', () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+  });
+
+  it('rejects a named-skill install before touching the registry or filesystem', async () => {
+    await installCommand.parseAsync(['test-skill', '--codex'], { from: 'user' });
+
+    expect(mockCreateRegistryAdapter).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockAppendFile).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('--codex'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('rejects a restore-all install before reading goodboy.json', async () => {
+    await installCommand.parseAsync(['--codex'], { from: 'user' });
+
+    expect(mockReadGoodBoyJson).not.toHaveBeenCalled();
+    expect(mockCreateRegistryAdapter).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('--codex'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
 

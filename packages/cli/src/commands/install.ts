@@ -31,6 +31,28 @@ export interface InstallOptions {
 // Skills readable by Claude Code (group/world read allowed)
 const PROJECT_SKILLS_DIR_MODE = 0o755;
 
+const AGENT_FLAG_NAMES: Array<{ key: keyof InstallOptions; flag: string }> = [
+  { key: 'claudeCode', flag: '--claude-code' },
+  { key: 'codex', flag: '--codex' },
+  { key: 'gemini', flag: '--gemini' },
+  { key: 'allAgents', flag: '--all-agents' },
+];
+
+export function assertAgentFlagsRequireGlobal(options: InstallOptions): void {
+  if (options.global) return;
+
+  const passedFlags = AGENT_FLAG_NAMES.filter(({ key }) => options[key]).map(
+    ({ flag }) => flag,
+  );
+
+  if (passedFlags.length === 0) return;
+
+  const flagList = passedFlags.join(', ');
+  throw new Error(
+    `${flagList} only applies to global installs — add -g/--global, or drop this flag for a project install.`,
+  );
+}
+
 function getProjectSkillsPath(cwd: string): string {
   return join(cwd, '.claude', 'skills');
 }
@@ -214,6 +236,7 @@ export const installCommand = new Command('install')
   .action(async (skillName: string | undefined, options: InstallOptions) => {
     const cwd = process.cwd();
     try {
+      assertAgentFlagsRequireGlobal(options);
       if (skillName !== undefined) {
         await installNamed(skillName, options, cwd);
       } else {
