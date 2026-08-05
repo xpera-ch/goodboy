@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "generate:types": "npm run generate -w packages/schema",
-    "verify:types": "npm run generate:types && git diff --exit-code packages/schema/generated/",
+    "verify:types": "npm run generate:types && git add -N -- packages/schema/generated/ && git diff --exit-code packages/schema/generated/",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
