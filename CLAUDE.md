@@ -125,10 +125,12 @@ on any chat's own storage — see `docs/roadmap.md` for the same provenance
 caveat: treat as a recovered draft of Bruno's stated preferences, correct
 anything that's drifted).
 
-- **Claude's role on this project is an explicit co-founder role**, not just
-  an implementer: give critical technical/product feedback, make
+- **Claude is used as an active technical collaborator, not just an
+  implementer**: expected to give critical technical/product feedback, make
   architectural calls when delegated, and push back on ideas that don't
-  serve the project rather than deferring by default.
+  serve the project rather than deferring by default. This is a deliberate
+  choice about how the tool is used here, not a description of a formal
+  role.
 - **Development happens in the skill source directory, not the registry;
   publishing is a release act.** Exploratory work never enters a registry —
   that's what the planned `goodboy link` is for (see `docs/roadmap.md`).
@@ -140,11 +142,13 @@ anything that's drifted).
   code, and live test results, never self-reported summaries.
 - **Nothing half-baked; pay complexity cost once.** No technical debt, no
   speculative features, no invented concepts not present in the open
-  standard — GoodBoy has a scar from inventing schema fields (`kind/executable`
-  skills, skill-to-skill dependencies) that required a deep architectural
-  correction. Concretely: don't add SKILL.md frontmatter keys or schema
-  properties beyond what the Agent Skills standard / `manifest.schema.json`
-  already define without an explicit decision to do so.
+  standard. Earlier in the project, two invented schema fields
+  (`kind`/`executable` skills, skill-to-skill dependencies) had to be
+  reverted and redesigned once their consequences became clear — the
+  concrete reason this rule exists, not just a stated preference.
+  Concretely: don't add SKILL.md frontmatter keys or schema properties
+  beyond what the Agent Skills standard / `manifest.schema.json` already
+  define without an explicit decision to do so.
 - **Prefer atomic commands and user agency over automatic/magic behavior**,
   even when magic would suit Bruno's personal workflow better — the tool is
   built for a broad audience ("Option B" in his own shorthand).
@@ -155,29 +159,33 @@ anything that's drifted).
   re-confirmation rather than acting on it — noted previously as a pattern
   worth preserving, not relaxing.
 
-## Current constraint: no direct code changes from chat/Cowork sessions
+## Operating policy: which surface may originate a code change
 
-As of 2026-07-23, a **Cowork session or a claude.ai/chat-style
-conversation** does not edit or commit source/test code in this repo
-directly (`packages/*/src/**`, etc.), regardless of how small or
-well-verified the change seems. Instead: draft the implementation as a
-`phase-prompt`-style prompt and stop — Bruno reviews it and executes it
-himself via **Claude Code CLI**, then reports results back.
+A **Cowork session or a claude.ai/chat-style conversation** does not edit or
+commit source/test code in this repo directly (`packages/*/src/**`, etc.),
+regardless of how small or well-verified the change seems. Instead: draft
+the implementation as a `phase-prompt`-style prompt and stop — Bruno reviews
+it and executes it himself via **Claude Code CLI**, then reports results
+back.
 
-**This constraint does not apply to Claude Code CLI itself when Bruno has
-explicitly run it to execute a reviewed prompt.** That's the sanctioned
-path this whole workflow exists for, not a loophole — Claude Code CLI
-should implement the prompt directly and should not pause to ask whether
-it's allowed to change code, or treat this section as applying to itself.
-The restriction is about *which surface originates a code change*
-(conversational planning vs. a deliberately-invoked CLI run against an
-already-reviewed prompt), not about code changes being forbidden outright.
+**This does not apply to Claude Code CLI itself when explicitly run to
+execute a reviewed prompt.** That's the sanctioned path this whole workflow
+exists for, not a loophole — Claude Code CLI should implement the prompt
+directly and should not pause to ask whether it's allowed to change code, or
+treat this section as applying to itself. The distinction is about *which
+surface originates a code change* — a conversational planning session versus
+a deliberately-invoked CLI run against an already-reviewed prompt — not
+about code changes being forbidden outright.
 
-This is a trust-rebuilding measure, not a permanent architectural rule —
-Bruno may lift it (including for Cowork/chat) once trust is restored;
-don't assume it's lifted without him saying so. Documentation and planning
-files (`docs/`, this file) are exempt from this constraint regardless of
-which surface is used.
+The reasoning: a chat-style session and a deliberately-invoked CLI run carry
+different levels of intentionality and review. Gating code changes to the
+surface where a human explicitly chose to execute a reviewed plan, rather
+than any surface that happens to have a model attached, keeps that
+distinction meaningful instead of nominal. This is a current, revisitable
+operating policy — Bruno may change it, including for Cowork/chat — not a
+fixed architectural law; don't assume it has changed without being told
+explicitly. Documentation and planning files (`docs/`, this file) are exempt
+from this constraint regardless of which surface is used.
 
 ## Standard workflow (not optional)
 

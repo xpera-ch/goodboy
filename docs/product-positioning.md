@@ -4,6 +4,14 @@
 (a claude.ai Chat project, not this repo), same caveat as `docs/roadmap.md`
 — treat as a recovered draft, verify before treating as locked.
 
+**Competitive-landscape refresh (2026-08-05):** the "Core differentiators"
+and "Ecosystem and standards" sections below were updated against an
+external review's findings — distinct from the provenance note above, this
+part reflects the field as of this date, not a recovered chat memory. See
+`docs/backlog.md` ("Competitive landscape has moved since
+`product-positioning.md` was written") for the full research this update is
+based on.
+
 ## What GoodBoy is
 
 A personal skill registry and package manager for Claude Code and the Agent
@@ -12,6 +20,24 @@ skill side of the ecosystem only; it does not manage `.claude/agents/`
 subagent definitions.
 
 ## Core differentiators (vs. `skills.sh` and `gh skill`)
+
+As of mid-2026 the installer role is no longer open ground: **Vercel**
+shipped `npx skills` plus the `skills.sh` directory/leaderboard, reportedly
+installing across 18+ agents (Claude Code, Copilot CLI, Codex, Cursor, and
+others); **GitHub** shipped `gh skill` as an official `gh` CLI preview
+(`add`/`publish`/`search`/`preview`), explicitly spec-compatible with
+Vercel's tool; and a wider community field (PolySkill, Skilldex, Lola, and
+assorted community CLIs) has grown alongside a package count reported in the
+hundreds of thousands by early 2026.
+
+Read correctly, this is validation of the underlying problem, not
+refutation of the project — three separate, well-resourced teams building
+tooling for the same gap in roughly one quarter is strong evidence the gap
+is real. What it does settle is that GoodBoy should not compete on *install*
+— first-party tools have already taken that role, for free, at a scale a
+personal registry tool has no reason to chase. That sharpens rather than
+weakens the differentiators below, since the installer question is now
+someone else's job to answer:
 
 - **Intelligent dispatcher (vision, not yet built):** analyze project
   context (`CLAUDE.md`, `package.json`, file structure) and propose which
@@ -27,7 +53,9 @@ subagent definitions.
   promoted back to the registry and rolled out to other projects. Not yet
   built — see `docs/roadmap.md`.
 - **Framing:** apt-vs-Ansible. `skills.sh` / `gh skill` are package
-  installers; GoodBoy is configuration management.
+  installers; GoodBoy is configuration management — "does what's installed
+  still match what I meant to install, across every project and machine," a
+  question neither first-party installer asks at all.
 
 ## Competitive positioning boundary
 
@@ -35,7 +63,11 @@ GoodBoy should **not** build a public marketplace or search index. It
 searches the user's own registry natively and accepts URLs found through
 external catalogs. This is a deliberate scope boundary, not a
 not-yet-gotten-to feature — see the "no network effects" principle in
-`CLAUDE.md`.
+`CLAUDE.md`. The 2026-08 competitive landscape strengthens this boundary
+rather than calling it into question: `skills.sh` and `gh skill` now run the
+marketplace/discovery role at a scale GoodBoy was never trying to compete
+at, which means GoodBoy never has to build one — it can stay the
+configuration-management layer on top of catalogs someone else maintains.
 
 ## Repository topology
 
@@ -73,7 +105,11 @@ not-yet-gotten-to feature — see the "no network effects" principle in
 - Git-based transport for installs is deliberately host-agnostic — covers
   any git host, not just GitHub, since some target users (e.g. agency
   clients) run self-hosted git infrastructure.
-- **Competitive reference points:** `skills.sh` (Vercel/marketplace-oriented)
-  and `gh skill` (GitHub CLI, supply-chain-grade with SHA provenance and
-  pinning) — both are useful comparisons for what GoodBoy deliberately is
-  and isn't.
+- **Competitive reference points:** `skills.sh`/`npx skills` (Vercel,
+  marketplace-oriented, reportedly 18+ agents supported) and `gh skill`
+  (official `gh` CLI preview, supply-chain-grade with SHA provenance and
+  pinning, explicitly spec-compatible with Vercel's tool) — both are useful
+  comparisons for what GoodBoy deliberately is and isn't. A wider community
+  field (PolySkill, Skilldex, Lola, and others) exists alongside a package
+  count reported in the hundreds of thousands by early 2026, underscoring
+  that GoodBoy is deliberately not trying to be a catalog among catalogs.
