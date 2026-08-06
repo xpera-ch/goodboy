@@ -17,9 +17,10 @@ export interface ValidationResult {
   issues: ValidationIssue[];
 }
 
-function parseFrontmatter(content: string): {
+export function parseFrontmatter(content: string): {
   name?: string;
   description?: string;
+  license?: string;
   hasDelimiters: boolean;
   hasClosingDelimiter: boolean;
   body: string;
@@ -37,7 +38,7 @@ function parseFrontmatter(content: string): {
   const frontmatterLines = lines.slice(1, closeIdx);
   const body = lines.slice(closeIdx + 1).join('\n').trim();
 
-  const result: { name?: string; description?: string } = {};
+  const result: { name?: string; description?: string; license?: string } = {};
   for (const line of frontmatterLines) {
     const colonIdx = line.indexOf(':');
     if (colonIdx === -1) continue;
@@ -45,6 +46,7 @@ function parseFrontmatter(content: string): {
     const value = line.slice(colonIdx + 1).trim().replace(/^["']|["']$/g, '');
     if (key === 'name') result.name = value;
     if (key === 'description') result.description = value;
+    if (key === 'license') result.license = value;
   }
 
   return { ...result, hasDelimiters: true, hasClosingDelimiter: true, body };
@@ -127,6 +129,12 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
         issues.push({
           severity: 'error',
           message: `SKILL.md frontmatter name "${fm.name}" does not match manifest.json name "${manifest.name}"`,
+        });
+      }
+      if (manifest && fm.license && fm.license !== manifest.license) {
+        issues.push({
+          severity: 'error',
+          message: `SKILL.md frontmatter license "${fm.license}" does not match manifest.json license "${manifest.license}"`,
         });
       }
       if (fm.body.length < 50) {

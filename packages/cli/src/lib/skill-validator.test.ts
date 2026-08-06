@@ -8,7 +8,7 @@ vi.mock('./logger.js', () => ({
 }));
 
 import { logger } from './logger.js';
-import { validateSkillDirectory, formatValidationResult } from './skill-validator.js';
+import { validateSkillDirectory, formatValidationResult, parseFrontmatter } from './skill-validator.js';
 import type { ValidationResult } from './skill-validator.js';
 
 const mockLogger = vi.mocked(logger);
@@ -182,6 +182,42 @@ describe('validateSkillDirectory() — SKILL.md errors', () => {
         message: expect.stringContaining('does not match manifest.json name'),
       }),
     );
+  });
+
+  it('reports no error when SKILL.md frontmatter license matches manifest license', async () => {
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp(
+      'SKILL.md',
+      '---\nname: test-skill\ndescription: A well-described skill for testing purposes\nlicense: MIT\n---\n\nBody content here that is longer than fifty characters for sure.',
+    );
+    const result = await validateSkillDirectory(tmpDir);
+    const errors = result.issues.filter((i) => i.severity === 'error');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('reports error when SKILL.md frontmatter license does not match manifest license', async () => {
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp(
+      'SKILL.md',
+      '---\nname: test-skill\ndescription: A well-described skill for testing purposes\nlicense: Apache-2.0\n---\n\nBody content here that is longer than fifty characters for sure.',
+    );
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.valid).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('does not match manifest.json license'),
+      }),
+    );
+  });
+
+  it('reports no error when SKILL.md frontmatter declares no license at all', async () => {
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    const errors = result.issues.filter((i) => i.severity === 'error');
+    expect(errors).toHaveLength(0);
+    expect(result.issues.some((i) => i.message.toLowerCase().includes('license'))).toBe(false);
   });
 });
 
@@ -368,6 +404,30 @@ describe('validateSkillDirectory() — requires.secrets (S2)', () => {
     writeTmp('SKILL.md', VALID_SKILL_MD);
     const result = await validateSkillDirectory(tmpDir);
     expect(result.issues.some((i) => i.severity === 'info')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseFrontmatter() — exported for reuse by `goodboy adopt`
+// ---------------------------------------------------------------------------
+
+describe('parseFrontmatter()', () => {
+  it('parses name, description, and license from valid frontmatter', () => {
+    const content = '---\nname: my-skill\ndescription: Does a thing\nlicense: MIT\n---\n\nBody text.';
+    const result = parseFrontmatter(content);
+    expect(result).toEqual({
+      name: 'my-skill',
+      description: 'Does a thing',
+      license: 'MIT',
+      hasDelimiters: true,
+      hasClosingDelimiter: true,
+      body: 'Body text.',
+    });
+  });
+
+  it('reports hasDelimiters=false when there is no opening --- delimiter', () => {
+    const result = parseFrontmatter('name: my-skill\ndescription: Does a thing');
+    expect(result.hasDelimiters).toBe(false);
   });
 });
 
