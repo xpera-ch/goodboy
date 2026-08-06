@@ -143,6 +143,14 @@
       ]
     },
     {
+      "pattern": "packages/cli/src/lib/logger.ts",
+      "reason": "Every message the CLI ever prints (info/success/warn/error, plus sanitiseError()) passes through here — the point where caller-provided strings, including untrusted content like SKILL.md frontmatter, become terminal output.",
+      "invariants": [
+        "Every message passed to info/success/warn/error has control characters and DEL stripped before being written, prior to redact() — no caller-provided string reaches stdout/stderr with raw control bytes intact",
+        "Control-character stripping always runs before redact(), never after, so a registered secret value is never sliced by a control byte inside it"
+      ]
+    },
+    {
       "pattern": "packages/schema/src/manifest.schema.json",
       "reason": "The JSON Schema used to validate every manifest.",
       "invariants": [

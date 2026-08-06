@@ -31,7 +31,6 @@ export default defineConfig({
         'src/commands/uninstall.ts',
         'src/commands/upgrade.ts',
         'src/__fixtures__/**',
-        'src/lib/logger.ts',
       ],
       thresholds: {
         lines: 80,
@@ -54,6 +53,7 @@ export default defineConfig({
         'src/lib/errors.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/process.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/redact.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/logger.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/secrets/config.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/gitignore.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/secrets/types.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
