@@ -7,7 +7,7 @@ import { parseFrontmatter } from '../lib/skill-validator.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { writeManifest } from '../lib/manifest.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
-import { logger } from '../lib/logger.js';
+import { logger, sanitiseError } from '../lib/logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,7 +168,7 @@ export const adoptCommand = new Command('adopt')
         if (err instanceof Error && /force closed|force-closed/i.test(err.message)) {
           process.exit(0);
         }
-        logger.error(err instanceof Error ? err.message : 'Unknown error');
+        logger.error(sanitiseError(err));
       }
       process.exit(1);
     }

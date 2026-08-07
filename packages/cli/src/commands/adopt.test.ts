@@ -32,13 +32,20 @@ vi.mock('../lib/manifest.js', async (importOriginal) => {
 });
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  // Mirrors sanitiseError()'s real three-way branch (Error / string / other)
+  // rather than logger.test.ts's simpler `String(e)` fallback used in some
+  // sibling command test suites, so the non-Error fallback text asserted in
+  // the "C3" test below matches sanitiseError's actual production behavior.
+  sanitiseError: vi.fn((e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : 'An unexpected error occurred',
+  ),
 }));
 
 import { input } from '@inquirer/prompts';
 import { existsSync, statSync, cpSync, readFileSync } from 'node:fs';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { writeManifest, validateManifest } from '../lib/manifest.js';
-import { logger } from '../lib/logger.js';
+import { logger, sanitiseError } from '../lib/logger.js';
 import { adoptCommand } from './adopt.js';
 
 const mockInput = vi.mocked(input);
@@ -49,6 +56,7 @@ const mockReadFileSync = vi.mocked(readFileSync);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
 const mockWriteManifest = vi.mocked(writeManifest);
 const mockLogger = vi.mocked(logger);
+const mockSanitiseError = vi.mocked(sanitiseError);
 
 const CWD = process.cwd();
 const SOURCE_PATH = '/home/user/some-skill';
@@ -438,6 +446,18 @@ describe('adopt command', () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
+  it('routes the top-level catch through sanitiseError() rather than logging err.message directly (F1)', async () => {
+    mockSanitiseError.mockImplementationOnce(
+      (e: unknown) => `SANITISED:${e instanceof Error ? e.message : String(e)}`,
+    );
+    mockWriteManifest.mockRejectedValue(new Error('disk full'));
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockSanitiseError).toHaveBeenCalledWith(expect.any(Error));
+    expect(mockLogger.error).toHaveBeenCalledWith('SANITISED:disk full');
+  });
+
   it('exits 0 without an error message when the prompt is force-closed', async () => {
     mockInput.mockReset().mockRejectedValueOnce(new Error('User force closed the prompt'));
 
@@ -447,12 +467,12 @@ describe('adopt command', () => {
     expect(process.exit).toHaveBeenCalledWith(0);
   });
 
-  it('logs "Unknown error" and exits 1 when a non-Error value is thrown (C3)', async () => {
+  it('logs sanitiseError()\'s fallback text and exits 1 when a non-Error value is thrown (C3)', async () => {
     mockWriteManifest.mockRejectedValue({ notAnError: true });
 
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
 
-    expect(mockLogger.error).toHaveBeenCalledWith('Unknown error');
+    expect(mockLogger.error).toHaveBeenCalledWith('An unexpected error occurred');
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
