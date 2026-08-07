@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { existsSync, mkdirSync, cpSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
 import ora from 'ora';
-import { SKILL_NAME_RE } from '../lib/validation.js';
+import { SKILL_NAME_RE, isRemoteRefArgument } from '../lib/validation.js';
 import { validateSkillDirectory, formatValidationResult } from '../lib/skill-validator.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
@@ -25,12 +25,21 @@ class HandledFailure extends Error {}
 
 export const addCommand = new Command('add')
   .description('Add a skill to the local registry')
-  .argument('<skill-path>', 'Path to the skill directory')
+  .argument('<skill-path>', 'Local path to the skill directory')
   .option('-f, --force', 'Overwrite an existing version')
   .action(async (skillPathArg: string, options: { force?: boolean }) => {
     const spinner = ora('Adding skill...').start();
 
     try {
+      if (isRemoteRefArgument(skillPathArg)) {
+        spinner.fail();
+        logger.error(
+          `"${skillPathArg}" looks like a URL, not a local path. ` +
+            `'goodboy add' only accepts a local skill directory.`,
+        );
+        throw new HandledFailure();
+      }
+
       const skillPath = resolve(skillPathArg);
 
       if (!existsSync(skillPath)) {

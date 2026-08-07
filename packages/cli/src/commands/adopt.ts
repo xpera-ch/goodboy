@@ -6,7 +6,7 @@ import { resolve, join } from 'node:path';
 import { parseFrontmatter } from '../lib/skill-validator.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { writeManifest } from '../lib/manifest.js';
-import { SKILL_NAME_RE } from '../lib/validation.js';
+import { SKILL_NAME_RE, isRemoteRefArgument } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
 
@@ -24,6 +24,14 @@ const MAX_SKILL_MD_BYTES = 512 * 1024; // 512 KB
 class HandledFailure extends Error {}
 
 async function run(pathArg: string): Promise<void> {
+  if (isRemoteRefArgument(pathArg)) {
+    logger.error(
+      `"${pathArg}" looks like a URL, not a local path. ` +
+        `'goodboy adopt' only accepts an existing local skill directory — clone or download the skill first, then run 'goodboy adopt <local-dir>'.`,
+    );
+    throw new HandledFailure();
+  }
+
   const sourcePath = resolve(pathArg);
 
   if (!existsSync(sourcePath)) {
@@ -159,7 +167,7 @@ async function run(pathArg: string): Promise<void> {
 
 export const adoptCommand = new Command('adopt')
   .description('Onboard an existing SKILL.md-only skill (no manifest.json) into a new local skill directory')
-  .argument('<path>', 'Path to an existing skill directory containing SKILL.md but no manifest.json')
+  .argument('<path>', 'Local path to an existing skill directory containing SKILL.md but no manifest.json')
   .action(async (pathArg: string) => {
     try {
       await run(pathArg);

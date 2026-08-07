@@ -29,6 +29,7 @@ vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
+import ora from 'ora';
 import { existsSync, mkdirSync, cpSync } from 'node:fs';
 import { validateSkillDirectory, formatValidationResult } from '../lib/skill-validator.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
@@ -96,6 +97,44 @@ describe('add command', () => {
       name: 'my-skill',
       latest: '1.0.0',
       versions: { '1.0.0': { path: 'versions/1.0.0', addedAt: '2026-01-01T00:00:00Z', yanked: false } },
+    });
+  });
+
+  describe('remote-ref rejection', () => {
+    it('rejects a URL argument before any filesystem or registry access', async () => {
+      await addCommand.parseAsync(['https://github.com/foo/bar'], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('https://github.com/foo/bar'),
+      );
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+
+      type SpinnerMock = { fail: ReturnType<typeof vi.fn> };
+      const spinnerInstance = vi.mocked(ora).mock.results[0]?.value as SpinnerMock;
+      expect(spinnerInstance.fail).toHaveBeenCalled();
+
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(mockValidateSkillDirectory).not.toHaveBeenCalled();
+      expect(mockReadManifest).not.toHaveBeenCalled();
+      expect(mockScanForSymlinks).not.toHaveBeenCalled();
+      expect(mockEnsureRegistryExists).not.toHaveBeenCalled();
+      expect(mockCpSync).not.toHaveBeenCalled();
+    });
+
+    it('rejects an scp-style git remote argument before any filesystem or registry access', async () => {
+      await addCommand.parseAsync(['git@github.com:foo/bar.git'], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('git@github.com:foo/bar.git'),
+      );
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledTimes(1);
+
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(mockEnsureRegistryExists).not.toHaveBeenCalled();
+      expect(mockCpSync).not.toHaveBeenCalled();
     });
   });
 

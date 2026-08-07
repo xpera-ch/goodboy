@@ -227,6 +227,48 @@ describe('adopt command', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Remote-ref rejection (URL-shaped / scp-style arguments)
+  // -------------------------------------------------------------------------
+
+  describe('remote-ref rejection', () => {
+    it('rejects a URL argument before touching the filesystem', async () => {
+      await adoptCommand.parseAsync(['https://github.com/foo/bar'], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('https://github.com/foo/bar'),
+      );
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(mockStatSync).not.toHaveBeenCalled();
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(mockCpSync).not.toHaveBeenCalled();
+      expect(mockScanForSymlinks).not.toHaveBeenCalled();
+    });
+
+    it('rejects an scp-style git remote argument before touching the filesystem', async () => {
+      await adoptCommand.parseAsync(['git@github.com:foo/bar.git'], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('git@github.com:foo/bar.git'),
+      );
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(mockStatSync).not.toHaveBeenCalled();
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(mockCpSync).not.toHaveBeenCalled();
+      expect(mockScanForSymlinks).not.toHaveBeenCalled();
+    });
+
+    it('never prompts the user when the argument is rejected as a remote ref', async () => {
+      await adoptCommand.parseAsync(['https://github.com/foo/bar'], { from: 'user' }).catch(() => {});
+
+      expect(mockInput).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Path validation
   // -------------------------------------------------------------------------
 
