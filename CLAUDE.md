@@ -5,12 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Source of truth
 
 This repository is the single source of truth for GoodBoy's state — current
-version, current design decisions, current backlog. If a chat (Cowork,
-Claude.ai, anywhere) surfaces information about this project that didn't
-come from reading these files directly in this session, treat it as
-possibly stale and re-verify against the repo before acting on it. In
-particular, do not trust a prior chat's memory/summary over `git log`,
-`git tag`, `package.json` versions, or the docs listed below.
+version, current design decisions, current backlog. (Domain-specific
+canonical lists still live in their own files, e.g. `CONTRIBUTING.md` for
+the security hard-requirements list, not this one — see the closing note
+under "Collaboration style".) If a chat (Cowork, Claude.ai, anywhere)
+surfaces information about this project that didn't come from reading
+these files directly in this session, treat it as possibly stale and
+re-verify against the repo before acting on it. In particular, do not
+trust a prior chat's memory/summary over `git log`, `git tag`,
+`package.json` versions, or the docs listed below.
 
 Living planning docs, in reading order for onboarding to current state:
 
@@ -175,7 +178,9 @@ directly and should not pause to ask whether it's allowed to change code, or
 treat this section as applying to itself. The distinction is about *which
 surface originates a code change* — a conversational planning session versus
 a deliberately-invoked CLI run against an already-reviewed prompt — not
-about code changes being forbidden outright.
+about code changes being forbidden outright. (This exemption covers
+*implementing*, not committing — see "Standard workflow" below for the
+separate, still-mandatory stop-before-commit gate.)
 
 The reasoning: a chat-style session and a deliberately-invoked CLI run carry
 different levels of intentionality and review. Gating code changes to the
