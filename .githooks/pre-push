@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Pre-push hook: run the test suite with coverage thresholds before anything
+# reaches the remote.
+#
+# Why this exists: GitHub branch protection requires a paid plan on private
+# repositories, so until this repo is public there is no server-side gate
+# preventing a red build landing on main. This is the local substitute. It
+# does not replace branch protection — it covers the failure mode a solo
+# developer actually has (pushing something broken), not the one branch
+# protection is for (someone else merging red).
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Bypass deliberately (and rarely):
+#   git push --no-verify
+#
+# Note this hook is branch-agnostic. It does not require or encourage
+# feature branches; pushing directly to main is fine.
+
+ZERO='0000000000000000000000000000000000000000'
+run_tests=0
+
+# stdin gives one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+	# Branch deletion — nothing to test.
+	if [ "$local_sha" = "$ZERO" ]; then
+		continue
+	fi
+
+	# New branch on the remote: we cannot cheaply determine what is new,
+	# so fail safe and run.
+	if [ "$remote_sha" = "$ZERO" ]; then
+		run_tests=1
+		break
+	fi
+
+	changed=$(git diff --name-only "$remote_sha" "$local_sha")
+
+	# Run unless EVERY changed path is documentation or hook tooling.
+	# grep -qv succeeds when at least one line does not match, i.e. when
+	# something outside those paths changed. The default is to run: if the
+	# classification is ever wrong, it errs toward running the suite.
+	if printf '%s\n' "$changed" | grep -qvE '^(docs/|\.githooks/|[^/]*\.md$)'; then
+		run_tests=1
+		break
+	fi
+done
+
+if [ "$run_tests" -eq 0 ]; then
+	echo "pre-push: documentation-only change — skipping test suite."
+	exit 0
+fi
+
+echo "pre-push: running npm run test:coverage…"
+
+if npm run test:coverage; then
+	echo "pre-push: OK"
+	exit 0
+fi
+
+cat >&2 <<'EOF'
+
+pre-push: FAILED — push aborted.
+
+The suite or a per-file coverage threshold did not pass. Note that a
+coverage-threshold breach exits non-zero even when every test passes, which
+is deliberate: roughly 30 files are pinned at 100% and a silent drop is the
+regression worth catching.
+
+To push anyway (deliberately, not habitually):
+  git push --no-verify
+EOF
+
+exit 1
