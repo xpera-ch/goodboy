@@ -21,6 +21,45 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-11 — Committed files never link into `docs/prompts/`
+
+**Decided:** no committed file may contain a `docs/prompts/…` path.
+Prompt-to-prompt references *within* that directory are fine — they never
+leave it.
+
+**Why:** `docs/prompts/` is gitignored, so such a link resolves only on
+Bruno's machine. By 2026-08-11 thirty-two had accumulated across
+`docs/backlog.md` (16), `docs/go-public-checklist.md` (5),
+`docs/concept-secrets.md` (5), `docs/decisions.md` (4),
+`docs/product-positioning.md` (1) and `CLAUDE.md` (1) — every one of which
+becomes a dead link the moment the repo is public, inside the documents
+whose entire value is demonstrating rigor.
+
+Many were **already broken locally**, using flat `docs/prompts/x.md` paths
+for prompts long since filed into `done/<topic>/` subfolders. Nothing
+checked them, so they decayed silently. That is the real argument for a
+rule rather than a one-off cleanup: the references rot faster than anyone
+notices.
+
+**Instead:** describe the artifact ("the phase prompt for this work, kept
+locally"), or put the substance in the committed document so no reference
+is needed. The second is usually better — if a committed doc needs to point
+at a prompt to be understood, the reasoning is in the wrong file.
+
+**Enforcement:** a grep in the go-public checklist for the launch cleanup;
+a markdown link-check over committed files is noted as a candidate for the
+deferred CI work, which would catch both this and the path decay.
+
+**Related convention adopted the same day:** prompt filenames carry their
+sequence code as a prefix (`A2-`, `B1-`, `deferred-`) so they can be found
+by code without opening `SEQUENCE.md`.
+
+**See:** `CLAUDE.md` (the rule), `docs/go-public-checklist.md` (the launch
+cleanup), `docs/backlog.md` (the full framing and the rejected alternative
+of publishing the prompts).
+
+---
+
 ## 2026-08-11 — Canonical domain is `goodboyjs.com`; schema `$id`s corrected
 
 **Decided:** the project's canonical domain is **`goodboyjs.com`**.
@@ -47,7 +86,7 @@ if `$schema` emission lands (see
 that phase after this fix rather than before.
 
 **Fix folded into the schema-2.0.0 phase**
-(`docs/prompts/clean-unused-manifest-fields.md`) rather than done
+(`docs/prompts/B2-clean-unused-manifest-fields.md`) rather than done
 standalone: a new major is when schema identity may change without
 awkwardness, and that phase was already bumping the version.
 
@@ -71,8 +110,16 @@ mismatch is sufficient.
 
 ## 2026-08-09 — Secrets removed from scope entirely
 
-**Decided:** remove S3 (partially) and S4 in full, plus S2's
-`requires.secrets` manifest field. GoodBoy does not handle secrets.
+**Decided:** remove S3 and S4 in full — the entire secrets resolution
+layer. GoodBoy does not handle secrets.
+
+**What actually landed (2026-08-09):** `src/secrets/` (8 modules),
+`src/commands/secrets/` (4 commands), both providers, the resolver and
+provider registry, `packages/schema/src/config.schema.json` and its
+generated types, and the supporting `lib/errors.ts` and `lib/process.ts`.
+`goodboy init` no longer writes a `goodboy.local.json` gitignore entry.
+Twelve of the thirty-two `security-sensitive.json` entries went with them.
+None of this had ever been published to npm.
 
 **Why:** D6 cut S5 (`secrets exec`) because agents do not execute skill
 scripts — but that reasoning removes S4's *consumer*, not just S5's
@@ -82,12 +129,25 @@ only output was "yes, your mapping resolves," after which the user had to
 export the value themselves anyway. Cutting S5 invalidated S4 and nobody
 re-examined S4.
 
-`requires.secrets` (S2) went too: its only consumer, `consent.ts`, existed
-because the field did, and the manifest schema was already going to 2.0.0
-for unrelated reasons, so removal carried no extra version cost.
+**S2 was NOT removed in this phase.** The intent is that `requires.secrets`
+goes too — its only consumer, `consent.ts`, exists because the field does —
+but it is a manifest-schema change, and the manifest-cleanup phase already
+owns the 2.0.0 major. Removing it here would have split one schema break
+across two diffs. It is deferred there deliberately, not overlooked: as of
+this entry `requires.secrets`, its `consent.ts` disclosure, and
+`manifest.ts`'s `assertPermissionsConsistency` are all still live and
+still published.
 
-**Kept:** `lib/redact.ts` (`logger.ts` depends on it for control-character
-stripping), and S1's forward-compatibility validation, which is general.
+**Kept:** S1's forward-compatibility validation (general, not secrets-
+specific), and `lib/redact.ts`. Note on `redact.ts`: it is retained because
+`logger.ts` calls `redact()` on every message — *not* for control-character
+stripping, which lives in `logger.ts`'s own `stripControlChars()` and was
+never in `redact.ts`. With the secrets feature gone nothing calls
+`registerSecret()`, so `redact()` now returns its input unchanged in
+production. The module is dormant, not load-bearing. Trimming it is
+all-or-nothing (removing the registration API makes `redact()`'s only real
+branch unreachable and breaks its 100% coverage pin), so it was left whole
+pending an explicit decision.
 
 **Reopens if:** a concrete use case appears in which something GoodBoy
 itself controls actually consumes a secret. Design against the real
@@ -98,8 +158,9 @@ which is retained but **withdrawn**.
 project did not have. That is worth stating plainly rather than quietly
 deleting — the correction is the useful part.
 
-**See:** `docs/prompts/remove-secrets-s3-s4.md`, `docs/concept-secrets.md`
-(withdrawn), CHANGELOG.
+**See:** `docs/concept-secrets.md` (withdrawn — read its header),
+`docs/backlog.md`'s resolved decision-point entry, and the CHANGELOG's
+Unreleased section.
 
 ---
 
@@ -127,7 +188,7 @@ settled use case.
 home for namespaced vendor keys, should GoodBoy ever need frontmatter
 presence. Spec-backed, not invented. Nothing needs it today.
 
-**See:** `docs/prompts/clean-unused-manifest-fields.md`.
+**See:** `docs/prompts/B2-clean-unused-manifest-fields.md`.
 
 ---
 
@@ -182,7 +243,7 @@ APIs the oldest supported Node lacks, and the type-check offers no
 protection because it reads the same typings on every matrix leg. The
 `@types/node` bump is only safe because the floor moved with it.
 
-**See:** `docs/prompts/bump-node-support-matrix.md`.
+**See:** `docs/prompts/A3-bump-node-support-matrix.md`.
 
 ---
 

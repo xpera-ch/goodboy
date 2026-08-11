@@ -7,8 +7,9 @@ none of it was previously written into the repo. It is a best-effort port,
 not a re-derivation from first principles. Bruno should read through it and
 correct anything that's stale, superseded, or misremembered; treat it as a
 recovered draft, not a locked decision record, until confirmed. Once
-confirmed, decisions here should graduate into `docs/concept-*.md` files the
-same way the secrets feature has one.
+confirmed, decisions here should graduate into `docs/concept-*.md` files —
+the same shape as `docs/concept-secrets.md`, which is itself now withdrawn
+but remains the worked example of the format.
 
 ---
 
@@ -180,8 +181,9 @@ to the slots idea below: three skills don't need hierarchy.
 These were flagged as worth doing *before* more feature code piles on top of
 the current manifest-separate-from-SKILL.md structure, since the migration
 gets more expensive the longer it's deferred. Not scheduled against a
-version yet — needs a decision on sequencing relative to the secrets
-roadmap (S3–S5) and the items above.
+version yet — needs a decision on sequencing relative to the items above.
+(This previously also had to be sequenced against the secrets roadmap
+S3–S5; that work was removed on 2026-08-09 and is no longer a constraint.)
 
 ## Go-to-market notes
 

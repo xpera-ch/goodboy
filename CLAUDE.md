@@ -17,9 +17,13 @@ trust a prior chat's memory/summary over `git log`, `git tag`,
 
 Living planning docs, in reading order for onboarding to current state:
 
-- `docs/concept-secrets.md` — the locked design for the in-progress secrets
-  feature (decision record in §7, ecosystem verification in §8). This is the
-  main feature currently being built, in phases (S1–S5).
+- `docs/concept-secrets.md` — **WITHDRAWN (2026-08-09).** The secrets
+  feature is not in scope and is not being built. S1/S2 shipped (the
+  `requires.secrets` manifest field and its install-time disclosure, which
+  remain); the S3/S4 resolution layer was built and then removed. The
+  document is retained as the design record and as the account of the
+  reversal — read its header before anything else in it. Do not treat it as
+  a plan.
 - `docs/backlog.md` — deliberate known-limitations and deferred work. If
   something looks unfinished or half-built, check here first — it may
   already be a tracked, intentional gap rather than an oversight.
@@ -39,7 +43,24 @@ Living planning docs, in reading order for onboarding to current state:
   confirmation — treat as a recovered draft, not a locked record, until he's
   reviewed it.
 - `docs/prompts/` — gitignored, per-phase implementation prompts (local
-  working artifacts, not part of the tracked design record).
+  working artifacts, not part of the tracked design record). Prompt
+  filenames carry their sequence code as a prefix (`A2-`, `B1-`,
+  `deferred-`) so they sort and can be found by code; `docs/prompts/
+  SEQUENCE.md` is the running execution order.
+
+  **Never reference a `docs/prompts/…` path from a committed file.**
+  Because the directory is gitignored, any such link resolves only on
+  Bruno's machine and is dead for every other reader — and the affected
+  files (`docs/backlog.md`, `docs/go-public-checklist.md`,
+  `docs/decisions.md`, this file) are exactly the ones meant to demonstrate
+  rigor. Thirty-two such links had accumulated by 2026-08-11, many already
+  broken locally too, because prompts get filed into `done/<topic>/` and
+  nothing re-points the references.
+
+  Instead, describe the artifact without linking it — "the phase prompt for
+  this work, kept locally" — or, better, put the substance in the committed
+  doc so the reference is not needed. Prompt-to-prompt references *within*
+  `docs/prompts/` are fine; they never leave the gitignored directory.
 - `docs/reviews/` — gitignored, the real output of `adversarial-review` and
   `security-impact` runs, one file per phase. Kept local rather than
   committed because this repo is expected to go public eventually (see
