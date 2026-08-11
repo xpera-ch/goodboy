@@ -59,12 +59,34 @@ kinds of state leak between tests, and they need different handling:
   that installs one (`mockFn.mockImplementation(() => { throw … })`) must
   ensure it cannot leak, e.g. by resetting the mock in the suite's
   `beforeEach`.
-- **Non-mock module state** — the one that bites hardest. Command objects
-  are module-level singletons and commander keeps parsed option values on
-  the instance, so parsing `['-g']` in one test leaves `global: true` set
-  for every later test that parses `[]`. Any suite that calls
-  `parseAsync()` must call `resetCommandOptions(<command>)` (from
-  `src/__fixtures__`) in its `beforeEach`.
+- **Non-mock module state** — the one that bites hardest, and the one
+  nothing global can fix. Commander keeps parsed option values on the
+  `Command` instance, so parsing `['-g']` in one test leaves
+  `global: true` set for every later test that parses `[]`.
+
+### Writing a command test
+
+There is no global reset for commander state — it cannot be done from a
+vitest `setupFiles` entry, because importing the command modules there
+binds them to real `lib/` implementations before each test file's hoisted
+`vi.mock()` factories apply. This was measured: it breaks ~26% of the
+suite, including files that never touch commander. So a command test must
+use one of these two patterns:
+
+1. **Build a fresh `Command` per parse.** A `buildProgram()` helper that
+   returns `new Command()` each time it is called, as in
+   `skill-version.test.ts`, `skill-status.test.ts`, `skill-diff.test.ts`,
+   `skill-open.test.ts`, `skill-create.test.ts`. Nothing is shared, so
+   nothing can leak. Prefer this for new tests.
+2. **Reuse the exported singleton, and reset it.** If the test imports a
+   module-level command (`installCommand`, `addCommand`, …), it must call
+   `resetCommandOptions(<command>)` (from `src/__fixtures__`) in its
+   `beforeEach`. The helper recurses into subcommands, because commander
+   stores a subcommand's values on the *child*: after parsing
+   `['version', 'x', '--bump', 'patch']`, the parent's `opts()` is `{}`
+   while the child's is `{ bump: 'patch' }`.
+
+A command with no options (`adopt`) has nothing to leak and needs neither.
 
 If you add a test that fails under `--sequence.shuffle` but passes in
 default order, that is a real defect in the test, not a flake — fix the
