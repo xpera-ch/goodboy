@@ -4,6 +4,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Recorded mock calls are cleared before every test, so a negative
+    // assertion (expect(fn).not.toHaveBeenCalled()) cannot silently pass or
+    // fail because of what an earlier test in another suite happened to
+    // call. Note this clears calls only — mock *implementations* and
+    // non-mock module state (e.g. commander's parsed option values, see
+    // resetCommandOptions in src/__fixtures__) survive it and still need
+    // explicit per-suite resets.
+    clearMocks: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -2,8 +2,22 @@ import { createRequire } from 'node:module';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { Command } from 'commander';
 
 const _require = createRequire(import.meta.url);
+
+export function resetCommandOptions(command: Command): void {
+  // Command instances are module-level singletons, and commander keeps the
+  // values it parsed on the instance — a later parseAsync() that omits a
+  // flag does NOT clear what an earlier one set. Without this, parsing
+  // ['-g'] in one test leaves global:true visible to every later test that
+  // parses [], which is order-dependent and silently inverts negative
+  // assertions. vi.clearAllMocks() cannot reach this: it is commander's
+  // own state, not a mock's.
+  for (const option of command.options) {
+    command.setOptionValue(option.attributeName(), undefined);
+  }
+}
 
 export function loadFixture(name: string): unknown {
   return _require(`./${name}.json`) as unknown;
