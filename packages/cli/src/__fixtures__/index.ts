@@ -14,8 +14,17 @@ export function resetCommandOptions(command: Command): void {
   // parses [], which is order-dependent and silently inverts negative
   // assertions. vi.clearAllMocks() cannot reach this: it is commander's
   // own state, not a mock's.
+  //
+  // Recurses into subcommands because commander stores a subcommand's
+  // parsed values on the CHILD, not the parent: after parsing
+  // ['version', 'x', '--bump', 'patch'], parent.opts() is {} while
+  // child.opts() is { bump: 'patch' }. Walking only the top-level
+  // command's own options would leave that untouched.
   for (const option of command.options) {
     command.setOptionValue(option.attributeName(), undefined);
+  }
+  for (const subcommand of command.commands) {
+    resetCommandOptions(subcommand);
   }
 }
 
