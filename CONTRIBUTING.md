@@ -37,6 +37,39 @@ npm run build -w packages/cli
 npm run build -w packages/registry-client
 ```
 
+## Testing
+
+**Tests must be order-independent.** The suite is verified under randomised
+ordering, not just the default file order:
+
+```sh
+cd packages/cli
+npx vitest run --sequence.shuffle                  # random order
+npx vitest run --sequence.shuffle --sequence.seed=42   # reproducible order
+```
+
+A test that only passes because of what ran before it certifies nothing —
+and a negative assertion (`expect(fn).not.toHaveBeenCalled()`) can silently
+invert its meaning that way, passing while the behaviour is broken. Three
+kinds of state leak between tests, and they need different handling:
+
+- **Recorded mock calls** — handled globally by `clearMocks: true` in
+  `packages/cli/vitest.config.ts`. Nothing to do per test.
+- **Mock implementations** — `clearMocks` does *not* remove these. A test
+  that installs one (`mockFn.mockImplementation(() => { throw … })`) must
+  ensure it cannot leak, e.g. by resetting the mock in the suite's
+  `beforeEach`.
+- **Non-mock module state** — the one that bites hardest. Command objects
+  are module-level singletons and commander keeps parsed option values on
+  the instance, so parsing `['-g']` in one test leaves `global: true` set
+  for every later test that parses `[]`. Any suite that calls
+  `parseAsync()` must call `resetCommandOptions(<command>)` (from
+  `src/__fixtures__`) in its `beforeEach`.
+
+If you add a test that fails under `--sequence.shuffle` but passes in
+default order, that is a real defect in the test, not a flake — fix the
+setup rather than pinning the order.
+
 ## Updating the schema
 
 1. Edit `packages/schema/src/manifest.schema.json`
