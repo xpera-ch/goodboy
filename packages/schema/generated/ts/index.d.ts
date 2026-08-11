@@ -23,7 +23,7 @@ export interface GoodBoySkillManifest {
    */
   license: string;
   /**
-   * GoodBoy manifest schema version, semver-shaped (v1.x only). CLIs tolerate a newer minor than they know, stripping unknown top-level fields with a warning; a newer major is rejected. See manifest.ts.
+   * GoodBoy manifest schema version, semver-shaped (v2.x only). CLIs tolerate a newer minor than they know, stripping unknown top-level fields with a warning; a newer major is rejected. See manifest.ts.
    */
   schema_version: string;
   /**
@@ -51,77 +51,9 @@ export interface GoodBoySkillManifest {
     | "research"
     | "other";
   /**
-   * Controlled vocabulary for registry faceted search. Unlike keywords, tags are a fixed enumeration owned by GoodBoy.
-   *
-   * @maxItems 5
-   */
-  tags?: (
-    | "code-review"
-    | "testing"
-    | "documentation"
-    | "git"
-    | "deployment"
-    | "security"
-    | "refactoring"
-    | "architecture"
-    | "debugging"
-    | "productivity"
-    | "writing"
-    | "data"
-    | "devops"
-    | "agent"
-    | "orchestration"
-    | "formatting"
-    | "analysis"
-    | "research"
-    | "workflow"
-    | "other"
-  )[];
-  homepage?: string;
-  repository?: {
-    type?: string;
-    url?: string;
-  };
-  changelog?: string;
-  /**
-   * Registry publisher handle. Set by registry on publish, not by skill author.
-   */
-  publisher?: string;
-  /**
-   * Registry visibility. private until explicitly published.
-   */
-  visibility?: "public" | "private";
-  /**
-   * Advisory. Runtime version requirements for scripts bundled in scripts/. Not enforced by GoodBoy — shown to user before install.
-   */
-  engines?: {
-    node?: string;
-    python?: string;
-    bash?: string;
-    deno?: string;
-  };
-  /**
-   * Advisory. Operating systems this skill's scripts are compatible with. Not enforced — shown to user before install.
-   *
-   * @maxItems 3
-   */
-  os?: ("darwin" | "linux" | "win32")[];
-  /**
    * DECLARED INTENT ONLY — not enforced at runtime. Skill authors declare what their scripts intend to access. GoodBoy displays this to users before install as a trust signal. An empty array or omitted field means no elevated access is claimed.
    *
    * @maxItems 5
    */
   permissions?: ("read_files" | "write_files" | "network" | "shell" | "env")[];
-  /**
-   * Logical runtime requirements. Introduced in schema 1.1.0; manifests using this field must declare schema_version >= 1.1.0.
-   */
-  requires?: {
-    /**
-     * Logical secret names (environment-variable style) this skill requires at runtime. DECLARED INTENT ONLY — GoodBoy validates and displays these; it never resolves or injects them during install, and never executes the skill.
-     *
-     * @minItems 1
-     * @maxItems 32
-     */
-    secrets: string[];
-  };
 }
