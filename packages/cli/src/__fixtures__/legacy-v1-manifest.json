@@ -1,0 +1,15 @@
+{
+  "name": "legacy-v1-skill",
+  "version": "0.2.0",
+  "description": "A manifest exactly as GoodBoy 0.2.0 wrote it, pinned to the previous schema major on purpose. Do not migrate.",
+  "author": {
+    "name": "Test Author"
+  },
+  "license": "MIT",
+  "schema_version": "1.0.0",
+  "status": "experimental",
+  "category": "testing",
+  "keywords": ["legacy"],
+  "tags": ["testing"],
+  "visibility": "private"
+}
