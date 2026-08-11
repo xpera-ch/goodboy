@@ -41,6 +41,7 @@ import { removeSkillFromManifest, removeSkillFromLock } from '../lib/goodboy-fil
 import { removeAgentSymlinks } from '../lib/agents.js';
 import { removeFromStore } from '../lib/store.js';
 import { logger } from '../lib/logger.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import { uninstallCommand } from './uninstall.js';
 
 const mockRmSync = vi.mocked(rmSync);
@@ -57,6 +58,7 @@ const PROJECT_SKILL_PATH = join(CWD, '.claude', 'skills', 'my-skill');
 describe('uninstall command — project', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(uninstallCommand);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
@@ -100,6 +102,7 @@ describe('uninstall command — project', () => {
 describe('uninstall command — global (-g)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(uninstallCommand);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });

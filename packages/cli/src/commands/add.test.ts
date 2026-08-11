@@ -42,6 +42,7 @@ import {
   addVersionToEntry,
 } from '../lib/registry-entry.js';
 import { logger } from '../lib/logger.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import { addCommand } from './add.js';
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -80,6 +81,7 @@ function validResult() {
 describe('add command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(addCommand);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });

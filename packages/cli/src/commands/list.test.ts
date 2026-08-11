@@ -32,6 +32,7 @@ import { createRegistryAdapter } from '../lib/registry-adapter.js';
 import { readManifest } from '../lib/manifest.js';
 import { readGoodBoyJson } from '../lib/goodboy-file.js';
 import { logger } from '../lib/logger.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import { listCommand } from './list.js';
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -72,6 +73,7 @@ describe('goodboy list', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(listCommand);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });

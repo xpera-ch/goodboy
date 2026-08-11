@@ -676,6 +676,11 @@ describe('writeManifest()', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks() only clears recorded calls — a mockImplementation()
+    // installed by an earlier test survives it. The permission-denied test
+    // below installs a throwing writeFileSync, so without this reset it
+    // leaks into whichever test runs next.
+    mockWriteFileSync.mockReset();
   });
 
   it('writes JSON with 2-space indentation and trailing newline', async () => {

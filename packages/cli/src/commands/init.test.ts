@@ -16,6 +16,7 @@ vi.mock('../lib/logger.js', () => ({
 import { readGoodBoyJson, writeGoodBoyJson } from '../lib/goodboy-file.js';
 import { ensureGitignoreEntry } from '../lib/gitignore.js';
 import { logger } from '../lib/logger.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import { initCommand } from './init.js';
 
 const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
@@ -28,6 +29,7 @@ const CWD = process.cwd();
 describe('goodboy init', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(initCommand);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
