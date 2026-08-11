@@ -142,7 +142,7 @@ load-bearing for this position.
 withdrawn stronger claim as a standing principle — *"GoodBoy should not
 compete on network effects (no public marketplace/search index)."* That
 needs correcting to match this section. Tracked in
-`docs/prompts/rewrite-claude-md-public.md`.
+`docs/prompts/D3-rewrite-claude-md-public.md`.
 
 ## Repository topology
 
