@@ -5,75 +5,152 @@
 — treat as a recovered draft, verify before treating as locked.
 
 **Competitive-landscape refresh (2026-08-05):** the "Core differentiators"
-and "Ecosystem and standards" sections below were updated against an
-external review's findings — distinct from the provenance note above, this
-part reflects the field as of this date, not a recovered chat memory. See
-`docs/backlog.md` ("Competitive landscape has moved since
-`product-positioning.md` was written") for the full research this update is
-based on.
+and "Ecosystem and standards" sections were updated against an external
+review's findings — distinct from the provenance note above, this part
+reflects the field as researched on that date, not a recovered chat memory.
+
+**Second refresh and correction (2026-08-09):** the differentiators were
+re-derived against the competitors' *actual current feature sets* rather
+than their general positioning, which changed the conclusions materially —
+see below. The "public marketplace" section was **corrected by Bruno** on
+the same date: the previous wording overstated a sequencing decision as a
+permanent boundary. Those two sections are now confirmed rather than
+recovered.
 
 ## What GoodBoy is
 
 A personal skill registry and package manager for Claude Code and the Agent
-Skills ecosystem — "npm for Claude Code skills." Scoped deliberately to the
-skill side of the ecosystem only; it does not manage `.claude/agents/`
-subagent definitions.
+Skills ecosystem. Scoped deliberately to the skill side of the ecosystem
+only; it does not manage `.claude/agents/` subagent definitions.
 
-## Core differentiators (vs. `skills.sh` and `gh skill`)
+## Competitive landscape (verified 2026-08-09)
 
-As of mid-2026 the installer role is no longer open ground: **Vercel**
-shipped `npx skills` plus the `skills.sh` directory/leaderboard, reportedly
-installing across 18+ agents (Claude Code, Copilot CLI, Codex, Cursor, and
-others); **GitHub** shipped `gh skill` as an official `gh` CLI preview
-(`add`/`publish`/`search`/`preview`), explicitly spec-compatible with
-Vercel's tool; and a wider community field (PolySkill, Skilldex, Lola, and
-assorted community CLIs) has grown alongside a package count reported in the
-hundreds of thousands by early 2026.
+Recorded with dates and specifics, because this field moved substantially
+during GoodBoy's development and a stale read of it produces bad
+positioning.
 
-Read correctly, this is validation of the underlying problem, not
-refutation of the project — three separate, well-resourced teams building
-tooling for the same gap in roughly one quarter is strong evidence the gap
-is real. What it does settle is that GoodBoy should not compete on *install*
-— first-party tools have already taken that role, for free, at a scale a
-personal registry tool has no reason to chase. That sharpens rather than
-weakens the differentiators below, since the installer question is now
-someone else's job to answer:
+- **`gh skill`** — GitHub CLI **v2.90.0, shipped 2026-04-16**. Subcommands
+  `install`, `preview`, `search`, `update`, `publish`. **Version pinning**
+  (pinned skills are skipped by `update --all`, so upgrades are
+  deliberate), install by name, tag, or **commit SHA**, **immutable
+  releases** tied to git tags, and multi-agent directory placement across
+  `.github/skills`, `.claude/skills`, `.agents/skills`. GitHub-hosted
+  repositories only.
+- **`npx skills`** (Vercel) — `add`, `list`, `find`, `update`, `check`. A
+  **lockfile** (`skills-lock.json`, format v3, keyed on `skillFolderHash`,
+  a GitHub tree SHA), global and project scoping (`-g` / `-p`). Discovery
+  via `skills.sh`, populated automatically by install telemetry rather than
+  a submission flow.
+- A wider community field: PolySkill, Skilldex, Lola, assorted community
+  CLIs, alongside a package count reported in the hundreds of thousands by
+  early 2026.
 
-- **Intelligent dispatcher (vision, not yet built):** analyze project
-  context (`CLAUDE.md`, `package.json`, file structure) and propose which
-  skills from the user's private registry belong in the current project.
-- **Personal private registry as center of gravity:** bidirectional skill
-  flow between registry and projects, across machines — not just a
-  one-directional install source.
-- **Deployment ledger:** tracks which skill versions are deployed to which
-  projects, answering drift questions. (Partially built — see
-  `docs/backlog.md` for the integrity-verification gap; the bundling-deps
-  ledger in `docs/roadmap.md` extends this further.)
-- **Promote-back workflow:** local edits to installed skills can be
-  promoted back to the registry and rolled out to other projects. Not yet
-  built — see `docs/roadmap.md`.
-- **Framing:** apt-vs-Ansible. `skills.sh` / `gh skill` are package
-  installers; GoodBoy is configuration management — "does what's installed
-  still match what I meant to install, across every project and machine," a
-  question neither first-party installer asks at all.
+**Four capabilities that would once have been differentiators are now table
+stakes, and must not be claimed as advantages:** multi-agent installation,
+version pinning, lockfile-based reproducibility, and update checking. The
+2026-08-05 revision of this document still implicitly claimed some of them;
+that is corrected below.
 
-## Competitive positioning boundary
+**Read the field as validation, not refutation.** Three separately-resourced
+teams shipping tooling for the same gap in roughly one quarter is the
+strongest available evidence the gap is real. What it settles is that
+GoodBoy should not compete on *installation* — that role is taken, for
+free, at a scale a personal registry tool has no reason to chase.
 
-GoodBoy should **not** build a public marketplace or search index. It
-searches the user's own registry natively and accepts URLs found through
-external catalogs. This is a deliberate scope boundary, not a
-not-yet-gotten-to feature — see the "no network effects" principle in
-`CLAUDE.md`. The 2026-08 competitive landscape strengthens this boundary
-rather than calling it into question: `skills.sh` and `gh skill` now run the
-marketplace/discovery role at a scale GoodBoy was never trying to compete
-at, which means GoodBoy never has to build one — it can stay the
-configuration-management layer on top of catalogs someone else maintains.
+## Core differentiators
+
+Revised 2026-08-09. Each states whether it exists **today**, because
+claiming unbuilt work as a differentiator is how a positioning document goes
+stale and how a README ends up writing cheques the tool cannot cash.
+
+1. **Local integrity verification — BUILT. The strongest current
+   differentiator.** `goodboy verify` and `goodboy skill status` answer
+   *"has my installed copy been modified since I installed it?"*
+
+   This is **not** the question Vercel's `check` answers. `check` asks *"is
+   there a newer version upstream?"* Those are different problems, and
+   nobody else is solving the second one. Local drift and tamper detection
+   is what the SRI content hashing in `goodboy.lock` actually buys.
+
+   The previous framing of this as a "deployment ledger" undersold it — a
+   ledger sounds like bookkeeping; this is verification, and it fails
+   closed.
+
+2. **A personal private registry with immutable versions — BUILT.**
+   `~/.goodboy/registry` is the centre of gravity, with bidirectional flow
+   between registry and projects across machines, not a one-directional
+   install source. Neither competitor has an equivalent: Vercel's discovery
+   is public and telemetry-driven; `gh skill` is GitHub repositories.
+
+3. **Git-host-agnostic, and fully usable with no remote host at all —
+   BUILT, and not previously claimed.** `gh skill` is GitHub-only; Vercel's
+   lockfile is keyed on GitHub tree SHAs. For self-hosted git
+   infrastructure — agency clients, regulated environments, anyone who
+   cannot put internal skills on github.com — **neither tool works at
+   all.** GoodBoy does, including entirely offline against a local
+   registry. This was previously buried as an implementation note under
+   "Ecosystem and standards"; it is a positioning claim.
+
+4. **Promote-back workflow — NOT BUILT.** Local edits to installed skills
+   promoted back to the registry and rolled out to other projects. See
+   `docs/roadmap.md`. Roadmap, not a current claim.
+
+5. **Intelligent dispatcher — NOT BUILT, vision only.** Analyse project
+   context (`CLAUDE.md`, `package.json`, file structure) and propose which
+   skills from the user's private registry belong in the current project.
+   Roadmap, not a current claim.
+
+**On the apt-vs-Ansible framing** (`skills.sh` / `gh skill` are package
+installers; GoodBoy is configuration management): still true, but thinner
+than when first written. Pinning and lockfiles are themselves
+configuration-management behaviours, so the distinction now has to be
+*argued* rather than asserted. Lead with differentiator 1 — a concrete
+capability nobody else has — and use the analogy as support, not as the
+opening claim.
+
+## Public marketplace: sequencing, not a boundary
+
+**Corrected 2026-08-09 by Bruno.** The previous version of this section
+said GoodBoy should **not** build a public marketplace or search index, and
+called it "a deliberate scope boundary, not a not-yet-gotten-to feature."
+**That overstated the actual decision and is withdrawn.**
+
+The real position: **a public marketplace is planned, but not for the first
+release.** v1 ships without one. Building it is contingent on the product
+finding a market first. This is a small operation with limited resources,
+and investing in marketplace infrastructure ahead of demand would spend the
+scarcest available resource on the least certain bet.
+
+GoodBoy is **not** attempting to compete head-on with Vercel or GitHub on
+distribution, and must not be positioned as doing so. Those are
+differently-resourced organisations, and that contest is neither winnable
+nor worth entering. The stated posture is straightforward: build something
+genuinely useful for a real problem, find out whether it finds users, and
+treat either outcome as worthwhile — if it finds a market, the marketplace
+becomes worth building; if it doesn't, the work and the learning still
+stand.
+
+Until then, GoodBoy searches the user's own registry natively and accepts
+skills found through external catalogs — which now includes `skills.sh` and
+`gh skill search`. **Treat that as an interoperability opportunity, not a
+concession:** those catalogs solve discovery, and a tool that consumes them
+cleanly gets discovery without operating a catalog. `goodboy adopt`
+(`docs/backlog.md`) is what makes consuming them practical, and is
+load-bearing for this position.
+
+**Note for anyone updating `CLAUDE.md`:** it currently carries the
+withdrawn stronger claim as a standing principle — *"GoodBoy should not
+compete on network effects (no public marketplace/search index)."* That
+needs correcting to match this section. Tracked in
+`docs/prompts/rewrite-claude-md-public.md`.
 
 ## Repository topology
 
 - **Public `goodboy` monorepo** (this repo): `packages/cli`,
   `packages/schema`, `packages/registry-client` — open source, contributors
   welcome once public (see `docs/go-public-checklist.md`).
+  `registry-client` is being withdrawn from npm until the hosted API
+  exists — see `docs/backlog.md`; it remains in the monorepo.
 - **Separate private `goodboy-registry-api` repo** (closed-source,
   monetization path — mirrors npm's own public-registry/private-registry
   split). The seam between the public CLI/schema and this private API is an
@@ -98,18 +175,10 @@ configuration-management layer on top of catalogs someone else maintains.
   GoodBoy doesn't define its own skill format or compete with the standard;
   it manages skills that already conform to it (see README's "How it
   works").
-- `gh skill`'s provenance-frontmatter conventions are a reference point for
-  interoperability (SHA provenance and pinning) — not yet adopted, worth
-  comparing against when the integrity-verification work in
-  `docs/backlog.md` lands.
-- Git-based transport for installs is deliberately host-agnostic — covers
-  any git host, not just GitHub, since some target users (e.g. agency
-  clients) run self-hosted git infrastructure.
-- **Competitive reference points:** `skills.sh`/`npx skills` (Vercel,
-  marketplace-oriented, reportedly 18+ agents supported) and `gh skill`
-  (official `gh` CLI preview, supply-chain-grade with SHA provenance and
-  pinning, explicitly spec-compatible with Vercel's tool) — both are useful
-  comparisons for what GoodBoy deliberately is and isn't. A wider community
-  field (PolySkill, Skilldex, Lola, and others) exists alongside a package
-  count reported in the hundreds of thousands by early 2026, underscoring
-  that GoodBoy is deliberately not trying to be a catalog among catalogs.
+- `gh skill`'s supply-chain conventions — SHA provenance, pinning, and
+  immutable releases — are a reference point for interoperability. Not yet
+  adopted; worth comparing against now that the integrity-verification work
+  has landed, since GoodBoy's hashing solves an adjacent but distinct
+  problem (local tamper detection vs. source provenance).
+- Git-based transport is deliberately host-agnostic — now promoted to
+  differentiator 3 rather than being a footnote here.
