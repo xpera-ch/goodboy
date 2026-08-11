@@ -117,6 +117,26 @@
       ]
     },
     {
+      "pattern": "packages/cli/src/commands/add.ts",
+      "reason": "Takes a user-supplied path argument and copies its directory contents into the registry — the primary entry point where third-party skill content first reaches persistent storage.",
+      "invariants": [
+        "isRemoteRefArgument() rejects a URL-shaped or scp-style argument before resolve() is ever called on it",
+        "scanForSymlinks() runs on the skill directory before any cpSync of its contents",
+        "The directory name (basename of the resolved path) is validated against SKILL_NAME_RE before being used to construct any registry path — and a manifest-declared name is required to exactly match that already-validated directory name before it is used instead"
+      ]
+    },
+    {
+      "pattern": "packages/cli/src/commands/adopt.ts",
+      "reason": "Takes a user-supplied path argument and a third-party SKILL.md with no manifest.json, parses its untrusted frontmatter to synthesise a manifest, and copies the source directory into a new local directory.",
+      "invariants": [
+        "isRemoteRefArgument() rejects a URL-shaped or scp-style argument before resolve() is ever called on it",
+        "scanForSymlinks() runs on the source directory before any cpSync of its contents",
+        "The frontmatter-declared name is validated against SKILL_NAME_RE before being used to construct the target directory path",
+        "MAX_SKILL_MD_BYTES (mirroring manifest.ts's size ceiling) is not raised without an explicit decision",
+        "An existing target directory is never overwritten — existsSync(targetDir) is checked and rejected before any cpSync"
+      ]
+    },
+    {
       "pattern": "packages/cli/src/lib/errors.ts",
       "reason": "Shared GoodBoyError base for the secrets feature (D4). Not itself an enforcement boundary, but its no-toJSON design is what keeps `cause` from leaking through default logging/serialization.",
       "invariants": [
