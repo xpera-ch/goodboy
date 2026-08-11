@@ -107,29 +107,6 @@ goodboy search git
 supported; clone or download the skill first, then point either command at
 the local directory.
 
-### Secrets
-
-A skill's `manifest.json` can declare the logical secret names it needs at
-runtime (`requires.secrets`) — advisory metadata, shown at install time,
-never enforced. Separately, you map those names to a secret provider in your
-own config (`~/.goodboy/config.json` for user-level defaults,
-`<project>/goodboy.local.json` for project-level, gitignored). Two providers
-ship today: `environment` (reads a variable from your shell) and
-`onepassword-cli` (shells out to the real `op` CLI — never a shell string,
-never cached, never written to disk).
-
-| Command | Description |
-| --- | --- |
-| `goodboy secrets doctor` | Check configured providers for availability (e.g. is `op` installed and signed in) — never prints a value |
-| `goodboy secrets list` | List configured mappings: name, provider, masked reference — never a value |
-| `goodboy secrets validate [--resolve]` | Check mappings are structurally valid, and with `--resolve`, that they actually resolve |
-| `goodboy secrets validate --skill <name>` | Validate against an installed project skill's declared `requires.secrets` instead of local config |
-
-GoodBoy diagnoses and validates secret configuration; it does not inject
-secrets into anything. There is no `exec`/run wrapper — resolving a value
-still means reading it yourself (e.g. `op read`) or configuring your agent's
-own environment.
-
 ## Skill lifecycle
 
 Treat `.claude/skills/` (and `~/.goodboy/skills/`) the way you'd treat `node_modules/`: GoodBoy owns it, and `goodboy upgrade` will silently overwrite anything you edit there. If you want to change a skill, edit the registry copy, not the installed one.

@@ -6,43 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Secrets can now be diagnosed, listed, and validated. This is the S3/S4 slice
-of the secrets feature (`docs/concept-secrets.md`): declaring a requirement
-(0.2.0) is now backed by actually mapping it to a provider and checking it
-resolves. `secrets exec` (injecting a resolved secret into a child process)
-was scoped as a possible future phase but is cut from the roadmap entirely —
-see the concept doc's decision record (D6) — not merely absent from this
-release.
+### Removed
 
-### Added
+- **The secrets resolution layer is removed.** GoodBoy does not handle
+  secrets. Decision D6 cut `secrets exec` because GoodBoy does not wrap a
+  skill's script execution — and that reasoning removes the *consumer* of
+  the resolution layer, not just the injection command. If nothing runs
+  skill scripts through GoodBoy, nothing consumes secrets through GoodBoy;
+  the credential is needed by your agent or your own shell, and GoodBoy is
+  on neither path. What was built resolved a mapping only to tell you it
+  resolved, after which you still had to read the value yourself.
 
-- `goodboy secrets doctor` — reports configured providers and their
-  availability (e.g. whether `op` is installed and signed in). Never prints
-  a secret value or a full provider reference.
-- `goodboy secrets list` — lists configured name → provider → masked-reference
-  mappings. Config-only; never invokes a provider.
-- `goodboy secrets validate [--skill <name>] [--resolve]` — checks that
-  mappings are structurally valid, and with `--resolve`, that they actually
-  resolve through their provider. `--skill` validates a name against an
-  installed project skill's declared `requires.secrets`, not local config.
-- Two secret providers: `environment` (reads `process.env`) and
-  `onepassword-cli` (shells out to the real `op` CLI via `execFile`, never a
-  shell string).
-- Two new config files: `~/.goodboy/config.json` (user-level) and
-  `<project>/goodboy.local.json` (project-level, gitignored) — `goodboy init`
-  adds the gitignore entry but does not scaffold the file itself.
-- Shared infrastructure backing the above: `lib/errors.ts`, `lib/process.ts`
-  (the only other place besides `skill open` that spawns a subprocess, and
-  the same `shell: false`-always rule applies), `lib/redact.ts` (values
-  registered here are stripped from all CLI logs/errors as a literal
-  substring match, never a constructed regex).
+  None of this ever shipped to npm — it existed only on `main`. Removed:
+  the `goodboy secrets` commands (`doctor`, `list`, `validate`), the
+  `environment` and `onepassword-cli` providers, the resolver and provider
+  registry, `~/.goodboy/config.json` / `<project>/goodboy.local.json` and
+  their schema, and the supporting `lib/errors.ts` and `lib/process.ts`.
+  `goodboy init` no longer adds a `goodboy.local.json` gitignore entry.
 
-### Security
+  `docs/concept-secrets.md` is retained, marked WITHDRAWN, with the
+  condition that would reopen it.
 
-- No secret value is ever persisted, cached, or written to a committed file.
-  Provider references (e.g. `op://vault/item/field`) are masked in `list`
-  output. See `CONTRIBUTING.md`'s sensitive-files table for the full list of
-  files this release adds to that boundary.
+### Unchanged
+
+- The `requires.secrets` manifest field (schema `1.1.0`, shipped in 0.2.0)
+  and its install-time disclosure still work exactly as before. Declaring
+  secret names remains advisory metadata that GoodBoy displays and never
+  resolves — which is now the only thing it ever does with them.
 
 ## [0.2.0] - 2026-07-21
 

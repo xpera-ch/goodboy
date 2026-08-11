@@ -137,29 +137,12 @@
       ]
     },
     {
-      "pattern": "packages/cli/src/lib/errors.ts",
-      "reason": "Shared GoodBoyError base for the secrets feature (D4). Not itself an enforcement boundary, but its no-toJSON design is what keeps `cause` from leaking through default logging/serialization.",
-      "invariants": [
-        "No toJSON/toString override is ever added that flattens `cause` into logged/serialized output — Node's own Error already keeps `cause` non-enumerable; adding a custom serializer would silently reopen that",
-        "safeMetadata is caller-attested safe-to-log data; this module never scrubs it, so callers are responsible for what they put there"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/lib/process.ts",
-      "reason": "Shared subprocess runner for the secrets feature (D4) — runCapture (execFile) and runInherit (spawn). Not yet called by any command, but is the second place (after skill-open.ts) GoodBoy will ever launch an external process.",
-      "invariants": [
-        "shell: false is hard-coded in both runCapture and runInherit — never a caller-configurable option",
-        "runCapture's output cap (1 MiB) always results in an explicit truncated:true result, never an uncaught/opaque buffer error",
-        "A timeout or AbortSignal cancellation is reported cleanly (timedOut/aborted flags), never leaves a hung child process"
-      ]
-    },
-    {
       "pattern": "packages/cli/src/lib/redact.ts",
-      "reason": "The mechanism the secrets feature's \"committed files/logs never contain secret material\" invariant depends on. Wired into logger.ts and sanitiseError — every CLI log/error path.",
+      "reason": "Literal-substring scrubber wired into logger.ts and sanitiseError(), so every CLI log/error path passes through it. NOTE: with the secrets feature removed there is no longer any caller of registerSecret(), so redact() currently returns its input unchanged in production — the mechanism is dormant, not load-bearing. Retained deliberately; see docs/backlog.md.",
       "invariants": [
         "A registered value is matched as a literal substring (split/join) — never compiled into a RegExp",
-        "Values are replaced longest-first so a registered value that is a substring of another registered value never fragments the longer one's redaction",
-        "redact() is a no-op (returns input unchanged) whenever nothing is registered — existing callers see zero behavior change until something actually registers a value"
+        "Values are replaced longest-first so a registered value that is a substring of another registered value never fragments the longer one redaction",
+        "redact() is a no-op (returns input unchanged) whenever nothing is registered — which, with no production registrar, is currently always"
       ]
     },
     {
@@ -176,95 +159,6 @@
       "invariants": [
         "additionalProperties: false on every object definition",
         "Adding additionalProperties: true anywhere is treated as a breaking security change"
-      ]
-    },
-    {
-      "pattern": "packages/schema/src/config.schema.json",
-      "reason": "The JSON Schema used to validate ~/.goodboy/config.json and <project>/goodboy.local.json — will eventually gate provider references and account identifiers for the secrets feature.",
-      "invariants": [
-        "additionalProperties: false on every object definition",
-        "secrets.providers is a closed oneOf over exactly the v1 provider types (D6) — widening it is a deliberate schema decision, not a drive-by addition",
-        "secrets.mappings[name].reference rejects control characters/newlines/null bytes as a defense-in-depth baseline, even though provider-specific reference format rules (e.g. op:// prefix) are intentionally NOT enforced here"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/config.ts",
-      "reason": "Loads, validates, and merges the two secrets-config files above via the Ajv singleton pattern. No provider/resolver logic yet, but this is the file that will hand validated provider references to the resolver in a later phase.",
-      "invariants": [
-        "Ajv instantiated with { strict: true, allErrors: true }, mirroring manifest.ts",
-        "A schema-invalid or malformed config file always throws a clear error naming the actual failure — never silently coerced or partially accepted",
-        "mergeConfig() replaces colliding provider/mapping entries wholesale (never a deep per-field merge) — a project-level entry fully overrides, it never partially blends with a user-level one of the same name"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/types.ts",
-      "reason": "Defines SecretValue, the wrapper every resolved secret flows through — the accidental-disclosure boundary the whole secrets feature relies on.",
-      "invariants": [
-        "toString()/toJSON()/the util.inspect custom symbol always return REDACTED_MARKER — reveal() is the only accessor that ever returns the real value",
-        "Construction always calls registerSecret() (lib/redact.ts) — a SecretValue that isn't registered with the redactor defeats the whole mechanism"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/provider-registry.ts",
-      "reason": "Lazily constructs and caches SecretProvider instances by configured name — the concrete implementation of invariant 7 (lazy initialization: no non-secrets command ever touches provider code).",
-      "invariants": [
-        "A provider is never constructed until getProvider() is actually called for its instance name — no eager construction for every configured provider",
-        "An instance name that isn't configured at all (E_PROVIDER_INSTANCE_NOT_CONFIGURED) and a provider type that bypasses the schema entirely (E_PROVIDER_UNKNOWN_TYPE) stay distinct, fail-closed error codes — never collapsed into one generic failure"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/providers/environment.ts",
-      "reason": "The first real provider — reads process.env[reference] and is the point where a raw secret value first enters the system.",
-      "invariants": [
-        "resolve() only ever reads the single named variable — never logs or serializes process.env wholesale",
-        "A missing variable's error message names only the variable name (safe to log), never a value"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/providers/onepassword-cli.ts",
-      "reason": "Shells out to the real op CLI via lib/process.ts's runCapture (never a shell) to resolve a reference into a SecretValue.",
-      "invariants": [
-        "op is always invoked via execFile with shell: false — never op run (that's S5's separate concern) and never a shell string",
-        "checkAvailability() never throws or rejects, even when op itself can't be invoked at all — it always resolves to a status",
-        "checkAvailability()'s detail is always a short, fixed phrase, never raw stderr echoed verbatim",
-        "resolve()'s thrown error message may name the reference (locally configured, not a secret) but never includes raw stderr — stderr is carried in safeMetadata only",
-        "The op:// prefix is validated before any subprocess is invoked — a malformed reference never reaches op at all"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/resolver.ts",
-      "reason": "The seam where a requested secret name is decided against a provider instance, and where multi-failure messages are assembled from concurrent resolutions.",
-      "invariants": [
-        "Only the requested names are ever touched — never iterates config.secrets.mappings/providers wholesale (invariant 6)",
-        "An empty names array never calls registry.getProvider() at all (invariant 7)",
-        "Failure aggregation never calls .reveal() on a SecretValue or otherwise carries a resolved value into an error message/safeMetadata — only names, provider instance names, and the underlying error objects",
-        "Multi-failure reporting is deterministic in input order (relies on Promise.allSettled's own result ordering), never settlement order"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/reference-masking.ts",
-      "reason": "The boundary that keeps vault/item/field/query content out of goodboy secrets list output.",
-      "invariants": [
-        "environment references pass through unchanged — they're variable names, not vault paths, so nothing to mask",
-        "Every other case (onepassword-cli, or a provider type that couldn't be determined) masks each path segment's content and any query string content, while the scheme prefix and segment count stay visible",
-        "An undetermined provider type is masked exactly as conservatively as a known-sensitive one — never assumed safe to show in full"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/secrets/from-skill.ts",
-      "reason": "Resolves an installed project skill's declared secrets by name (D5) — name-keyed against goodboy.json only, no path argument, no registry or global-scope fallback.",
-      "invariants": [
-        "Only ever resolves an installed PROJECT skill by name against goodboy.json's skills map — no raw path argument, no registry lookup, no global-scope fallback",
-        "A skill listed in goodboy.json whose manifest is missing/corrupt on disk surfaces a clear wrapped error, never an unhandled crash"
-      ]
-    },
-    {
-      "pattern": "packages/cli/src/commands/secrets/validate.ts",
-      "reason": "The first command to call resolver.ts's resolveSecrets() and handle its aggregate failure metadata.",
-      "invariants": [
-        "Never calls .reveal() on a SecretValue or otherwise reads a resolved value — only success/failure per name is ever reported",
-        "A name that fails structural validation is never passed into resolveSecrets — only the structurally-valid subset is",
-        "Fail-closed: non-zero exit if any checked name has a structural problem or (with --resolve) failed to actually resolve"
       ]
     }
   ]
