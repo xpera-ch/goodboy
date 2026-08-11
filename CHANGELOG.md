@@ -58,26 +58,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   this costs one major now and any future re-add is cheap, whereas keeping
   them until there are users would cost a major *with* users.
 
-  **To migrate:** delete any of the above from your `manifest.json` and set
-  `"schema_version": "2.0.0"`. A CLI older than this release will reject a
+  **This release cannot read any 1.x manifest, and there is no migration
+  path.** This is the direction you will actually hit: every skill authored or
+  installed under 0.1.x/0.2.0 becomes unreadable the moment you upgrade, and
+  no command converts them. `goodboy install`, `goodboy upgrade` and
+  `goodboy add` fail with:
+
+  ```
+  manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.
+  ```
+
+  `goodboy list` and `goodboy skill status` do not fail — they list the skill
+  as installed-but-unreadable and name the remedy. They deliberately do **not**
+  report it as absent.
+
+  **To migrate, by hand, per skill:** delete any of the above fields from
+  `manifest.json` and set `"schema_version": "2.0.0"`. Or re-add the skill
+  from its source with `goodboy add <path>`.
+
+  Automatic migration is deliberately not offered: nothing in GoodBoy rewrites
+  user content silently (see `docs/decisions.md`, 2026-08-11). A compatibility
+  window that reads 1.x manifests directly is under design and is not in this
+  release.
+
+  In the opposite direction, a CLI older than this release will reject a
   2.x manifest with `manifest declares schema 2.0.0; this version of GoodBoy
   supports 1.x manifests. Upgrade GoodBoy to use this skill.`
 
 - The manifest schema `$id` moves from `https://goodboy.dev/schemas/manifest/1.0.0`
-  to `https://goodboyjs.com/schemas/manifest/2.0.0`. `goodboy.dev` is not a
-  domain this project controls. Ajv never fetches `$id`, so GoodBoy itself was
-  unaffected, but editors and third-party validators may resolve it. The frozen
-  `versions/v1/` copy deliberately keeps the old identifier so it stays an
-  accurate record of what shipped — see `packages/schema/versions/README.md`.
+  to `https://goodboyjs.com/schemas/manifest/v2`. Two changes in one: the
+  domain, because `goodboy.dev` is not a domain this project controls; and the
+  granularity, from full version to **major**, matching the `versions/`
+  directory layout. A full version in the `$id` goes stale on the first minor —
+  1.1.0 shipped carrying `…/manifest/1.0.0`. Ajv never fetches `$id`, so
+  GoodBoy itself was unaffected, but editors and third-party validators may
+  resolve it. The frozen `versions/v1/` copy deliberately keeps the old
+  identifier so it stays an accurate record of what shipped — see
+  `packages/schema/versions/README.md`.
 
 ### Added
 
-- `goodboy add` / `goodboy skill validate` now emit a **warning** when
+- `goodboy add` now emits a **warning** when
   `SKILL.md`'s `description` differs from `manifest.json`'s. A warning rather
   than an error, unlike the existing `name` and `license` cross-checks:
   `description` is prose, exact equality is brittle, and the two legitimately
   serve different readers — SKILL.md's drives agent triggering, the manifest's
   drives registry search.
+
+### Fixed
+
+- **`goodboy list` no longer reports "No skills installed" when skills are
+  installed but unreadable.** It silently dropped any skill whose manifest
+  failed to parse, so after the 2.0.0 break a user with a full store was told
+  they had none and directed to install skills already on disk. It now warns
+  per skill (naming it and the reason), distinguishes "nothing there" from
+  "nothing readable", and reports the count of skills it could not read
+  alongside the count it listed.
+
+- **`goodboy skill status` no longer reports a present skill as
+  "not installed".** A manifest that exists but cannot be parsed was
+  indistinguishable from a missing one. There is now a distinct `unreadable`
+  state; the integrity check is skipped for it, because an unreadable manifest
+  offers no trustworthy version to compare against.
+
+- **`goodboy search` now reports an unreadable registry** instead of returning
+  no results. A misconfigured `GOODBOY_REGISTRY` was indistinguishable from a
+  registry holding no match.
+
+  All three printed a confident, false statement about state rather than
+  admitting an error. Each now names the remedy, not only the fault.
 
 ## [0.2.0] - 2026-07-21
 
@@ -100,7 +149,7 @@ Two rules are enforced to keep this reliable:
   a reliable signal on its own.
 
 Declared secrets are now shown (names only, never values) in the install/upgrade
-consent prompt and in `goodboy skill validate` / `goodboy add` output. `goodboy
+consent prompt and in `goodboy add` output. `goodboy
 skill version --bump` normalizes `schema_version` to its minimum needed value
 on every new version it creates — `1.1.0` if the manifest uses `requires`,
 `1.0.0` otherwise — but only for a manifest that already validates strictly.
@@ -120,7 +169,7 @@ the declaration.
 ### Added
 
 - `manifest.json`: new optional `requires.secrets` field (schema `1.1.0`) — an array of 1–32 unique, environment-variable-style logical secret names.
-- `goodboy skill validate` / `goodboy add`: an info line (`✓ declares N required secrets`) when a manifest declares secrets and validates cleanly.
+- `goodboy add`: an info line (`✓ declares N required secrets`) when a manifest declares secrets and validates cleanly.
 - Install/upgrade consent prompt: a "Required secrets" section listing declared names alongside permissions.
 
 ### Changed

@@ -19,11 +19,13 @@ Living planning docs, in reading order for onboarding to current state:
 
 - `docs/concept-secrets.md` — **WITHDRAWN (2026-08-09).** The secrets
   feature is not in scope and is not being built. S1/S2 shipped (the
-  `requires.secrets` manifest field and its install-time disclosure, which
-  remain); the S3/S4 resolution layer was built and then removed. The
-  document is retained as the design record and as the account of the
-  reversal — read its header before anything else in it. Do not treat it as
-  a plan.
+  `requires.secrets` manifest field and its install-time disclosure) and
+  the S3/S4 resolution layer was built and then removed. **Nothing of the
+  feature remains as of schema 2.0.0 (2026-08-11):** `requires` was one of
+  the nine fields that removal dropped, and its consent disclosure went with
+  it. The document is retained as the design record and as the account of
+  the reversal — read its header before anything else in it. Do not treat it
+  as a plan.
 - `docs/backlog.md` — deliberate known-limitations and deferred work. If
   something looks unfinished or half-built, check here first — it may
   already be a tracked, intentional gap rather than an oversight.

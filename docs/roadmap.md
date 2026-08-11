@@ -44,8 +44,10 @@ section) can't stay single-registry once it exists.
 
 ## GoodBoy-managed bundling dependencies
 
-Distinct from `requires.secrets` (which is already implemented, schema
-1.1.0, see `docs/concept-secrets.md`). This is a broader, **not yet
+Distinct from `requires.secrets`, which shipped in schema 1.1.0 and was
+**removed in schema 2.0.0** (2026-08-11) along with the rest of the secrets
+feature — see `docs/concept-secrets.md`, marked WITHDRAWN. Nothing named
+`requires` exists in the schema today. This is a broader, **not yet
 implemented** concept: install-time bundling dependencies between skills
 themselves, declared under a namespaced `goodboy.requires` frontmatter key
 (not yet present anywhere in the schema or codebase — confirmed via search).
