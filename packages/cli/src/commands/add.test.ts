@@ -294,4 +294,69 @@ describe('add command', () => {
     expect(mockCreateRegistryEntry).toHaveBeenCalled();
     expect(mockAddVersionToEntry).not.toHaveBeenCalled();
   });
+
+  describe('skill registry directory creation', () => {
+    const SKILL_REGISTRY_DIR = join(REGISTRY_PATH, 'my-skill');
+    const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '1.0.0');
+
+    it('creates the skill registry directory when it does not yet exist', async () => {
+      mockExistsSync.mockImplementation((path) => path !== SKILL_REGISTRY_DIR);
+
+      await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
+
+      expect(mockMkdirSync).toHaveBeenCalledWith(
+        SKILL_REGISTRY_DIR,
+        expect.objectContaining({ recursive: true, mode: 0o700 }),
+      );
+      expect(mockWriteRegistryEntry).toHaveBeenCalled();
+      expect(mockLogger.error).not.toHaveBeenCalled();
+    });
+
+    it('does not recreate the skill registry directory when it already exists', async () => {
+      await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
+
+      expect(mockMkdirSync).toHaveBeenCalledWith(
+        VERSION_ABS_PATH,
+        expect.objectContaining({ recursive: true, mode: 0o700 }),
+      );
+      expect(mockMkdirSync).not.toHaveBeenCalledWith(SKILL_REGISTRY_DIR, expect.anything());
+    });
+  });
+
+  describe('top-level catch handler', () => {
+    it('recognises a symlink error message regardless of casing', async () => {
+      mockScanForSymlinks.mockRejectedValue(new Error('SYMLINK escape DETECTED'));
+
+      await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Skill rejected: symlink pointing outside skill directory detected',
+      );
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+    });
+
+    it('logs the raw error message for a non-symlink Error', async () => {
+      mockWriteRegistryEntry.mockRejectedValue(new Error('registry entry write failed: disk quota exceeded'));
+
+      await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith('registry entry write failed: disk quota exceeded');
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+    });
+
+    it('falls back to "Unknown error" for a non-Error thrown value', async () => {
+      mockWriteRegistryEntry.mockRejectedValue('boom');
+
+      await addCommand.parseAsync([SKILL_PATH], { from: 'user' }).catch(() => {});
+
+      expect(mockLogger.error).toHaveBeenCalledWith('Unknown error');
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(1);
+    });
+  });
 });

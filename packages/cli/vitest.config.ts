@@ -12,14 +12,13 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/types/**',
         'src/index.ts',
-        // src/commands/skill-version.ts, verify.ts, skill-status.ts, and
-        // adopt.ts are intentionally NOT listed here — they contain
-        // security-relevant cleanup/tamper-detection/untrusted-input logic
-        // and are held to 100% coverage below, like the security-critical
-        // lib files. The rest of src/commands/ remains excluded;
-        // un-excluding another command file is a separate decision (each
-        // will surface its own pre-existing gaps).
-        'src/commands/add.ts',
+        // src/commands/skill-version.ts, verify.ts, skill-status.ts,
+        // adopt.ts, and add.ts are intentionally NOT listed here — they
+        // contain security-relevant cleanup/tamper-detection/untrusted-input
+        // logic and are held to 100% coverage below, like the
+        // security-critical lib files. The rest of src/commands/ remains
+        // excluded; un-excluding another command file is a separate
+        // decision (each will surface its own pre-existing gaps).
         'src/commands/init.ts',
         'src/commands/install.ts',
         'src/commands/list.ts',
@@ -52,6 +51,7 @@ export default defineConfig({
         'src/commands/verify.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/skill-status.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/adopt.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/add.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/errors.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/process.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/redact.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
