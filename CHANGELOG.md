@@ -27,12 +27,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `docs/concept-secrets.md` is retained, marked WITHDRAWN, with the
   condition that would reopen it.
 
-### Unchanged
+- **BREAKING — manifest schema 2.0.0 removes nine fields.** `@goodboyjs/schema`
+  goes to `2.0.0` and manifests must now declare `"schema_version": "2.x.y"`.
+  Because the schema sets `additionalProperties: false`, a manifest still
+  carrying any removed field now **fails validation outright** rather than
+  being ignored.
 
-- The `requires.secrets` manifest field (schema `1.1.0`, shipped in 0.2.0)
-  and its install-time disclosure still work exactly as before. Declaring
-  secret names remains advisory metadata that GoodBoy displays and never
-  resolves — which is now the only thing it ever does with them.
+  Removed, with the reason each existed:
+
+  | Field | Why it was there | Reads in the CLI |
+  |---|---|---|
+  | `publisher` | set by a registry on publish | 0 |
+  | `visibility` | private until published | 0 |
+  | `homepage` | registry display | 0 |
+  | `repository` | registry display | 0 |
+  | `changelog` | registry display | 0 |
+  | `engines` | advisory runtime constraints | 0 |
+  | `os` | advisory OS constraints | 0 |
+  | `tags` | controlled vocabulary for faceted search | searched, but identically to `keywords` |
+  | `requires` | declared secret names | 1 — a disclosure line, now gone with the secrets feature |
+
+  Seven of these had **zero** readers anywhere in the CLI. They were added
+  for a hosted public registry that does not exist and whose existence is
+  not yet decided. `tags` went because it and `keywords` were searched by the
+  same code path with no differentiated behaviour, while authors were warned
+  to fill in both — faceted search is a registry-UI concern and belongs with
+  the registry decision.
+
+  Removing an optional field is a major bump; adding one back is a minor. So
+  this costs one major now and any future re-add is cheap, whereas keeping
+  them until there are users would cost a major *with* users.
+
+  **To migrate:** delete any of the above from your `manifest.json` and set
+  `"schema_version": "2.0.0"`. A CLI older than this release will reject a
+  2.x manifest with `manifest declares schema 2.0.0; this version of GoodBoy
+  supports 1.x manifests. Upgrade GoodBoy to use this skill.`
+
+- The manifest schema `$id` moves from `https://goodboy.dev/schemas/manifest/1.0.0`
+  to `https://goodboyjs.com/schemas/manifest/2.0.0`. `goodboy.dev` is not a
+  domain this project controls. Ajv never fetches `$id`, so GoodBoy itself was
+  unaffected, but editors and third-party validators may resolve it. The frozen
+  `versions/v1/` copy deliberately keeps the old identifier so it stays an
+  accurate record of what shipped — see `packages/schema/versions/README.md`.
+
+### Added
+
+- `goodboy add` / `goodboy skill validate` now emit a **warning** when
+  `SKILL.md`'s `description` differs from `manifest.json`'s. A warning rather
+  than an error, unlike the existing `name` and `license` cross-checks:
+  `description` is prose, exact equality is brittle, and the two legitimately
+  serve different readers — SKILL.md's drives agent triggering, the manifest's
+  drives registry search.
 
 ## [0.2.0] - 2026-07-21
 
