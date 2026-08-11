@@ -9,3 +9,4 @@ coverage/
 docs/prompts/
 docs/reviews/
 .claude/skills/engineering-principles/
+vitest.config.ts.timestamp-*
