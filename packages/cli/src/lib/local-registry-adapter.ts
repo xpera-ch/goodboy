@@ -85,8 +85,6 @@ export class LocalRegistryAdapter implements RegistryAdapter {
       skill.description.toLowerCase().includes(queryLower) ||
       (Array.isArray(skill.keywords) &&
         skill.keywords.some((kw) => kw.toLowerCase().includes(queryLower))) ||
-      (Array.isArray(skill.tags) &&
-        skill.tags.some((t) => t.toLowerCase().includes(queryLower))) ||
       (skill.category !== undefined && skill.category.toLowerCase().includes(queryLower))
     );
   }

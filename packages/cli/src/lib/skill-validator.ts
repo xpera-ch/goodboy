@@ -93,16 +93,6 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
     if (!manifest.category) {
       issues.push({ severity: 'warning', message: 'manifest has no category' });
     }
-    if (!manifest.tags || manifest.tags.length === 0) {
-      issues.push({ severity: 'warning', message: 'manifest has no tags' });
-    }
-    const secretCount = manifest.requires?.secrets.length ?? 0;
-    if (secretCount > 0) {
-      issues.push({
-        severity: 'info',
-        message: `declares ${secretCount} required secret${secretCount === 1 ? '' : 's'}`,
-      });
-    }
   }
 
   // --- SKILL.md checks ---
@@ -135,6 +125,19 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
         issues.push({
           severity: 'error',
           message: `SKILL.md frontmatter license "${fm.license}" does not match manifest.json license "${manifest.license}"`,
+        });
+      }
+      // Warning, not error, unlike the name/license checks above. `description`
+      // is prose up to 1024 characters, so exact equality is brittle (trailing
+      // punctuation, re-wrapping, YAML folding) — and the two legitimately
+      // serve different readers: SKILL.md's description is what an agent
+      // matches against to decide whether to trigger the skill, while the
+      // manifest's drives registry search. This catches accidental drift
+      // without hard-failing a deliberate difference.
+      if (manifest && fm.description && fm.description !== manifest.description) {
+        issues.push({
+          severity: 'warning',
+          message: `SKILL.md frontmatter description does not match manifest.json description`,
         });
       }
       if (fm.body.length < 50) {
