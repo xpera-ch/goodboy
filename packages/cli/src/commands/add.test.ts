@@ -178,13 +178,10 @@ describe('add command', () => {
     expect(mockCpSync).toHaveBeenCalled();
   });
 
-  it('shows the info line for a warning-free skill with declared secrets, mirroring registry-validate behavior', async () => {
-    mockValidateSkillDirectory.mockResolvedValue({
-      valid: true,
-      issues: [{ severity: 'info', message: 'declares 1 required secret' }],
-    });
+  it('adds a skill with no issues at all without printing a validation report', async () => {
+    mockValidateSkillDirectory.mockResolvedValue({ valid: true, issues: [] });
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
-    expect(mockFormatValidationResult).toHaveBeenCalled();
+    expect(mockFormatValidationResult).not.toHaveBeenCalled();
     expect(mockCpSync).toHaveBeenCalled();
   });
 

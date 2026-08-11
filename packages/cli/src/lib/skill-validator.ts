@@ -5,7 +5,11 @@ import { readManifest, validateManifestDetailed } from './manifest.js';
 import type { ManifestValidationResult } from './manifest.js';
 import { logger } from './logger.js';
 
-export type ValidationSeverity = 'error' | 'warning' | 'info';
+// 'info' was removed with the secrets feature in schema 2.0.0: it had no
+// producer left, and its handling stayed at 100% coverage only because a test
+// fabricated an issue the product could no longer emit. Re-add it alongside a
+// real producer if one ever exists.
+export type ValidationSeverity = 'error' | 'warning';
 
 export interface ValidationIssue {
   severity: ValidationSeverity;
@@ -153,7 +157,6 @@ export async function validateSkillDirectory(skillPath: string): Promise<Validat
 export function formatValidationResult(result: ValidationResult, skillName: string): void {
   const errors = result.issues.filter((i) => i.severity === 'error');
   const warnings = result.issues.filter((i) => i.severity === 'warning');
-  const infos = result.issues.filter((i) => i.severity === 'info');
 
   if (errors.length > 0) {
     logger.error(`Validation errors for "${skillName}":`);
@@ -166,8 +169,5 @@ export function formatValidationResult(result: ValidationResult, skillName: stri
     for (const issue of warnings) {
       logger.warn(`  • ${issue.message}`);
     }
-  }
-  for (const issue of infos) {
-    logger.success(issue.message);
   }
 }

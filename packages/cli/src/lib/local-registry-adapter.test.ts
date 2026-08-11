@@ -124,10 +124,24 @@ describe('LocalRegistryAdapter.search()', () => {
     adapter = new LocalRegistryAdapter();
   });
 
-  it('returns [] when listRegistry() throws', async () => {
+  it('warns, rather than silently returning [], when listRegistry() throws', async () => {
+    // Otherwise a misconfigured GOODBOY_REGISTRY is indistinguishable from a
+    // registry that simply holds no match — the same false-state defect as F1.
     mockListRegistry.mockRejectedValue(new Error('registry error'));
     const result = await adapter.search('anything');
     expect(result).toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Cannot read the registry: registry error'),
+    );
+  });
+
+  it('falls back to a generic reason when a non-Error is thrown', async () => {
+    mockListRegistry.mockRejectedValue('not an Error instance');
+    const result = await adapter.search('anything');
+    expect(result).toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Cannot read the registry: unknown error'),
+    );
   });
 
   it('returns [] when the registry is empty', async () => {
@@ -136,11 +150,14 @@ describe('LocalRegistryAdapter.search()', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns [] when getRegistryPath() throws after listRegistry() succeeds', async () => {
+  it('warns when getRegistryPath() throws after listRegistry() succeeds', async () => {
     mockListRegistry.mockResolvedValue([makeRegistryEntry('test-skill')]);
     mockGetRegistryPath.mockImplementation(() => { throw new Error('no registry'); });
     const result = await adapter.search('test');
     expect(result).toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Cannot read the registry: no registry'),
+    );
   });
 
   it('warns and skips skills with unreadable manifests', async () => {

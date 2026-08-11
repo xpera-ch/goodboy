@@ -251,7 +251,10 @@ describe('goodboy skill status', () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
-  it('treats a skill with a corrupt/invalid installed manifest as not installed', async () => {
+  // C5 regression. This test previously asserted "not installed" for a skill
+  // whose manifest is present but unparseable — it encoded the defect: the
+  // command claimed a skill was absent while it sat on disk.
+  it('reports a present-but-unreadable manifest as "unreadable", never as absent', async () => {
     mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-f': '^1.0.0' } });
     mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
     mockReadManifest.mockResolvedValue({ not: 'a valid manifest' });
@@ -259,7 +262,52 @@ describe('goodboy skill status', () => {
 
     await buildProgram().parseAsync(['status'], { from: 'user' });
 
-    expect(tableOutput()).toContain('not installed');
+    const output = tableOutput();
+    expect(output).toContain('unreadable');
+    expect(output).not.toContain('not installed');
+  });
+
+  it('names the skill, the reason, and a remedy for an unreadable manifest', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-f': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockRejectedValue(
+      new Error('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.'),
+    );
+    mockReadRegistryEntry.mockResolvedValue(null);
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Installed but unreadable'),
+    );
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('skill-f: manifest declares schema 1.0.0'),
+    );
+    expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('goodboy add'));
+  });
+
+  it('does not run the integrity check on an unreadable skill', async () => {
+    // With no trustworthy version there is nothing to compare; claiming
+    // "up to date" or "modified" would be a guess.
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-f': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockRejectedValue(new Error('unreadable'));
+    mockReadRegistryEntry.mockResolvedValue(entryFor('skill-f', '1.0.0'));
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(mockVerifySkillIntegrity).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a generic reason when a non-Error is thrown', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({ schema: '1.0.0', skills: { 'skill-f': '^1.0.0' } });
+    mockExistsSync.mockImplementation((p) => String(p).includes('manifest.json'));
+    mockReadManifest.mockRejectedValue('not an Error instance');
+    mockReadRegistryEntry.mockResolvedValue(null);
+
+    await buildProgram().parseAsync(['status'], { from: 'user' });
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('invalid manifest'));
   });
 
   it('still runs the integrity check (and shows "—" for Registry) when the skill has no matching registry entry', async () => {

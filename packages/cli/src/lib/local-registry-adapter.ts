@@ -38,7 +38,14 @@ export class LocalRegistryAdapter implements RegistryAdapter {
     try {
       entries = await listRegistry();
       registryPath = getRegistryPath();
-    } catch {
+    } catch (err) {
+      // Same class as F1: returning [] here made a misconfigured
+      // GOODBOY_REGISTRY (non-absolute, or containing "..") indistinguishable
+      // from a registry that simply holds no match. The per-entry catch below
+      // already warns; the registry-level one must too.
+      logger.warn(
+        `Cannot read the registry: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
       return [];
     }
 

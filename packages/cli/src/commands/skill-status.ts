@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import { readGoodBoyJson, getLockedVersion, readGoodBoyLock } from '../lib/goodboy-file.js';
 import { getRegistryPath } from '../lib/registry.js';
 import { readRegistryEntry, resolveLatestVersion } from '../lib/registry-entry.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, validateManifest, UNREADABLE_MANIFEST_REMEDY } from '../lib/manifest.js';
 import { verifySkillIntegrity } from '../lib/verify.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
@@ -16,7 +16,19 @@ interface SkillStatusOptions {
   global?: boolean;
 }
 
-type State = 'not installed' | 'upgrade available' | 'modified' | 'not verified' | 'up to date';
+// "unreadable" is a distinct state, not a flavour of "not installed": the
+// existing vocabulary had no way to say "present on disk, manifest cannot be
+// parsed", so both collapsed into "not installed" — a false claim of absence
+// about a skill that is physically there. This is the same class of defect as
+// reporting an unverified skill as verified, so it gets its own state rather
+// than a footnote on an existing one.
+type State =
+  | 'not installed'
+  | 'unreadable'
+  | 'upgrade available'
+  | 'modified'
+  | 'not verified'
+  | 'up to date';
 
 interface SkillStatusRow {
   name: string;
@@ -24,7 +36,13 @@ interface SkillStatusRow {
   registryLatest: string | null;
   lockedVersion: string | null;
   state: State;
+  unreadableReason: string | null;
 }
+
+type InstalledManifest =
+  | { kind: 'absent' }
+  | { kind: 'unreadable'; reason: string }
+  | { kind: 'present'; version: string };
 
 // Exported for direct unit testing: SKILL_NAME_RE already blocks every
 // traversal character through the public API, so this guard's throw path is
@@ -44,19 +62,30 @@ function stateColor(state: State): string {
     case 'upgrade available': return chalk.cyan(state);
     case 'modified':          return chalk.yellow(state);
     case 'not verified':      return chalk.gray(state);
+    case 'unreadable':        return chalk.red(state);
     case 'not installed':     return chalk.red(state);
   }
 }
 
-async function getInstalledVersion(skillsBase: string, skillName: string): Promise<string | null> {
+// Returns a discriminated result rather than `string | null`: the previous
+// signature could not express the difference between "no manifest file" and
+// "manifest file present but unparseable", so the caller reported both as
+// "not installed".
+async function readInstalledManifest(
+  skillsBase: string,
+  skillName: string,
+): Promise<InstalledManifest> {
   const manifestPath = join(skillsBase, skillName, 'manifest.json');
-  if (!existsSync(manifestPath)) return null;
+  if (!existsSync(manifestPath)) return { kind: 'absent' };
   try {
     const raw = await readManifest(manifestPath);
     const manifest = validateManifest(raw);
-    return manifest.version;
-  } catch {
-    return null;
+    return { kind: 'present', version: manifest.version };
+  } catch (err) {
+    return {
+      kind: 'unreadable',
+      reason: err instanceof Error ? err.message : 'invalid manifest',
+    };
   }
 }
 
@@ -65,7 +94,9 @@ async function computeRow(
   skillsBase: string,
   manifestDir: string,
 ): Promise<SkillStatusRow> {
-  const installedVersion = await getInstalledVersion(skillsBase, skillName);
+  const installed = await readInstalledManifest(skillsBase, skillName);
+  const installedVersion = installed.kind === 'present' ? installed.version : null;
+  const unreadableReason = installed.kind === 'unreadable' ? installed.reason : null;
   const lockedVersion = await getLockedVersion(manifestDir, skillName);
 
   const registryPath = getRegistryPath();
@@ -74,9 +105,14 @@ async function computeRow(
   const registryLatest = entry ? resolveLatestVersion(entry) : null;
 
   let state: State;
-  if (installedVersion === null) {
+  if (installed.kind === 'absent') {
     state = 'not installed';
-  } else if (registryLatest !== null && installedVersion !== registryLatest) {
+  } else if (installed.kind === 'unreadable') {
+    // Deliberately not carried further into the drift check: with an
+    // unreadable manifest there is no trustworthy version to compare, so
+    // claiming "up to date" or "modified" would be a guess.
+    state = 'unreadable';
+  } else if (registryLatest !== null && installed.version !== registryLatest) {
     state = 'upgrade available';
   } else {
     const installedDir = join(skillsBase, skillName);
@@ -92,7 +128,14 @@ async function computeRow(
     }
   }
 
-  return { name: skillName, installedVersion, registryLatest, lockedVersion, state };
+  return {
+    name: skillName,
+    installedVersion,
+    registryLatest,
+    lockedVersion,
+    state,
+    unreadableReason,
+  };
 }
 
 async function run(options: SkillStatusOptions): Promise<void> {
@@ -141,6 +184,14 @@ async function run(options: SkillStatusOptions): Promise<void> {
 
   process.stdout.write(table.toString() + '\n');
 
+  const unreadable = rows.filter((r) => r.state === 'unreadable');
+  if (unreadable.length > 0) {
+    logger.warn('\n⚠  Installed but unreadable — these skills are present on disk:');
+    for (const row of unreadable) {
+      logger.warn(`  • ${row.name}: ${row.unreadableReason}`);
+    }
+    logger.info(UNREADABLE_MANIFEST_REMEDY);
+  }
   if (rows.some((r) => r.state === 'modified')) {
     logger.warn("\n⚠  Modified skills will lose changes on 'goodboy upgrade'.");
     logger.info("Run 'goodboy skill diff <name>' to see what changed.");

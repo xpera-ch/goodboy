@@ -105,7 +105,9 @@
       "pattern": "packages/cli/src/commands/skill-status.ts",
       "reason": "Displays installed-skill drift, now via the same whole-tree integrity comparison verify.ts performs (previously only diffed SKILL.md, which could miss tampering in any other file). Informational only — no exit-code gate — but a false \"up to date\"/\"modified\" here is the same class of false confidence as a wrong goodboy verify result, so it's held to the same 100% bar.",
       "invariants": [
-        "A not-verified skill is rendered distinctly from both \"up to date\" and \"modified\" — never folded into either"
+        "A not-verified skill is rendered distinctly from both \"up to date\" and \"modified\" — never folded into either",
+        "A skill whose manifest is present but unparseable is rendered as \"unreadable\", never as \"not installed\" — an unknown state is never reported as a known one, in either direction",
+        "The integrity check is not run for a skill whose manifest could not be parsed — there is no trustworthy version to compare, so no drift verdict is emitted"
       ]
     },
     {

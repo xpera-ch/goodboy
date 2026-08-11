@@ -401,12 +401,4 @@ describe('formatValidationResult()', () => {
     expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
-  it('calls logger.success for each info issue', () => {
-    const result: ValidationResult = {
-      valid: true,
-      issues: [{ severity: 'info', message: 'an informational note' }],
-    };
-    formatValidationResult(result, 'test-skill');
-    expect(mockLogger.success).toHaveBeenCalledWith('an informational note');
-  });
 });

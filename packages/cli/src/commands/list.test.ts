@@ -189,6 +189,106 @@ describe('goodboy list', () => {
     });
   });
 
+  describe('unreadable skills (F1 regression)', () => {
+    // The bug: every skill on disk had a schema-1.x manifest, each threw, each
+    // was silently dropped, and `list` printed "No skills installed" — telling
+    // a user with six installed skills that they had none.
+    function rejectAll(message: string): void {
+      mockReadManifest.mockRejectedValue(new Error(message));
+    }
+
+    it('warns per unreadable skill, naming it and the reason', async () => {
+      rejectAll('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.');
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping "global-skill" (global)'),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('supports 2.x manifests'),
+      );
+    });
+
+    it('does NOT claim "No skills installed" when skills are present but unreadable', async () => {
+      rejectAll('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.');
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      const said = mockLogger.info.mock.calls
+        .concat(mockLogger.warn.mock.calls)
+        .map((c) => String(c[0]));
+      expect(said.some((m) => m.includes('No skills installed'))).toBe(false);
+      expect(said.some((m) => m.includes('installed but could not be read'))).toBe(true);
+    });
+
+    it('names a remedy, not just the fault', async () => {
+      rejectAll('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.');
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('goodboy add'),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('"schema_version": "2.0.0"'),
+      );
+    });
+
+    it('still reports the empty case correctly when the directory is genuinely empty', async () => {
+      // §5.2 — the fix must distinguish "nothing there" from "nothing
+      // readable", not replace one wrong answer with another.
+      mockReaddir.mockResolvedValue([] as never);
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('No skills installed'),
+      );
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('lists readable skills and warns about unreadable ones in a mixed store', async () => {
+      mockReaddir.mockImplementation(async (dir) => {
+        if (dir === GLOBAL_SKILLS_PATH) {
+          return [fakeDirent('good-skill'), fakeDirent('legacy-skill')] as never;
+        }
+        return [] as never;
+      });
+      mockReadManifest.mockImplementation(async (path) => {
+        if (String(path).includes('good-skill')) return manifestFor('good-skill');
+        throw new Error('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.');
+      });
+
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+
+      expect(output()).toContain('good-skill');
+      expect(output()).not.toContain('legacy-skill');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping "legacy-skill"'),
+      );
+      // The count line must not silently under-report what is on disk.
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('1 skill installed'));
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('1 further skill installed but could not be read'),
+      );
+    });
+
+    it('falls back to a generic reason when a non-Error is thrown', async () => {
+      mockReadManifest.mockRejectedValue('not an Error instance');
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('invalid manifest'),
+      );
+    });
+
+    it('pluralises correctly for multiple unreadable skills', async () => {
+      mockReaddir.mockImplementation(async (dir) => {
+        if (dir === GLOBAL_SKILLS_PATH) {
+          return [fakeDirent('legacy-a'), fakeDirent('legacy-b')] as never;
+        }
+        return [] as never;
+      });
+      rejectAll('manifest declares schema 1.0.0; this version of GoodBoy supports 2.x manifests.');
+      await listCommand.parseAsync(['-g'], { from: 'user' });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('2 skills are installed but could not be read'),
+      );
+    });
+  });
+
   describe('goodboy list --all', () => {
     it('shows a project-skills notice and still shows global skills when no goodboy.json', async () => {
       mockReadGoodBoyJson.mockResolvedValue(null);

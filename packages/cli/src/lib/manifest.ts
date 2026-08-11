@@ -42,6 +42,22 @@ export const FIELD_INTRODUCED_IN: Record<string, string> = {};
  */
 export const SCHEMA_BASE_VERSION = `${KNOWN_SCHEMA_VERSION.split('.')[0]}.0.0`;
 
+/**
+ * Shown after any command reports a skill that is installed but whose manifest
+ * cannot be read. Every such message must name a remedy, not only the fault:
+ * the common cause is a manifest written against a previous schema major, and
+ * there is deliberately no automatic migration (see docs/decisions.md,
+ * 2026-08-11 — nothing rewrites user content silently). Interpolates
+ * SCHEMA_BASE_VERSION so it stays correct across majors.
+ *
+ * Kept here, next to the version constants it depends on, so `list` and
+ * `skill status` cannot drift into telling the user two different things.
+ */
+export const UNREADABLE_MANIFEST_REMEDY =
+  `To fix: set "schema_version": "${SCHEMA_BASE_VERSION}" in the skill's manifest.json and remove any ` +
+  `field this schema no longer defines, or re-add the skill from its source with 'goodboy add <path>'. ` +
+  `There is no automatic migration.`;
+
 const SCHEMA_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
 let _schema: Record<string, unknown> | null = null;
