@@ -21,6 +21,9 @@
   },
   "license": "MIT",
   "types": "./generated/ts/index.d.ts",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"

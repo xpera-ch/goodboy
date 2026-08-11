@@ -20,6 +20,9 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
@@ -33,7 +36,7 @@
     "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "typescript": "^5.5.0"
   }
 }

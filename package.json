@@ -20,7 +20,7 @@
     "publish:all": "npm run publish:schema && npm run publish:registry-client && npm run publish:cli"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "json-schema-to-typescript": "^15.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.0"
