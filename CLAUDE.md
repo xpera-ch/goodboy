@@ -166,13 +166,35 @@ anything that's drifted).
   code, and live test results, never self-reported summaries.
 - **Nothing half-baked; pay complexity cost once.** No technical debt, no
   speculative features, no invented concepts not present in the open
-  standard. Earlier in the project, two invented schema fields
-  (`kind`/`executable` skills, skill-to-skill dependencies) had to be
-  reverted and redesigned once their consequences became clear — the
-  concrete reason this rule exists, not just a stated preference.
-  Concretely: don't add SKILL.md frontmatter keys or schema properties
-  beyond what the Agent Skills standard / `manifest.schema.json` already
-  define without an explicit decision to do so.
+  standard. Concretely: don't add SKILL.md frontmatter keys or schema
+  properties beyond what the Agent Skills standard / `manifest.schema.json`
+  already define without an explicit decision to do so.
+
+  **This is a pattern with three instances, not a preference.** All three
+  are the same failure: *surface committed before a consumer existed.*
+
+  1. **Invented schema fields** — `kind`/`executable` skills and
+     skill-to-skill dependencies. Reverted and redesigned once their
+     consequences became clear.
+  2. **The secrets layer (S3/S4)** — removed entirely 2026-08-11. D6 cut
+     S5 because agents don't execute skill scripts, which removed S4's
+     *consumer*; nobody propagated that one level down, so a configuration
+     layer shipped whose only output was "yes, your mapping resolves."
+  3. **Nine manifest registry fields** — `publisher`, `visibility`,
+     `homepage`, `repository`, `changelog`, `engines`, `os`, `tags`,
+     `requires`. Zero reads across the codebase. Added for a hosted
+     registry that does not exist and whose existence is not yet decided.
+     Removing them forced the schema to 2.0.0 and broke every 1.x manifest.
+
+  **The lesson is "ship less up front," not "think longer up front."** More
+  design time before the 1.0.0 schema would most likely have produced *more*
+  speculative fields, not fewer — you cannot design a registry schema well
+  before you know what the registry does. The schema was not
+  under-designed; it was over-scoped.
+
+  **The test that would have caught all three:** does anything *read* this
+  today? If not, it does not ship. See `docs/decisions.md` (2026-08-09 and
+  2026-08-11) for the full reasoning on instances 2 and 3.
 - **Prefer atomic commands and user agency over automatic/magic behavior**,
   even when magic would suit Bruno's personal workflow better — the tool is
   built for a broad audience ("Option B" in his own shorthand).
