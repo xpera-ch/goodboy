@@ -51,6 +51,7 @@ import {
 } from '../lib/goodboy-file.js';
 import { computeSkillIntegrity } from '../lib/integrity.js';
 import { upgradeSkill, upgradeAll, upgradeCommand } from './upgrade.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import type { UpgradeOptions } from './upgrade.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
@@ -95,6 +96,7 @@ const DEFAULT_OPTS: UpgradeOptions = {};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetCommandOptions(upgradeCommand);
   mockExistsSync.mockReturnValue(true);
   mockCreateRegistryAdapter.mockReturnValue(mockAdapter());
   mockReadManifest.mockResolvedValue({});

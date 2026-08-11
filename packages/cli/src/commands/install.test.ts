@@ -77,6 +77,7 @@ import {
   assertAgentFlagsRequireGlobal,
 } from './install.js';
 import type { InstallOptions } from './install.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 
 const mockCreateRegistryAdapter = vi.mocked(createRegistryAdapter);
 const mockReadManifest = vi.mocked(readManifest);
@@ -125,6 +126,7 @@ const DEFAULT_OPTS: InstallOptions = {};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetCommandOptions(installCommand);
   mockExistsSync.mockReturnValue(false);
   mockCreateRegistryAdapter.mockReturnValue(mockAdapter());
   mockReadManifest.mockResolvedValue({});

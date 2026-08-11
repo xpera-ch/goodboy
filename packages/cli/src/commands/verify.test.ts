@@ -23,6 +23,7 @@ import { readGoodBoyJson, readGoodBoyLock } from '../lib/goodboy-file.js';
 import { verifySkillIntegrity } from '../lib/verify.js';
 import { logger } from '../lib/logger.js';
 import { runVerify, verifyCommand, assertWithin } from './verify.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadGoodBoyJson = vi.mocked(readGoodBoyJson);
@@ -263,6 +264,7 @@ describe('assertWithin', () => {
 describe('verifyCommand — Commander registration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCommandOptions(verifyCommand);
     mockExistsSync.mockReturnValue(false);
   });
 
