@@ -4,6 +4,6 @@
   "description": "A skill marked as deprecated",
   "author": { "name": "Test Author" },
   "license": "MIT",
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "status": "deprecated"
 }

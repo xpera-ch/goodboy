@@ -70,7 +70,7 @@ const MANIFEST: GoodBoyManifest = {
   description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  schema_version: '1.0.0',
+  schema_version: '2.0.0',
   status: 'experimental',
 };
 

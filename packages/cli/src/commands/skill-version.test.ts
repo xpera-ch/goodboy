@@ -63,7 +63,7 @@ const MANIFEST: GoodBoyManifest = {
   description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  schema_version: '1.0.0',
+  schema_version: '2.0.0',
   status: 'experimental',
 };
 
@@ -313,33 +313,19 @@ describe('goodboy skill version --bump', () => {
     expect(mockCp).not.toHaveBeenCalled();
   });
 
-  it('stamps schema_version 1.1.0 on the written manifest when it declares requires', async () => {
-    mockReadManifest.mockResolvedValue({
-      ...MANIFEST,
-      schema_version: '1.1.0',
-      permissions: ['env'],
-      requires: { secrets: ['EXOSCALE_API_KEY'] },
-    });
+  it('normalizes schema_version to the base version on bump', async () => {
+    // As of schema 2.0.0 no field is feature-stamped, so the minimum any
+    // manifest needs is always the major's base version.
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '2.0.0' });
     await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
     expect(mockWriteManifest).toHaveBeenCalledWith(
       join(SKILL_DIR, 'versions', '1.0.1', 'manifest.json'),
-      expect.objectContaining({ schema_version: '1.1.0' }),
-    );
-  });
-
-  it('normalizes schema_version to 1.0.0 on bump for a strictly-valid, over-stamped manifest with no requires', async () => {
-    // 1.1.0 is within the known range (no tolerance warning) but is more than
-    // this manifest actually needs, since it declares no `requires`.
-    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.1.0' });
-    await buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' });
-    expect(mockWriteManifest).toHaveBeenCalledWith(
-      join(SKILL_DIR, 'versions', '1.0.1', 'manifest.json'),
-      expect.objectContaining({ schema_version: '1.0.0' }),
+      expect.objectContaining({ schema_version: '2.0.0' }),
     );
   });
 
   it('refuses to bump a newer-minor (tolerated) manifest: validates before acting, no directory ever created', async () => {
-    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0', future_field: 'unused' });
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '2.5.0', future_field: 'unused' });
     await expect(
       buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
     ).rejects.toThrow('process.exit called');
@@ -356,7 +342,7 @@ describe('goodboy skill version --bump', () => {
   });
 
   it('reads the manifest from the SOURCE version directory, before any copy exists', async () => {
-    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '1.5.0' });
+    mockReadManifest.mockResolvedValue({ ...MANIFEST, schema_version: '2.5.0' });
     await expect(
       buildProgram().parseAsync(['version', 'my-skill', '--bump', 'patch'], { from: 'user' }),
     ).rejects.toThrow('process.exit called');

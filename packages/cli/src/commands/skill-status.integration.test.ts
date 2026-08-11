@@ -83,7 +83,7 @@ describe('goodboy skill status — real-file regression: whole-tree drift detect
         description: 'A regression-test skill',
         author: { name: 'Test' },
         license: 'MIT',
-        schema_version: '1.0.0',
+        schema_version: '2.0.0',
         status: 'experimental',
       }),
     );

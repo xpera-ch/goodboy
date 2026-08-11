@@ -77,7 +77,7 @@ const MANIFEST: GoodBoyManifest = {
   description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  schema_version: '1.0.0',
+  schema_version: '2.0.0',
   status: 'experimental',
 };
 
@@ -149,11 +149,11 @@ describe('upgradeSkill — project scope', () => {
     mockValidateManifestDetailed.mockReturnValue({
       manifest: MANIFEST,
       warnings: [
-        'manifest uses schema 1.5.0; this GoodBoy CLI knows 1.0.0. Unknown fields were ignored — upgrade GoodBoy to use them.',
+        'manifest uses schema 2.5.0; this GoodBoy CLI knows 1.0.0. Unknown fields were ignored — upgrade GoodBoy to use them.',
       ],
     });
     await upgradeSkill('test-skill', DEFAULT_OPTS, CWD);
-    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('schema 1.5.0'));
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('schema 2.5.0'));
   });
 
   it('does not warn when the manifest has no tolerance warnings', async () => {

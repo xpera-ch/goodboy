@@ -215,18 +215,6 @@ describe('LocalRegistryAdapter.search()', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('returns matching skills by tag', async () => {
-    const fixture = loadFixture('valid-complete') as GoodBoyManifest;
-    mockListRegistry.mockResolvedValue([makeRegistryEntry('complete-skill')]);
-    mockGetRegistryPath.mockReturnValue(DEFAULT_REGISTRY);
-    mockReadManifest.mockResolvedValue(fixture);
-    mockValidateManifest.mockReturnValue(fixture);
-
-    // valid-complete has tags: ["testing", "workflow"]
-    const result = await adapter.search('testing');
-    expect(result).toHaveLength(1);
-  });
-
   it('excludes non-matching skills', async () => {
     const fixture = loadFixture('valid-minimal') as GoodBoyManifest;
     mockListRegistry.mockResolvedValue([makeRegistryEntry('test-skill')]);

@@ -19,11 +19,10 @@ const VALID_MANIFEST = JSON.stringify({
   description: 'A well-described skill for testing purposes',
   author: { name: 'Test Author' },
   license: 'MIT',
-  schema_version: '1.0.0',
+  schema_version: '2.0.0',
   status: 'experimental',
   keywords: ['test', 'example'],
   category: 'testing',
-  tags: ['testing'],
 }, null, 2);
 
 const VALID_SKILL_MD = `---
@@ -232,7 +231,7 @@ describe('validateSkillDirectory() — warnings', () => {
     description: 'A well-described skill for testing purposes',
     author: { name: 'Test Author' },
     license: 'MIT',
-    schema_version: '1.0.0',
+    schema_version: '2.0.0',
     status: 'experimental',
   }, null, 2);
 
@@ -266,15 +265,6 @@ describe('validateSkillDirectory() — warnings', () => {
     );
   });
 
-  it('warns when manifest has no tags', async () => {
-    writeTmp('manifest.json', BASE_MANIFEST);
-    writeTmp('SKILL.md', VALID_SKILL_MD);
-    const result = await validateSkillDirectory(tmpDir);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ severity: 'warning', message: expect.stringContaining('no tags') }),
-    );
-  });
-
   it('warns when SKILL.md body is empty', async () => {
     writeTmp('manifest.json', VALID_MANIFEST);
     writeTmp('SKILL.md', '---\nname: test-skill\ndescription: A well-described skill for testing\n---\n\n');
@@ -295,14 +285,33 @@ describe('validateSkillDirectory() — warnings', () => {
     );
   });
 
-  it('warns when manifest has empty tags array', async () => {
-    const m = JSON.parse(VALID_MANIFEST);
-    m.tags = [];
-    writeTmp('manifest.json', JSON.stringify(m));
-    writeTmp('SKILL.md', VALID_SKILL_MD);
+  it('warns when SKILL.md description does not match the manifest description', async () => {
+    // Warning, not error — unlike the name/license cross-checks. See
+    // skill-validator.ts for why prose equality is deliberately soft.
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp(
+      'SKILL.md',
+      '---\nname: test-skill\ndescription: A completely different description\n---\n\n' +
+        'A body long enough to avoid the short-body warning entirely, so the only\n' +
+        'issue raised here is the description mismatch under test.\n',
+    );
     const result = await validateSkillDirectory(tmpDir);
     expect(result.issues).toContainEqual(
-      expect.objectContaining({ severity: 'warning', message: expect.stringContaining('no tags') }),
+      expect.objectContaining({
+        severity: 'warning',
+        message: expect.stringContaining('description does not match'),
+      }),
+    );
+    expect(result.issues.filter((i) => i.severity === 'error')).toHaveLength(0);
+    expect(result.valid).toBe(true);
+  });
+
+  it('does not warn when SKILL.md and manifest descriptions are identical', async () => {
+    writeTmp('manifest.json', VALID_MANIFEST);
+    writeTmp('SKILL.md', VALID_SKILL_MD);
+    const result = await validateSkillDirectory(tmpDir);
+    expect(result.issues).not.toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('description does not match') }),
     );
   });
 
@@ -317,93 +326,15 @@ describe('validateSkillDirectory() — warnings', () => {
 
   it('warns (not errors) when the manifest uses a tolerated newer-minor schema version', async () => {
     const m = JSON.parse(BASE_MANIFEST);
-    m.schema_version = '1.5.0';
+    m.schema_version = '2.5.0';
     m.future_field = 'unused';
     writeTmp('manifest.json', JSON.stringify(m));
     writeTmp('SKILL.md', VALID_SKILL_MD);
     const result = await validateSkillDirectory(tmpDir);
     expect(result.valid).toBe(true);
     expect(result.issues).toContainEqual(
-      expect.objectContaining({ severity: 'warning', message: expect.stringContaining('schema 1.5.0') }),
+      expect.objectContaining({ severity: 'warning', message: expect.stringContaining('schema 2.5.0') }),
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// requires.secrets (S2)
-// ---------------------------------------------------------------------------
-
-describe('validateSkillDirectory() — requires.secrets (S2)', () => {
-  it('passes with an info issue when a skill declares required secrets', async () => {
-    const m = {
-      name: 'test-skill',
-      version: '1.0.0',
-      description: 'A well-described skill for testing purposes',
-      author: { name: 'Test Author' },
-      license: 'MIT',
-      schema_version: '1.1.0',
-      status: 'experimental',
-      permissions: ['env'],
-      requires: { secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] },
-    };
-    writeTmp('manifest.json', JSON.stringify(m));
-    writeTmp('SKILL.md', VALID_SKILL_MD);
-    const result = await validateSkillDirectory(tmpDir);
-    expect(result.valid).toBe(true);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ severity: 'info', message: 'declares 2 required secrets' }),
-    );
-  });
-
-  it('singularizes the info message for exactly one declared secret', async () => {
-    const m = {
-      name: 'test-skill',
-      version: '1.0.0',
-      description: 'A well-described skill for testing purposes',
-      author: { name: 'Test Author' },
-      license: 'MIT',
-      schema_version: '1.1.0',
-      status: 'experimental',
-      permissions: ['env'],
-      requires: { secrets: ['EXOSCALE_API_KEY'] },
-    };
-    writeTmp('manifest.json', JSON.stringify(m));
-    writeTmp('SKILL.md', VALID_SKILL_MD);
-    const result = await validateSkillDirectory(tmpDir);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ severity: 'info', message: 'declares 1 required secret' }),
-    );
-  });
-
-  it('fails with the stamping remediation message for a 1.0.0 manifest that uses requires', async () => {
-    const m = {
-      name: 'test-skill',
-      version: '1.0.0',
-      description: 'A well-described skill for testing purposes',
-      author: { name: 'Test Author' },
-      license: 'MIT',
-      schema_version: '1.0.0',
-      status: 'experimental',
-      permissions: ['env'],
-      requires: { secrets: ['EXOSCALE_API_KEY'] },
-    };
-    writeTmp('manifest.json', JSON.stringify(m));
-    writeTmp('SKILL.md', VALID_SKILL_MD);
-    const result = await validateSkillDirectory(tmpDir);
-    expect(result.valid).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        severity: 'error',
-        message: expect.stringContaining('which needs 1.1.0'),
-      }),
-    );
-  });
-
-  it('does not add an info issue for a manifest without requires', async () => {
-    writeTmp('manifest.json', VALID_MANIFEST);
-    writeTmp('SKILL.md', VALID_SKILL_MD);
-    const result = await validateSkillDirectory(tmpDir);
-    expect(result.issues.some((i) => i.severity === 'info')).toBe(false);
   });
 });
 
@@ -473,9 +404,9 @@ describe('formatValidationResult()', () => {
   it('calls logger.success for each info issue', () => {
     const result: ValidationResult = {
       valid: true,
-      issues: [{ severity: 'info', message: 'declares 2 required secrets' }],
+      issues: [{ severity: 'info', message: 'an informational note' }],
     };
     formatValidationResult(result, 'test-skill');
-    expect(mockLogger.success).toHaveBeenCalledWith('declares 2 required secrets');
+    expect(mockLogger.success).toHaveBeenCalledWith('an informational note');
   });
 });

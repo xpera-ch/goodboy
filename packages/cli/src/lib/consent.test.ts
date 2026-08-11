@@ -19,7 +19,7 @@ const MANIFEST: GoodBoyManifest = {
   description: 'A test skill',
   author: { name: 'Test' },
   license: 'MIT',
-  schema_version: '1.0.0',
+  schema_version: '2.0.0',
   status: 'experimental',
 };
 
@@ -107,40 +107,12 @@ describe('requestConsent()', () => {
       expect.objectContaining({ default: false }),
     );
   });
-
-  it('shows required secret names, exact strings, alongside permissions', async () => {
-    mockConfirm.mockResolvedValue(true);
-    const manifest: GoodBoyManifest = {
-      ...MANIFEST,
-      schema_version: '1.1.0',
-      permissions: ['env'],
-      requires: { secrets: ['EXOSCALE_API_KEY', 'EXOSCALE_API_SECRET'] },
-    };
-    await requestConsent(manifest);
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      'Required secrets (names only — never resolved or read during install):',
-    );
-    expect(mockLogger.info).toHaveBeenCalledWith('  • EXOSCALE_API_KEY');
-    expect(mockLogger.info).toHaveBeenCalledWith('  • EXOSCALE_API_SECRET');
-  });
-
-  it('does not show a secrets section for a manifest without requires', async () => {
-    mockConfirm.mockResolvedValue(true);
-    const manifest: GoodBoyManifest = { ...MANIFEST, permissions: ['shell'] };
-    await requestConsent(manifest);
-    const infoLines = mockLogger.info.mock.calls.map((c) => String(c[0]));
-    expect(infoLines.some((line) => line.includes('Required secrets'))).toBe(false);
-  });
-
-  it('prompts when secrets are declared even if permissions is empty (condition is explicit, not inferred from the permissions/secrets consistency rule)', async () => {
-    mockConfirm.mockResolvedValue(true);
-    const manifest = {
-      ...MANIFEST,
-      permissions: [],
-      requires: { secrets: ['SOME_SECRET'] },
-    } as GoodBoyManifest;
+  it('auto-approves without prompting when permissions is an empty array', async () => {
+    // Since schema 2.0.0 removed `requires`, permissions is the only thing
+    // consent gates on — an empty array means nothing to disclose.
+    const manifest = { ...MANIFEST, permissions: [] } as GoodBoyManifest;
     const result = await requestConsent(manifest);
-    expect(mockConfirm).toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
     expect(result).toBe(true);
   });
 });

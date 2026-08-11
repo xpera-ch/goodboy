@@ -165,9 +165,8 @@ describe('adopt command', () => {
       name: 'my-skill',
       version: '0.1.0',
       description: 'A well-described skill for testing purposes',
-      schema_version: '1.0.0',
+      schema_version: '2.0.0',
       status: 'experimental',
-      visibility: 'private',
       category: 'other',
     });
   });

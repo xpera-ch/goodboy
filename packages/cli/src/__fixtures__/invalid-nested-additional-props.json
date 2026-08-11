@@ -4,6 +4,6 @@
   "description": "Author object has an additional property",
   "author": { "name": "Test Author", "role": "admin" },
   "license": "MIT",
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "status": "experimental"
 }

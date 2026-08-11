@@ -43,7 +43,7 @@ export function generateOversizedManifest(): string {
     description: 'x'.repeat(600 * 1024),
     author: { name: 'Test Author' },
     license: 'MIT',
-    schema_version: '1.0.0',
+    schema_version: '2.0.0',
     status: 'experimental',
   };
   return JSON.stringify(base);
