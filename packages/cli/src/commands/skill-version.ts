@@ -14,7 +14,7 @@ import {
   readManifest,
   writeManifest,
   validateManifestDetailed,
-  FIELD_INTRODUCED_IN,
+  SCHEMA_BASE_VERSION,
   KNOWN_SCHEMA_VERSION,
 } from '../lib/manifest.js';
 import { SKILL_NAME_RE } from '../lib/validation.js';
@@ -158,14 +158,12 @@ async function createNewVersion(skillName: string, bump: string): Promise<void> 
       manifest.version = newVersion;
       // Stamp the lowest schema version this manifest actually needs. This only
       // ever runs on a manifest that already validated strictly (no warnings,
-      // checked above) — it normalizes an already-valid, possibly over-stamped
-      // manifest down to its minimum (e.g. requires present but stamped higher
-      // than 1.1.0 -> 1.1.0; requires absent -> 1.0.0). It does NOT rescue an
-      // under-stamped, invalid manifest (schema_version below what a field it
-      // uses requires) — that already failed above, in manifest.ts's own
-      // feature-stamping gate, before this function even reached the copy step;
-      // fixing it requires a manual schema_version edit, by design.
-      manifest.schema_version = manifest.requires ? FIELD_INTRODUCED_IN['requires']! : '1.0.0';
+      // checked above), so it normalizes an already-valid, possibly over-stamped
+      // manifest down to its minimum. As of schema 2.0.0 no top-level field is
+      // feature-stamped (FIELD_INTRODUCED_IN is empty), so that minimum is
+      // always the base version. If a future minor introduces a stamped field,
+      // this must consult FIELD_INTRODUCED_IN again rather than staying fixed.
+      manifest.schema_version = SCHEMA_BASE_VERSION;
       await writeManifest(manifestPath, manifest);
 
       const updatedEntry = addVersionToEntry(entry, newVersion, join('versions', newVersion));

@@ -16,7 +16,7 @@ const MAX_NESTING_DEPTH = 10;
  * declaring a newer minor are tolerated (unknown top-level fields stripped,
  * with a warning); a newer major is rejected. See validateManifestDetailed().
  */
-export const KNOWN_SCHEMA_VERSION = '1.1.0';
+export const KNOWN_SCHEMA_VERSION = '2.0.0';
 
 // Feature-driven stamping: a top-level field may only be used by a manifest
 // that declares a schema_version at or above the version that introduced it.
@@ -26,9 +26,21 @@ export const KNOWN_SCHEMA_VERSION = '1.1.0';
 // would reject it with a confusing additionalProperties error. Enforced here,
 // in code, because remediation text like this needs to name the exact field
 // and the exact version to stamp — not something Ajv's own error shapes give us.
-export const FIELD_INTRODUCED_IN: Record<string, string> = {
-  requires: '1.1.0',
-};
+//
+// Deliberately EMPTY as of schema 2.0.0: its only entry (`requires: '1.1.0'`)
+// left with that field in the 2.0.0 cleanup. The mechanism is kept rather than
+// removed because it is what makes the NEXT additive field safe to introduce,
+// and a major version is exactly when you want that machinery already in place
+// rather than reconstructed later. Add an entry here whenever a new optional
+// top-level field lands in a minor.
+export const FIELD_INTRODUCED_IN: Record<string, string> = {};
+
+/**
+ * The lowest schema version in the current major — the correct stamp for a
+ * manifest that uses no feature-stamped field. Derived from
+ * KNOWN_SCHEMA_VERSION so it stays correct as minors advance.
+ */
+export const SCHEMA_BASE_VERSION = `${KNOWN_SCHEMA_VERSION.split('.')[0]}.0.0`;
 
 const SCHEMA_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
@@ -97,22 +109,6 @@ function assertFeatureStamping(manifest: GoodBoyManifest): void {
           `Set "schema_version": "${introducedIn}" in manifest.json.`,
       );
     }
-  }
-}
-
-// Hard-error consistency rule (concept doc §7.1): requires.secrets is only
-// ever visible to a skill-installing user via the "env" permission on a
-// tolerant older CLI that doesn't know about `requires` at all — so the two
-// fields must never disagree. Fail closed rather than silently trusting one.
-function assertPermissionsConsistency(manifest: GoodBoyManifest): void {
-  const secrets = manifest.requires?.secrets;
-  if (!secrets || secrets.length === 0) return;
-  const permissions = manifest.permissions ?? [];
-  if (!permissions.includes('env')) {
-    throw new Error(
-      'manifest declares requires.secrets but "permissions" does not include "env".\n' +
-        'Secrets are delivered as environment variables; add "env" to permissions.',
-    );
   }
 }
 
@@ -215,7 +211,6 @@ export function validateManifestDetailed(data: unknown): ManifestValidationResul
           if (!validate(stripped)) throwValidationError(validate);
           const manifest = stripped as unknown as GoodBoyManifest;
           assertFeatureStamping(manifest);
-          assertPermissionsConsistency(manifest);
           return {
             manifest,
             warnings: [
@@ -233,7 +228,6 @@ export function validateManifestDetailed(data: unknown): ManifestValidationResul
   if (!validate(data)) throwValidationError(validate);
   const manifest = data as GoodBoyManifest;
   assertFeatureStamping(manifest);
-  assertPermissionsConsistency(manifest);
   return { manifest, warnings: [] };
 }
 

@@ -44,26 +44,13 @@ export function summarizePermissions(manifest: GoodBoyManifest): string[] {
 
 export async function requestConsent(manifest: GoodBoyManifest): Promise<boolean> {
   const permissionLines = summarizePermissions(manifest);
-  const secretNames = manifest.requires?.secrets ?? [];
 
-  // Explicit, not inferred: declared secrets imply the "env" permission (enforced
-  // as a hard error in manifest.ts), but this check must not rely on that — it
-  // decides whether to prompt at all, so it names both conditions directly.
-  if (permissionLines.length === 0 && secretNames.length === 0) return true;
+  if (permissionLines.length === 0) return true;
 
   logger.info('');
-  if (permissionLines.length > 0) {
-    logger.info(`Skill "${manifest.name}" requests the following permissions:`);
-    for (const line of permissionLines) {
-      logger.info(`  • ${line}`);
-    }
-  }
-  if (secretNames.length > 0) {
-    logger.info('');
-    logger.info('Required secrets (names only — never resolved or read during install):');
-    for (const name of secretNames) {
-      logger.info(`  • ${name}`);
-    }
+  logger.info(`Skill "${manifest.name}" requests the following permissions:`);
+  for (const line of permissionLines) {
+    logger.info(`  • ${line}`);
   }
   logger.info('');
 

@@ -139,9 +139,8 @@ async function run(pathArg: string): Promise<void> {
       ...(authorEmail.trim() ? { email: authorEmail.trim() } : {}),
     },
     license: license.trim(),
-    schema_version: '1.0.0',
+    schema_version: '2.0.0',
     status: 'experimental',
-    visibility: 'private',
     category: 'other',
   };
 
