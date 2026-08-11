@@ -21,6 +21,47 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-11 — Integrity protects the skill, not the bytes
+
+**Decided:** a change to `schema_version`, or to the manifest's *format*,
+is **not** a change to the skill. The skill is `SKILL.md` and its bundled
+files — what an agent reads and a user experiences. `manifest.json` is
+GoodBoy's record of it.
+
+**Why:** `README.md:21-22` already draws this line, and the code did not
+follow it. `computeSkillIntegrity` hashes the whole directory including the
+manifest, so rewriting `schema_version` would change a skill's content
+hash, trip drift detection, and appear to violate the immutability
+promise — for a change that alters nothing an agent or user could observe.
+
+**Second principle, decided alongside it:** nothing rewrites user content
+silently. Auto-migration on read is ruled out.
+
+**What this unlocks:** the apparent three-way conflict between migration,
+immutable versions, and integrity was an artefact of hashing raw bytes.
+Under this definition, migrating a manifest's format changes no hash and
+breaks no promise, so a migration command and a compatibility window stop
+being competing options.
+
+**Explicitly NOT decided — the mechanism.** Where the boundary falls inside
+the manifest (`permissions` and `license` are argued to be skill-side, not
+verified), and whether hashing moves to normalised content or stays on raw
+bytes. The second has a permanent cost: a normalisation function becomes
+part of the integrity contract, and changing it later invalidates every
+recorded hash. Both belong in `docs/concept-schema-compatibility.md`.
+
+**Correction recorded:** during this discussion the claim "a manifest format
+change is a change to the skill's files, so it earns a new version" was
+made twice and is wrong — it conflates files in the directory with the
+skill.
+
+**Sequencing:** post-launch. 0.3.0 ships with the 1.x break documented.
+
+**See:** `docs/backlog.md`, "No migration path for manifests across a
+schema major".
+
+---
+
 ## 2026-08-11 — Committed files never link into `docs/prompts/`
 
 **Decided:** no committed file may contain a `docs/prompts/…` path.
