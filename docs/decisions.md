@@ -21,6 +21,54 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-11 — Canonical domain is `goodboyjs.com`; schema `$id`s corrected
+
+**Decided:** the project's canonical domain is **`goodboyjs.com`**.
+`goodboy.dev` — which appears in every schema `$id` in the repo — is **not
+a domain this project controls or can obtain**, and every reference to it
+is wrong.
+
+**Scope of the error, verified 2026-08-11:**
+
+| Location | Status |
+|---|---|
+| `packages/schema/src/manifest.schema.json` | fixed in the schema-2.0.0 phase |
+| `packages/schema/src/config.schema.json` | removed with secrets |
+| `packages/schema/versions/v1/manifest.schema.json` | frozen copy — see below |
+| `@goodboyjs/schema` 1.0.0, 1.0.1, 1.1.0 on npm | **immutable, cannot be fixed** |
+
+**Severity, stated precisely so it is neither over- nor under-sold:** Ajv
+treats `$id` as an identifier and never fetches it, so GoodBoy is
+functionally unaffected. The risk is third-party — some editors and
+validators resolve `$id` as a URL, and whoever controls `goodboy.dev`
+controls what those tools fetch. It becomes a genuine supply-chain vector
+if `$schema` emission lands (see
+`docs/project-file-schemas-handoff.md` Q7), which is a reason to sequence
+that phase after this fix rather than before.
+
+**Fix folded into the schema-2.0.0 phase**
+(`docs/prompts/clean-unused-manifest-fields.md`) rather than done
+standalone: a new major is when schema identity may change without
+awkwardness, and that phase was already bumping the version.
+
+**The `$id` version segment was also wrong** independently — it read
+`…/manifest/1.0.0` even in the 1.1.0 release. v2's `$id` carries `2.0.0`.
+
+**Frozen v1 copy:** left as-is, with a `versions/README.md` explaining
+why — the copy's purpose is fidelity with what was published, and the npm
+artifacts are immutable regardless, so rewriting it would buy accuracy in
+one place while creating divergence in another.
+
+**Prevented from recurring** by a test asserting every `$id` under
+`packages/schema/src/**` is on `goodboyjs.com`.
+
+**Open action:** determine whether `goodboy.dev` is registered by a third
+party. That decides whether the three published 1.x versions warrant
+`npm deprecate` with a pointer to 2.0.0, or whether documenting the
+mismatch is sufficient.
+
+---
+
 ## 2026-08-09 — Secrets removed from scope entirely
 
 **Decided:** remove S3 (partially) and S4 in full, plus S2's
