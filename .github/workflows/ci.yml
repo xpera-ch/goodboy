@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build & type-check (Node ${{ matrix.node-version }})
+    name: Build, type-check & test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -38,6 +38,9 @@ jobs:
 
       - name: Type-check registry client
         run: npm run build -w packages/registry-client
+
+      - name: Test with coverage thresholds
+        run: npm run test:coverage
 
       - name: Verify no forbidden patterns in CLI source
         run: |
