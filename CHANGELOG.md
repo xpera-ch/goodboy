@@ -128,6 +128,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All three printed a confident, false statement about state rather than
   admitting an error. Each now names the remedy, not only the fault.
 
+### Security
+
+- **`fast-uri` updated to 3.1.5**, clearing two high-severity host-confusion
+  advisories in URI authority parsing (`GHSA-v2hh-gcrm-f6hx`,
+  `GHSA-7p8r-x3mc-p8w7`; vulnerable range 3.0.0–3.1.4). It reaches users
+  through `ajv`, which GoodBoy uses to validate every skill manifest, so the
+  vulnerable parser shipped in the published CLI. `ajv` itself is unchanged —
+  3.1.5 already satisfies the `^3.0.1` range it declares, so this is a
+  lockfile update, not a dependency change. `npm audit --omit=dev` now
+  reports zero vulnerabilities.
+
 ## [0.2.0] - 2026-07-21
 
 Skills can now declare logical secret requirements: `manifest.json` supports
