@@ -131,6 +131,105 @@ describe('security — symlink attack prevention', () => {
 
     await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
   });
+
+  // ---------------------------------------------------------------------
+  // Nested structure. Every case above uses a flat directory listing, so
+  // the recursive branch (fs-security.ts:26) was never executed: a symlink
+  // one directory deep had no test proving the scanner reaches it at all.
+  //
+  // These mock readdir per-path rather than with a single fixed list,
+  // because the recursive call needs a different dirent list than the
+  // top-level call.
+  // ---------------------------------------------------------------------
+
+  type ReaddirResult = Awaited<ReturnType<typeof readdir>>;
+
+  function mockTree(tree: Record<string, Dirent[]>): void {
+    mockReaddir.mockImplementation(async (dir) => {
+      const entries = tree[String(dir)];
+      if (!entries) throw new Error(`unexpected readdir on ${String(dir)}`);
+      return entries as unknown as ReaddirResult;
+    });
+  }
+
+  it('symlink nested one directory deep escaping the skill dir aborts installation', async () => {
+    mockTree({
+      '/skill': [makeDirent('nested', { isDir: true })],
+      '/skill/nested': [makeDirent('evil-link', { isSymlink: true })],
+    });
+    mockReadlink.mockResolvedValue('/etc/passwd');
+
+    await expect(scanForSymlinks('/skill')).rejects.toThrow(
+      'Security: skill contains a symlink pointing outside its directory',
+    );
+  });
+
+  it('symlink nested two directories deep escaping the skill dir aborts installation', async () => {
+    // Proves the rejection propagates back up through more than one frame,
+    // not merely that one recursive call happens.
+    mockTree({
+      '/skill': [makeDirent('a', { isDir: true })],
+      '/skill/a': [makeDirent('b', { isDir: true })],
+      '/skill/a/b': [makeDirent('escape', { isSymlink: true })],
+    });
+    mockReadlink.mockResolvedValue('../../../../etc/passwd');
+
+    await expect(scanForSymlinks('/skill')).rejects.toThrow(
+      'Security: skill contains a symlink pointing outside its directory',
+    );
+  });
+
+  it('nested subdirectory containing only regular files resolves cleanly', async () => {
+    mockTree({
+      '/skill': [
+        makeDirent('SKILL.md', { isDir: false }),
+        makeDirent('scripts', { isDir: true }),
+      ],
+      '/skill/scripts': [
+        makeDirent('run.sh', { isDir: false }),
+        makeDirent('helper.sh', { isDir: false }),
+      ],
+    });
+
+    await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
+  });
+
+  it('symlink inside a nested subdirectory pointing within that subdirectory is permitted', async () => {
+    // Recursion must not false-positive on legitimate nested structure.
+    mockTree({
+      '/skill': [makeDirent('scripts', { isDir: true })],
+      '/skill/scripts': [makeDirent('alias.sh', { isSymlink: true })],
+    });
+    mockReadlink.mockResolvedValue('real.sh');
+
+    await expect(scanForSymlinks('/skill')).resolves.toBeUndefined();
+  });
+
+  it('CHARACTERISATION: a nested symlink to a sibling at skill root is rejected', async () => {
+    // Documents current behaviour, which is stricter than the doc comment on
+    // scanForSymlinks() describes. The containment check compares against
+    // `dirPath`, and `dirPath` becomes the SUBDIRECTORY on a recursive call —
+    // so "points inside the skill" narrows to "points inside this
+    // subdirectory" as soon as recursion begins. `scripts/alias.sh -> ../
+    // real.sh` resolves to /skill/real.sh, still inside the skill, and is
+    // nonetheless rejected as an escape.
+    //
+    // This fails closed (it over-rejects; it does not let an escape through),
+    // so it is not a hole — but it is a false-positive risk for legitimate
+    // skills, and it is NOT what the function's own docstring promises. Left
+    // unchanged deliberately: see the phase report. This test exists so that
+    // any future change to the containment rule is a deliberate decision
+    // rather than a silent one.
+    mockTree({
+      '/skill': [makeDirent('scripts', { isDir: true })],
+      '/skill/scripts': [makeDirent('alias.sh', { isSymlink: true })],
+    });
+    mockReadlink.mockResolvedValue('../real.sh');
+
+    await expect(scanForSymlinks('/skill')).rejects.toThrow(
+      'Security: skill contains a symlink pointing outside its directory',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
