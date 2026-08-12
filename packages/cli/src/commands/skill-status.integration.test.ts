@@ -103,7 +103,7 @@ describe('goodboy skill status — real-file regression: whole-tree drift detect
       JSON.stringify({
         schema: '1.0.0',
         generated: new Date().toISOString(),
-        skills: { [skillName]: { version, resolved: installedDir, integrity } },
+        skills: { [skillName]: { version, integrity } },
       }) + '\n',
     );
 
