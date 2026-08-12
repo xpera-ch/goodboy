@@ -34,8 +34,10 @@
     },
     {
       "pattern": "packages/cli/src/lib/goodboy-file.ts",
-      "reason": "Reads/writes goodboy.json, the per-project manifest of installed skills.",
+      "reason": "Reads/writes goodboy.json (user intent) and goodboy.lock (machine-generated state), and is the only place either file is validated against its JSON Schema before any caller consumes it.",
       "invariants": [
+        "Untrusted goodboy.json/goodboy.lock content only reaches callers through readGoodBoyJson/readGoodBoyLock, which validate against the schemas (Ajv strict + allErrors) — never parsed or blind-cast directly; a same-major file failing validation is rejected (goodboy.json: hard error; goodboy.lock: warn + treated as absent, never partially trusted)",
+        "A goodboy.lock declaring a newer-major schema is a hard error, never treated as absent and regenerated — an older CLI must not overwrite a newer tool's output; an older-major or same-major-invalid lock is regenerated on the next write",
         "Skill names are validated against SKILL_NAME_RE before being written or used in a path",
         "The lock never stores an absolute path — the `resolved` field was removed (2026-08-12); installed locations are always recomputed from a validated skill name"
       ]
