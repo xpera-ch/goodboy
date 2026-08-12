@@ -171,7 +171,7 @@ export async function installNamed(
     const integrity = await computeSkillIntegrity(resolvedPath);
     const goodboyHome = getGoodboyHome();
     await addSkillToManifest(goodboyHome, name, manifest.version);
-    await addSkillToLock(goodboyHome, name, manifest.version, resolvedPath, integrity);
+    await addSkillToLock(goodboyHome, name, manifest.version, integrity);
   } else {
     try {
       resolvedPath = await installNamedProject(name, skillPath, cwd);
@@ -186,7 +186,7 @@ export async function installNamed(
 
     const integrity = await computeSkillIntegrity(resolvedPath);
     await addSkillToManifest(cwd, name, manifest.version);
-    await addSkillToLock(cwd, name, manifest.version, resolvedPath, integrity);
+    await addSkillToLock(cwd, name, manifest.version, integrity);
   }
 
   spinner.succeed(`Installed "${name}" (${manifest.version})`);

@@ -9,7 +9,6 @@ export interface GoodBoyJson {
 
 export interface GoodBoyLockEntry {
   version: string;
-  resolved: string;
   integrity?: string;
 }
 
@@ -95,7 +94,6 @@ export async function addSkillToLock(
   dir: string,
   skillName: string,
   version: string,
-  resolvedPath: string,
   integrity: string,
 ): Promise<void> {
   const existing = await readGoodBoyLock(dir);
@@ -104,7 +102,7 @@ export async function addSkillToLock(
     generated: new Date().toISOString(),
     skills: {},
   };
-  lock.skills[skillName] = { version, resolved: resolvedPath, integrity };
+  lock.skills[skillName] = { version, integrity };
   await writeGoodBoyLock(dir, lock);
 }
 

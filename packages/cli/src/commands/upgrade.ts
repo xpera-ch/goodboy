@@ -89,7 +89,7 @@ export async function upgradeSkill(
 
   const integrity = await computeSkillIntegrity(destPath);
   await addSkillToManifest(lockDir, name, manifest.version);
-  await addSkillToLock(lockDir, name, manifest.version, destPath, integrity);
+  await addSkillToLock(lockDir, name, manifest.version, integrity);
 
   const from = lockedVersion !== null ? `${lockedVersion} → ` : '';
   spinner.succeed(`Upgraded "${name}" (${from}${manifest.version})`);
