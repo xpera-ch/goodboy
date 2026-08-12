@@ -306,27 +306,24 @@ describe('add command', () => {
     const SKILL_REGISTRY_DIR = join(REGISTRY_PATH, 'my-skill');
     const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '1.0.0');
 
-    it('creates the skill registry directory when it does not yet exist', async () => {
+    // The skill's registry directory is never created on its own: it is an
+    // ancestor of the version directory, so the single recursive mkdirSync
+    // brings it into being with the same 0o700 mode. An explicit
+    // `if (!existsSync(skillRegistryDir)) mkdirSync(...)` used to follow the
+    // copy step; it could never fire, and the test that "covered" it only
+    // passed because node:fs is fully mocked here, letting existsSync
+    // contradict the mkdirSync that had just run.
+    it('creates the version directory and its ancestors when the skill directory does not yet exist', async () => {
       mockExistsSync.mockImplementation((path) => path !== SKILL_REGISTRY_DIR);
 
-      await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
-
-      expect(mockMkdirSync).toHaveBeenCalledWith(
-        SKILL_REGISTRY_DIR,
-        expect.objectContaining({ recursive: true, mode: 0o700 }),
-      );
-      expect(mockWriteRegistryEntry).toHaveBeenCalled();
-      expect(mockLogger.error).not.toHaveBeenCalled();
-    });
-
-    it('does not recreate the skill registry directory when it already exists', async () => {
       await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
 
       expect(mockMkdirSync).toHaveBeenCalledWith(
         VERSION_ABS_PATH,
         expect.objectContaining({ recursive: true, mode: 0o700 }),
       );
-      expect(mockMkdirSync).not.toHaveBeenCalledWith(SKILL_REGISTRY_DIR, expect.anything());
+      expect(mockWriteRegistryEntry).toHaveBeenCalled();
+      expect(mockLogger.error).not.toHaveBeenCalled();
     });
   });
 

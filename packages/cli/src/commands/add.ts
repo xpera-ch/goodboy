@@ -116,10 +116,6 @@ export const addCommand = new Command('add')
       mkdirSync(versionAbsPath, { recursive: true, mode: 0o700 });
       cpSync(skillPath, versionAbsPath, { recursive: true });
 
-      if (!existsSync(skillRegistryDir)) {
-        mkdirSync(skillRegistryDir, { recursive: true, mode: 0o700 });
-      }
-
       const entry = existingEntry
         ? addVersionToEntry(existingEntry, version, versionRelPath)
         : createRegistryEntry(manifest.name, version, versionRelPath);
