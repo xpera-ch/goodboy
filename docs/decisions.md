@@ -21,6 +21,112 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-12 — One domain: `goodboyjs.com`. Extends the 2026-08-11 entry
+
+**Decided (Bruno):** `goodboyjs.com` is the project's only referenced
+domain. `goodboyjs.io` is also under the project's control but is **not**
+to be used anywhere. `goodboy.dev` is not ours and must never appear in a
+live surface.
+
+**What reopened it.** The 2026-08-11 decision settled the canonical domain
+and corrected the schema `$id`s, and a guard test was added — but scoped to
+`$id` values under `packages/schema/src/`. All three `package.json` files
+were still publishing `"homepage": "https://goodboyjs.io"`, which is the
+npm package page: the domain users actually see. Found 2026-08-12 while
+reviewing C4b, not by any check.
+
+**The lesson is about the guard, not the domain.** This is the third
+instance of "a fact stored in two places with nothing reconciling them" —
+and unlike the schema/lockfile cases, here a reconciler *existed* and was
+simply scoped too narrowly. A guard covering one of two copies reads as
+protection while providing none for the other. C4c widens it to the whole
+repo and requires it be observed failing before it counts.
+
+**The deliberate exception.**
+`packages/schema/versions/v1/manifest.schema.json` keeps its `goodboy.dev`
+`$id`. It records what `@goodboyjs/schema` 1.0.0/1.0.1/1.1.0 actually
+published; those tarballs are immutable. Correcting the frozen copy would
+buy accuracy in one file at the cost of making it a false record of v1
+everywhere else, and would change nothing on npm. Documenting the mistake
+in `versions/README.md` is not a use of the domain.
+
+**What would reopen this:** acquiring `goodboy.dev`, or a decision to
+retire `goodboyjs.com` in favour of another domain — in which case the
+guard's exemption list is the first place to look.
+
+**Follow-on (Bruno, same day): schema 1.x is deprecated after the release,
+and the stated reason is the wrong domain as a security concern** — not
+merely a stale identifier. The frozen `versions/v1` copy still stays; the
+deprecation covers the *published* artifacts, which is the surface that
+actually reaches anyone.
+
+This **supersedes the framing** of the 2026-08-11 decision to keep the npm
+deprecation message neutral. That decision was made when this was
+classified as a metadata error; whether the message itself now names the
+reason is open and belongs to C7.
+
+**Severity, recorded honestly so the eventual message can be too.**
+`versions/v1` carries **no `$ref`**, only the `$id` string. Ajv never
+fetches `$id`, and validators resolve `$ref` rather than `$id`, so nothing
+in normal use retrieves that URL. The exposure is tooling that treats `$id`
+as retrievable — some editors and schema catalogs — where the domain's
+owner could serve a permissive schema and cause a **validation bypass**,
+not code execution; plus the brand-confusion surface of a published package
+pointing at a third party. Real, low, worth fixing, not worth inflating.
+
+**Why deprecation rather than a `1.1.1` patch or an unpublish.**
+Deprecation only warns — a consumer on `^1.1.0` still resolves to a bad
+artifact — so a corrected patch release would be the stronger fix, and
+unpublishing stronger still. Neither is being done.
+
+**Corrected by Bruno, 2026-08-12: "the package has no external users" is an
+assumption, not a fact, and must be treated as one.** The package is public
+on npm; who pulled it is not knowable from here.
+
+Measured rather than assumed (npm downloads API, 2026-07-11 → 2026-08-09):
+**463 downloads in the month.** Three spikes — 115, 132 and 156 — cluster
+around publish dates and look like registry mirrors and scanners; the
+steady tail runs 0–8/day. Most of it is very likely automated. **Some of it
+might not be.** The last seven days total 13.
+
+So the decision rests on proportionality under uncertainty, not on an
+empty user base: the project is early, a schema change is expected at this
+stage, and the issue is low-severity and probably inert. Spending release
+effort on a corrected patch or an unpublish is disproportionate to that.
+**If an early adopter is affected, they can contact us and we solve it with
+them directly** — a workable path precisely because the numbers are small.
+
+Recorded this way so the reasoning is honest about what is known. It is not
+"nobody uses this"; it is "the cost of the stronger fix outweighs a
+low-severity risk to an audience we cannot measure, and we are reachable if
+we are wrong."
+
+---
+
+## 2026-08-12 — An executed prompt is immutable
+
+**Decided (Bruno):** once an implementer has run a prompt in
+`docs/prompts/`, that file is closed. Follow-up work gets its own prompt at
+the next letter (`C4b` → `C4c`), never an appendix to the original.
+
+**What prompted it.** Review findings on C4b were appended to the C4b
+prompt itself. Bruno's objection: C4b has already been run, so amending it
+implies re-running the whole phase when only a delta is needed — and it
+destroys the distinction between what was asked for and what was learned
+afterwards. The same correction was made on 2026-08-11, when a fix was
+proposed as an addition to an already-committed phase rather than a clean
+prompt.
+
+**Why it keeps happening, recorded so it can be recognised.** Appending to
+the prompt that produced a finding feels like keeping related things
+together. It is the same instinct as amending a pushed commit, and it is
+wrong for the same reason: the artifact has already been consumed by
+someone else.
+
+Recorded in `CLAUDE.md` under the `docs/prompts/` bullet.
+
+---
+
 ## 2026-08-11 — Integrity protects the skill, not the bytes
 
 **Decided:** a change to `schema_version`, or to the manifest's *format*,
