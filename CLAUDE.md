@@ -197,6 +197,25 @@ anything that's drifted).
   **The test that would have caught all three:** does anything *read* this
   today? If not, it does not ship. See `docs/decisions.md` (2026-08-09 and
   2026-08-11) for the full reasoning on instances 2 and 3.
+- **A guard is not done until it has been observed failing.** Applies to
+  gates, checks and guards — things whose job is to fail — not to ordinary
+  behavioural assertions. Break what it guards, paste the failure, revert.
+  Four gates that could never fail were found in a single week
+  (`verify:types` diffing a gitignored directory; CI whose "green" excluded
+  the tests; `security-sensitive.json` blind to entry removal; a lockfile
+  disagreeing with `package.json` versions). Each was written, passed, and
+  never seen to fail. Full framing and worked examples in
+  `CONTRIBUTING.md`'s Testing section.
+
+- **Watch for a fact stored in two places with nothing reconciling them.**
+  This is the structural tell behind most of those gates. Schema version in
+  `package.json` *and* the lockfile. Sensitive files in
+  `security-sensitive.json` *and* a `CONTRIBUTING.md` table. Types in the
+  schema *and* in committed output. Every one drifted. When a change
+  introduces a second copy of a fact, pick one deliberately: **generate it,
+  check it, or don't duplicate it.** Discovering the drift later is the
+  expensive option.
+
 - **Prefer atomic commands and user agency over automatic/magic behavior**,
   even when magic would suit Bruno's personal workflow better — the tool is
   built for a broad audience ("Option B" in his own shorthand).
@@ -245,6 +264,13 @@ already have them:
 
 - **Every commit** goes through `commit-creation` — never hand-write a
   commit message directly.
+- **Every phase report starts with the word "Report".** The first line is
+  `Report: <phase>` — e.g. `Report: manifest schema 2.0.0`. This is not
+  cosmetic: reports arrive in the same stream as ordinary CLI output and
+  progress messages, and the opening word is what distinguishes "this is
+  the deliverable, review it" from "this is a status line, skim it." A
+  report that opens with a section heading reads as narration.
+
 - **Implementation work from a phase-prompt stops after implementation and
   verification, before any commit.** Report the diff and verification
   output back and wait — completing verification is not itself

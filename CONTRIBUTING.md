@@ -39,8 +39,59 @@ npm run build -w packages/registry-client
 
 ## Testing
 
-**Tests must be order-independent.** The suite is verified under randomised
-ordering, not just the default file order:
+### A guard is not done until you have watched it fail
+
+**Scope — read this first, because the rule is deliberately narrow.**
+
+It applies to **guards**: things whose *job* is to fail. A CI step, a
+`verify:*` script, a coverage threshold, a security check, a negative
+assertion, a lint. Ask: *does this exist to catch something?* If yes, the
+rule applies.
+
+It does **not** apply to ordinary assertions about behaviour.
+`expect(resolveSkill('x')).toBe(…)` describes what the code does; it needs
+no proof that it can fail. Most of the suite is this, and applying the rule
+there would be pure ceremony.
+
+**The rule:** before a guard is considered done, break the thing it
+guards, observe the failure, paste the output, revert. **Evidence, not
+assertion** — "I verified it works" is exactly the claim that produced
+every instance below.
+
+Keep the proof proportionate. A one-line assertion needs a one-line proof.
+
+**Why this exists — four gates that could not fail, all found in one week:**
+
+| Guard | Why it could never fail |
+|---|---|
+| `verify:types` | diffed a directory that was gitignored |
+| CI "green" | the workflow never ran the tests |
+| `security-sensitive.json` | invisible to entry *removal*, by construction |
+| lockfile vs `package.json` versions | nothing compared the two records |
+
+Plus two guards that *could* fail but passed for the wrong reason: a test
+covering unreachable code (so it only passed because `node:fs` was mocked
+into a state the real filesystem cannot produce), and a negative assertion
+satisfied by test ordering rather than by the code being correct.
+
+In every case the guard was written, it passed, and nobody ever saw it
+fail.
+
+**Worked examples from this repo**, all cheap:
+
+- Threshold enforcement: `it.skip` one test on a 100%-pinned file, confirm
+  `test:coverage` exits non-zero, revert.
+- A negative assertion: temporarily make the code do the thing being
+  asserted against, watch the test fail, revert.
+- A schema or identity guard: mutate the value it checks, confirm the guard
+  catches it, revert.
+- A fixture pinned to a previous state: try migrating it and confirm the
+  guard rejects the migration.
+
+### Tests must be order-independent
+
+The suite is verified under randomised ordering, not just the default file
+order:
 
 ```sh
 cd packages/cli
