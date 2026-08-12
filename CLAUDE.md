@@ -50,6 +50,18 @@ Living planning docs, in reading order for onboarding to current state:
   `deferred-`) so they sort and can be found by code; `docs/prompts/
   SEQUENCE.md` is the running execution order.
 
+  **A prompt that has been executed is immutable.** Once an implementer has
+  run a prompt, that file is the record of what was asked for. Never append
+  to it, never edit it — a follow-up gets its own prompt with the next
+  letter (`C4b` → `C4c`). Editing an executed prompt destroys the ability to
+  tell what was asked from what was learned afterwards, and implies the
+  whole phase needs re-running when only a delta does.
+
+  This has now been corrected twice (2026-08-11, 2026-08-12), both times by
+  Bruno rather than caught in drafting. The pull is real: appending to the
+  prompt that produced a finding feels like keeping related things together.
+  It is the same instinct as editing a commit that has already been pushed.
+
   **Never reference a `docs/prompts/…` path from a committed file.**
   Because the directory is gitignored, any such link resolves only on
   Bruno's machine and is dead for every other reader — and the affected
