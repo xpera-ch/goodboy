@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://goodboyjs.com/schemas/goodboy-json/v1",
+  "title": "GoodBoy JSON",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "skills"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^1\\.\\d+\\.\\d+$",
+      "maxLength": 32,
+      "description": "GoodBoy goodboy.json schema version, semver-shaped (v1.x only). CLIs tolerate a newer minor than they know by ignoring unknown top-level fields (with a warning); a field added inside a nested object fails validation and makes the file unreadable (a hard error). A newer major is rejected."
+    },
+    "registry": {
+      "type": "string",
+      "maxLength": 2048,
+      "description": "Registry URL or path override for this project."
+    },
+    "skills": {
+      "type": "object",
+      "description": "Installed skills as a name-to-semver-range map. Names must match the skill-name pattern; ranges are the pinned-or-caret form GoodBoy writes (e.g. ^1.2.0).",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$",
+        "maxLength": 64
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^\\^?\\d+\\.\\d+\\.\\d+$",
+        "maxLength": 64
+      }
+    }
+  }
+}

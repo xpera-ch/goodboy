@@ -9,6 +9,14 @@ const targets = [
     schemaPath: join(__dirname, "../packages/schema/src/manifest.schema.json"),
     outFile: join(outDir, "index.d.ts"),
   },
+  {
+    schemaPath: join(__dirname, "../packages/schema/src/goodboy-json.schema.json"),
+    outFile: join(outDir, "goodboy-json.d.ts"),
+  },
+  {
+    schemaPath: join(__dirname, "../packages/schema/src/goodboy-lock.schema.json"),
+    outFile: join(outDir, "goodboy-lock.d.ts"),
+  },
 ];
 
 async function main() {
