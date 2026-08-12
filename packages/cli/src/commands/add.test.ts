@@ -109,6 +109,11 @@ describe('add command', () => {
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('https://github.com/foo/bar'),
       );
+      // Someone pasting a catalog URL into `add` almost certainly wants a
+      // command that can act on it once cloned — say which one.
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("'goodboy adopt <local-dir>'"),
+      );
       expect(mockLogger.error).toHaveBeenCalledTimes(1);
       expect(process.exit).toHaveBeenCalledTimes(1);
       expect(process.exit).toHaveBeenCalledWith(1);
@@ -130,6 +135,9 @@ describe('add command', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('git@github.com:foo/bar.git'),
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("'goodboy adopt <local-dir>'"),
       );
       expect(mockLogger.error).toHaveBeenCalledTimes(1);
       expect(process.exit).toHaveBeenCalledTimes(1);

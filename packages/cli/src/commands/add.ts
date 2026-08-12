@@ -35,7 +35,8 @@ export const addCommand = new Command('add')
         spinner.fail();
         logger.error(
           `"${skillPathArg}" looks like a URL, not a local path. ` +
-            `'goodboy add' only accepts a local skill directory.`,
+            `'goodboy add' only accepts a local skill directory — clone or download the skill first, ` +
+            `then run 'goodboy add <local-dir>', or 'goodboy adopt <local-dir>' if it has no manifest.json yet.`,
         );
         throw new HandledFailure();
       }
