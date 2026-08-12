@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { Ajv } from 'ajv';
 import * as addFormatsPkg from 'ajv-formats';
 import type { GoodBoyManifest } from '../types/index.js';
+import { applyVersionPolicy, stripToKnownKeys, SEMVER_VERSION_PATTERN } from './schema-version.js';
 
 const addFormats = (addFormatsPkg as unknown as { default: (ajv: Ajv) => Ajv }).default;
 const _require = createRequire(import.meta.url);
@@ -14,7 +15,10 @@ const MAX_NESTING_DEPTH = 10;
 /**
  * The manifest schema version this CLI validates strictly against. Manifests
  * declaring a newer minor are tolerated (unknown top-level fields stripped,
- * with a warning); a newer major is rejected. See validateManifestDetailed().
+ * with a warning); a newer major is rejected. The tolerant-minor/reject-major
+ * policy itself lives in schema-version.ts, shared with goodboy.json and
+ * goodboy.lock; this file supplies the manifest-specific pieces around it
+ * (schema loading, Ajv, feature stamping).
  */
 export const KNOWN_SCHEMA_VERSION = '2.0.0';
 
@@ -58,8 +62,6 @@ export const UNREADABLE_MANIFEST_REMEDY =
   `field this schema no longer defines, or re-add the skill from its source with 'goodboy add <path>'. ` +
   `There is no automatic migration.`;
 
-const SCHEMA_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
-
 let _schema: Record<string, unknown> | null = null;
 let _validator: ReturnType<Ajv['compile']> | null = null;
 
@@ -95,7 +97,7 @@ function throwValidationError(validate: ReturnType<Ajv['compile']>): never {
 }
 
 function parseSemverTriple(version: string): [number, number, number] | null {
-  const match = SCHEMA_VERSION_PATTERN.exec(version);
+  const match = SEMVER_VERSION_PATTERN.exec(version);
   /* c8 ignore next -- both call sites only ever pass an already-valid version string; null is a defensive return, not a reachable case */
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
@@ -195,52 +197,34 @@ export interface ManifestValidationResult {
  */
 export function validateManifestDetailed(data: unknown): ManifestValidationResult {
   const validate = getValidator();
-  const knownParts = KNOWN_SCHEMA_VERSION.split('.').map(Number);
-  const knownMajor = knownParts[0]!;
-  const knownMinor = knownParts[1]!;
+  const knownMajor = KNOWN_SCHEMA_VERSION.split('.')[0]!;
 
-  if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
-    const rawVersion = (data as Record<string, unknown>)['schema_version'];
-    // The length gate (mirrors the schema's own maxLength: 32) must run before any
-    // interpolation of rawVersion into a message: an overlong value falls straight
-    // through to strict Ajv validation, which rejects it via maxLength without ever
-    // embedding the value in the error text.
-    if (typeof rawVersion === 'string' && rawVersion.length <= 32) {
-      const match = SCHEMA_VERSION_PATTERN.exec(rawVersion);
-      if (match) {
-        const major = Number(match[1]);
-        const minor = Number(match[2]);
+  const policy = applyVersionPolicy(data, 'schema_version', KNOWN_SCHEMA_VERSION);
 
-        if (major !== knownMajor) {
-          const upgradeHint = major > knownMajor ? ' Upgrade GoodBoy to use this skill.' : '';
-          throw new Error(
-            `manifest declares schema ${rawVersion}; this version of GoodBoy supports ${knownMajor}.x manifests.${upgradeHint}`,
-          );
-        }
-
-        if (minor > knownMinor) {
-          const known = getKnownTopLevelKeys();
-          const stripped: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-            if (known.has(key)) stripped[key] = value;
-          }
-          if (!validate(stripped)) throwValidationError(validate);
-          const manifest = stripped as unknown as GoodBoyManifest;
-          assertFeatureStamping(manifest);
-          return {
-            manifest,
-            warnings: [
-              `manifest uses schema ${rawVersion}; this GoodBoy CLI knows ${KNOWN_SCHEMA_VERSION}. Unknown fields were ignored — upgrade GoodBoy to use them.`,
-            ],
-          };
-        }
-        // minor <= knownMinor: fall through to strict validation below, unchanged.
-      }
-      // non-matching string: fall through; Ajv's pattern check reports the standard error.
-    }
-    // missing/non-string schema_version: fall through; Ajv's required/type check reports the standard error.
+  if (policy.outcome === 'newer-major' || policy.outcome === 'older-major') {
+    const upgradeHint =
+      policy.outcome === 'newer-major' ? ' Upgrade GoodBoy to use this skill.' : '';
+    throw new Error(
+      `manifest declares schema ${policy.version}; this version of GoodBoy supports ${knownMajor}.x manifests.${upgradeHint}`,
+    );
   }
 
+  if (policy.outcome === 'newer-minor') {
+    const known = getKnownTopLevelKeys();
+    const stripped = stripToKnownKeys(data as Record<string, unknown>, known);
+    if (!validate(stripped)) throwValidationError(validate);
+    const manifest = stripped as unknown as GoodBoyManifest;
+    assertFeatureStamping(manifest);
+    return {
+      manifest,
+      warnings: [
+        `manifest uses schema ${policy.version}; this GoodBoy CLI knows ${KNOWN_SCHEMA_VERSION}. Unknown fields were ignored — upgrade GoodBoy to use them.`,
+      ],
+    };
+  }
+
+  // outcome === 'strict': at or below the known minor, or not parseable —
+  // Ajv's required/type/pattern/maxLength checks report the standard error.
   if (!validate(data)) throwValidationError(validate);
   const manifest = data as GoodBoyManifest;
   assertFeatureStamping(manifest);
