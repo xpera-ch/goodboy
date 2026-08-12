@@ -30,7 +30,16 @@ const VALID_LOCK: GoodBoyLock = {
   schema: '1.0.0',
   generated: '2026-01-01T00:00:00.000Z',
   skills: {
-    'my-skill': { version: '1.0.0', resolved: '/store/my-skill' },
+    'my-skill': { version: '1.0.0' },
+  },
+};
+
+// A lock written before `resolved` was removed — must still read without error.
+const OLD_LOCK = {
+  schema: '1.0.0',
+  generated: '2026-01-01T00:00:00.000Z',
+  skills: {
+    'old-skill': { version: '1.0.0', resolved: '/some/path', integrity: 'sha256-x' },
   },
 };
 
@@ -101,6 +110,12 @@ describe('readGoodBoyLock', () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(VALID_LOCK));
     const result = await readGoodBoyLock(DIR);
     expect(result).toEqual(VALID_LOCK);
+  });
+
+  it('reads an old-format lock carrying `resolved` without error', async () => {
+    (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(OLD_LOCK));
+    const result = await readGoodBoyLock(DIR);
+    expect(result?.skills['old-skill']?.version).toBe('1.0.0');
   });
 
   it('throws on invalid JSON', async () => {
@@ -176,13 +191,12 @@ describe('addSkillToLock', () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockRejectedValue(enoent);
     (mockWriteFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    await addSkillToLock(DIR, 'new-skill', '1.2.3', '/store/new-skill', 'sha256-abc123==');
+    await addSkillToLock(DIR, 'new-skill', '1.2.3', 'sha256-abc123==');
 
     const [, content] = (mockWriteFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string];
     const parsed = JSON.parse(content) as GoodBoyLock;
     expect(parsed.skills['new-skill']).toEqual({
       version: '1.2.3',
-      resolved: '/store/new-skill',
       integrity: 'sha256-abc123==',
     });
   });
@@ -191,15 +205,30 @@ describe('addSkillToLock', () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(VALID_LOCK));
     (mockWriteFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    await addSkillToLock(DIR, 'extra', '0.5.0', '/store/extra', 'sha256-def456==');
+    await addSkillToLock(DIR, 'extra', '0.5.0', 'sha256-def456==');
 
     const [, content] = (mockWriteFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string];
     const parsed = JSON.parse(content) as GoodBoyLock;
     expect(parsed.skills['my-skill']).toBeDefined();
     expect(parsed.skills['extra']).toEqual({
       version: '0.5.0',
-      resolved: '/store/extra',
       integrity: 'sha256-def456==',
+    });
+  });
+
+  it('writes no resolved key on top of an old-format lock; untouched old entries keep theirs', async () => {
+    (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(OLD_LOCK));
+    (mockWriteFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    await addSkillToLock(DIR, 'new-skill', '2.0.0', 'sha256-new==');
+
+    const [, content] = (mockWriteFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string];
+    const parsed = JSON.parse(content) as GoodBoyLock;
+    expect(parsed.skills['new-skill']).toEqual({ version: '2.0.0', integrity: 'sha256-new==' });
+    expect(parsed.skills['old-skill']).toEqual({
+      version: '1.0.0',
+      resolved: '/some/path',
+      integrity: 'sha256-x',
     });
   });
 });
@@ -274,6 +303,11 @@ describe('getLockedVersion', () => {
   it('returns the version for a locked skill', async () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(VALID_LOCK));
     await expect(getLockedVersion(DIR, 'my-skill')).resolves.toBe('1.0.0');
+  });
+
+  it('returns the version from an old-format lock entry', async () => {
+    (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify(OLD_LOCK));
+    await expect(getLockedVersion(DIR, 'old-skill')).resolves.toBe('1.0.0');
   });
 
   it('returns null when the lock does not exist', async () => {

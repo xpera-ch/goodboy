@@ -174,7 +174,6 @@ describe('installNamed — project install', () => {
       CWD,
       'test-skill',
       '0.1.0',
-      join(PROJECT_SKILLS, 'test-skill'),
       'sha256-mockintegrity==',
     );
   });
@@ -266,9 +265,9 @@ describe('installNamed — global install', () => {
       '/mock/.goodboy',
       'test-skill',
       '0.1.0',
-      '/mock/.goodboy/skills/test-skill',
       'sha256-mockintegrity==',
     );
+    expect(mockComputeSkillIntegrity).toHaveBeenCalledWith('/mock/.goodboy/skills/test-skill');
   });
 
   it('never touches .gitignore, even with --no-commit', async () => {
@@ -296,7 +295,6 @@ describe('installNamed — no-commit', () => {
       CWD,
       'test-skill',
       '0.1.0',
-      join(PROJECT_SKILLS, 'test-skill'),
       'sha256-mockintegrity==',
     );
   });

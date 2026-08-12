@@ -36,7 +36,8 @@
       "pattern": "packages/cli/src/lib/goodboy-file.ts",
       "reason": "Reads/writes goodboy.json, the per-project manifest of installed skills.",
       "invariants": [
-        "Skill names are validated against SKILL_NAME_RE before being written or used in a path"
+        "Skill names are validated against SKILL_NAME_RE before being written or used in a path",
+        "The lock never stores an absolute path — the `resolved` field was removed (2026-08-12); installed locations are always recomputed from a validated skill name"
       ]
     },
     {

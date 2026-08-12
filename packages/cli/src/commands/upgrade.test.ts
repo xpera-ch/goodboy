@@ -128,7 +128,6 @@ describe('upgradeSkill — project scope', () => {
       CWD,
       'test-skill',
       '0.2.0',
-      join(PROJECT_SKILLS, 'test-skill'),
       'sha256-mockintegrity==',
     );
   });
@@ -209,9 +208,9 @@ describe('upgradeSkill — global scope', () => {
       '/mock/.goodboy',
       'test-skill',
       '0.2.0',
-      '/mock/.goodboy/skills/test-skill',
       'sha256-mockintegrity==',
     );
+    expect(mockComputeSkillIntegrity).toHaveBeenCalledWith('/mock/.goodboy/skills/test-skill');
   });
 });
 
