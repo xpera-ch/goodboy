@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('chalk', () => ({
   default: {
@@ -10,7 +10,6 @@ vi.mock('chalk', () => ({
 }));
 
 import { homedir } from 'node:os';
-import { registerSecret, clearRegisteredSecrets } from './redact.js';
 import { logger, sanitiseError } from './logger.js';
 
 const METHODS = ['info', 'success', 'warn', 'error'] as const;
@@ -25,10 +24,6 @@ function captureWrites(stream: 'stdout' | 'stderr'): { calls: string[]; restore:
 }
 
 describe('logger — control-character stripping', () => {
-  afterEach(() => {
-    clearRegisteredSecrets();
-  });
-
   for (const method of METHODS) {
     const stream = method === 'info' ? 'stdout' : 'stderr';
 
@@ -72,24 +67,9 @@ describe('logger — control-character stripping', () => {
     expect(output).toContain('PWNED-TITLE');
     expect(output).toContain('Invalid skill name');
   });
-
-  it('strips control characters before redact() runs, so a registered secret adjacent to a control character is still redacted', () => {
-    registerSecret('super-secret-value');
-    const { calls, restore } = captureWrites('stderr');
-    logger.error('token=\x1bsuper-secret-value end');
-    restore();
-    const output = calls.join('');
-    expect(output).not.toContain('\x1b');
-    expect(output).not.toContain('super-secret-value');
-    expect(output).toContain('[REDACTED]');
-  });
 });
 
 describe('sanitiseError()', () => {
-  afterEach(() => {
-    clearRegisteredSecrets();
-  });
-
   it('returns the message of an Error instance', () => {
     expect(sanitiseError(new Error('something broke'))).toBe('something broke');
   });
@@ -114,13 +94,6 @@ describe('sanitiseError()', () => {
     expect(sanitiseError(message)).toBe('failed to read ~/config.json');
   });
 
-  it('redacts a registered secret value inside an Error message', () => {
-    registerSecret('super-secret-value');
-    expect(sanitiseError(new Error('token super-secret-value invalid'))).toBe(
-      'token [REDACTED] invalid',
-    );
-  });
-
   it('strips a control character from an Error instance message', () => {
     expect(sanitiseError(new Error('bad\x1beviltext'))).toBe('badeviltext');
   });
@@ -129,9 +102,8 @@ describe('sanitiseError()', () => {
     expect(sanitiseError('bad\x1beviltext')).toBe('badeviltext');
   });
 
-  it('composes strip + home-path redaction + secret redaction together on one message', () => {
-    registerSecret('super-secret-value');
-    const message = `token \x1bsuper-secret-value at ${homedir()}/config.json`;
-    expect(sanitiseError(new Error(message))).toBe('token [REDACTED] at ~/config.json');
+  it('composes control-character stripping and home-path redaction together on one message', () => {
+    const message = `token \x1bvalue at ${homedir()}/config.json`;
+    expect(sanitiseError(new Error(message))).toBe('token value at ~/config.json');
   });
 });

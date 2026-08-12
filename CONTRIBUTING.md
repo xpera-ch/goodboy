@@ -132,7 +132,6 @@ The following files implement security-critical logic. Changes to them require e
 | `packages/cli/src/commands/skill-status.ts` | Displays installed-skill drift via the same whole-tree integrity comparison as `verify.ts`. Informational only, but a false "up to date" here is the same class of false confidence as a wrong `goodboy verify` result. |
 | `packages/cli/src/commands/skill-open.ts` | Spawns `$EDITOR` (or an autodetected editor) as a subprocess — the one place GoodBoy launches an external process. Must never use `shell: true`, and must only ever pass the resolved `SKILL.md` path as an argument. |
 | `packages/schema/src/manifest.schema.json` | The JSON Schema used to validate all manifests. Adding `additionalProperties: true` to any object definition is a breaking security change. |
-| `packages/cli/src/lib/redact.ts` | Literal-substring scrubber wired into `logger.ts` and `sanitiseError()`, so every log/error path passes through it. Registered values are matched as literal substrings, never compiled into a `RegExp`. Currently dormant: nothing registers a value, so `redact()` returns its input unchanged. |
 
 ### Hard requirements for contributors
 

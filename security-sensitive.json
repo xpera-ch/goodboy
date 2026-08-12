@@ -139,20 +139,10 @@
       ]
     },
     {
-      "pattern": "packages/cli/src/lib/redact.ts",
-      "reason": "Literal-substring scrubber wired into logger.ts and sanitiseError(), so every CLI log/error path passes through it. NOTE: with the secrets feature removed there is no longer any caller of registerSecret(), so redact() currently returns its input unchanged in production — the mechanism is dormant, not load-bearing. Retained deliberately; see docs/backlog.md.",
-      "invariants": [
-        "A registered value is matched as a literal substring (split/join) — never compiled into a RegExp",
-        "Values are replaced longest-first so a registered value that is a substring of another registered value never fragments the longer one redaction",
-        "redact() is a no-op (returns input unchanged) whenever nothing is registered — which, with no production registrar, is currently always"
-      ]
-    },
-    {
       "pattern": "packages/cli/src/lib/logger.ts",
       "reason": "Every message the CLI ever prints (info/success/warn/error, plus sanitiseError()) passes through here — the point where caller-provided strings, including untrusted content like SKILL.md frontmatter, become terminal output.",
       "invariants": [
-        "Every message passed to info/success/warn/error has control characters and DEL stripped before being written, prior to redact() — no caller-provided string reaches stdout/stderr with raw control bytes intact",
-        "Control-character stripping always runs before redact(), never after, so a registered secret value is never sliced by a control byte inside it"
+        "Every message passed to info/success/warn/error has control characters and DEL stripped before being written — no caller-provided string reaches stdout/stderr with raw control bytes intact"
       ]
     },
     {

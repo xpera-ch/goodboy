@@ -1,13 +1,11 @@
 import chalk from 'chalk';
 import { homedir } from 'node:os';
-import { redact } from './redact.js';
 
 /**
  * Strips C0 control characters and DEL from `msg`, keeping `\n` and `\t`.
  * Every ANSI/CSI/OSC escape sequence requires a leading ESC (\x1B) byte, so
  * removing it neutralizes the sequence into inert literal text rather than
- * attempting to parse/allowlist specific sequences. Runs before redact() so
- * a registered secret value is never sliced by a control byte inside it.
+ * attempting to parse/allowlist specific sequences.
  */
 function stripControlChars(msg: string): string {
   // eslint-disable-next-line no-control-regex
@@ -15,7 +13,7 @@ function stripControlChars(msg: string): string {
 }
 
 function clean(msg: string): string {
-  return redact(stripControlChars(msg));
+  return stripControlChars(msg);
 }
 
 export const logger = {
@@ -39,10 +37,10 @@ function redactHomePath(message: string): string {
 
 export function sanitiseError(error: unknown): string {
   if (error instanceof Error) {
-    return redact(redactHomePath(stripControlChars(error.message)));
+    return redactHomePath(stripControlChars(error.message));
   }
   if (typeof error === 'string') {
-    return redact(redactHomePath(stripControlChars(error)));
+    return redactHomePath(stripControlChars(error));
   }
   return 'An unexpected error occurred';
 }

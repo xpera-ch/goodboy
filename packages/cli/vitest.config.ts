@@ -61,7 +61,6 @@ export default defineConfig({
         'src/commands/skill-status.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/adopt.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/commands/add.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
-        'src/lib/redact.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/logger.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/gitignore.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
