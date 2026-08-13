@@ -21,6 +21,73 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-13 — Agent skill directories: flags name intent, a list-valued map is the mechanism
+
+**Decided (Bruno):** `AGENT_SKILL_DIRS` moves from one path per agent to one
+*list* of paths per agent. A flag (`--codex`, `--gemini`, `--claude-code`)
+names an intent — "make this visible to X" — and the list underneath it is
+the current mechanism for satisfying that intent, which can gain or lose
+entries later without the flag ever changing meaning to a user.
+
+**What prompted it.** The Codex symlink bug (`docs/backlog.md`) surfaced a
+deeper question: `~/.agents/skills/` is an emerging cross-vendor convention
+(Codex reads only it; Gemini reads it with precedence over its own path;
+`gh skill` writes to it), while `~/.claude/skills/` is Claude Code's own,
+standard-native only in content format. Naming flags after products assumed
+each vendor needed an exclusive directory, which stopped being true.
+
+**Shape:** `codex -> [~/.agents/skills]`; `gemini -> [~/.agents/skills,
+~/.gemini/skills]` (kept for version-safety — Gemini's `.agents/skills`
+support lands only around CLI v0.25–0.26, confirmed against
+[geminicli.com/docs/cli/skills](https://geminicli.com/docs/cli/skills/));
+`claude-code -> [~/.claude/skills]`; a new standalone `agents` flag ->
+`[~/.agents/skills]`, a forward-compat escape hatch for a future agent
+GoodBoy hasn't given its own flag yet.
+
+**Explicitly rejected: a per-agent "strategy" field tracking whether a path
+is shared.** Shared-ness is fully derivable by cross-referencing the map
+itself — a path is shared if more than one agent's list contains it — so a
+small helper computes it live rather than storing it. Persisting "which
+agents were selected at install" as separate state would be a second copy
+of a fact the map already encodes, the exact pattern this project keeps
+finding and removing elsewhere (schema version vs. lockfile, sensitive
+files in two configs).
+
+**Uninstall consequence, also decided:** a shared path has no per-vendor
+removal — it is one physical symlink, read by whichever tools scan that
+directory. `goodboy uninstall --codex` on a shared path cannot "remove for
+Codex but keep for Gemini"; the only real choice is remove-for-everyone or
+leave-it. So uninstall prompts before removing a shared path ("also read
+by: gemini. Remove anyway?"); declining leaves the symlink for every reader,
+including the one named on the command line.
+
+**Deferred, not decided:** a `-f`/`--force` flag to skip that prompt for
+automation. Tracked in `docs/backlog.md`. It carries its own open question
+— whether force defaults to removing or keeping a shared path — which is
+not obvious and should not be assumed when it's picked up.
+
+**What would reopen this:** Claude Code adopting the `.agents/skills`
+convention, which would fold its own entry into the shared list the same
+way Gemini's already is.
+
+**Closed same day: the dead `~/.codex/skills/` symlinks from 0.2.0.**
+Neither auto-cleaned nor silently left. **Auto-cleanup on next install was
+rejected** — deleting an unrelated directory as a side effect of an install
+command is exactly the automatic behaviour `CLAUDE.md`'s "atomic commands
+over magic" principle exists to rule out, and it would mean carrying the
+*old* mapping in the codebase indefinitely as one-time migration logic for
+a population that is realistically Bruno alone. **Silent leave-alone was
+also rejected**, on a narrower ground: this bug's whole shape was GoodBoy
+succeeding and saying nothing while doing nothing, and leaving its own
+leftover just as silent repeats that rather than closing it. **Decided:
+print a one-time notice** when `codex` is actually processed by
+`createAgentSymlinks`/`removeAgentSymlinks` — one `lstat` on the known
+legacy path, and if it still has entries, a line pointing out it's no
+longer read and safe to delete. Scoped to the moment Codex is touched, not
+a standing background scan.
+
+---
+
 ## 2026-08-12 — One domain: `goodboyjs.com`. Extends the 2026-08-11 entry
 
 **Decided (Bruno):** `goodboyjs.com` is the project's only referenced
