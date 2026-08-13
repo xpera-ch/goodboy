@@ -25,6 +25,7 @@ export interface InstallOptions {
   claudeCode?: boolean;
   codex?: boolean;
   gemini?: boolean;
+  agents?: boolean;
   allAgents?: boolean;
 }
 
@@ -35,6 +36,7 @@ const AGENT_FLAG_NAMES: Array<{ key: keyof InstallOptions; flag: string }> = [
   { key: 'claudeCode', flag: '--claude-code' },
   { key: 'codex', flag: '--codex' },
   { key: 'gemini', flag: '--gemini' },
+  { key: 'agents', flag: '--agents' },
   { key: 'allAgents', flag: '--all-agents' },
 ];
 
@@ -156,6 +158,7 @@ export async function installNamed(
       claudeCode: options.claudeCode,
       codex: options.codex,
       gemini: options.gemini,
+      agents: options.agents,
       allAgents: options.allAgents,
     });
 
@@ -230,8 +233,9 @@ export const installCommand = new Command('install')
   .option('-g, --global', 'Install to global store (~/.goodboy/skills/)')
   .option('--no-commit', 'Add .claude/skills/<name>/ to .gitignore (goodboy.json/lock are still written)')
   .option('--claude-code', 'Link into ~/.claude/skills/ (default when -g and no agent flag)')
-  .option('--codex', 'Link into ~/.codex/skills/')
-  .option('--gemini', 'Link into ~/.gemini/skills/')
+  .option('--codex', 'Link into ~/.agents/skills/ (the directory Codex reads)')
+  .option('--gemini', 'Link into ~/.agents/skills/ and ~/.gemini/skills/')
+  .option('--agents', 'Link into ~/.agents/skills/ (the shared cross-agent convention)')
   .option('--all-agents', 'Link into all agent skill directories')
   .action(async (skillName: string | undefined, options: InstallOptions) => {
     const cwd = process.cwd();

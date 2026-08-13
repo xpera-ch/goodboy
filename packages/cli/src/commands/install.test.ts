@@ -377,6 +377,7 @@ describe('assertAgentFlagsRequireGlobal', () => {
     ['claudeCode', '--claude-code'],
     ['codex', '--codex'],
     ['gemini', '--gemini'],
+    ['agents', '--agents'],
     ['allAgents', '--all-agents'],
   ] as const)('rejects %s without -g, naming %s', (key, flag) => {
     expect(() =>
@@ -400,6 +401,7 @@ describe('assertAgentFlagsRequireGlobal', () => {
     ['claudeCode'],
     ['codex'],
     ['gemini'],
+    ['agents'],
     ['allAgents'],
   ] as const)('allows %s combined with -g', (key) => {
     expect(() =>
@@ -469,5 +471,17 @@ describe('installCommand — Commander registration', () => {
   it('has a --no-commit flag', () => {
     const opt = installCommand.options.find((o) => o.long === '--no-commit');
     expect(opt).toBeDefined();
+  });
+
+  it('has the --agents flag', () => {
+    const opt = installCommand.options.find((o) => o.long === '--agents');
+    expect(opt).toBeDefined();
+    expect(opt?.description).toContain('~/.agents/skills/');
+  });
+
+  it('describes --codex by the directory Codex actually reads, not the stale ~/.codex/skills/', () => {
+    const opt = installCommand.options.find((o) => o.long === '--codex');
+    expect(opt?.description).toContain('~/.agents/skills/');
+    expect(opt?.description).not.toContain('~/.codex/skills/');
   });
 });
