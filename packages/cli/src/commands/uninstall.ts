@@ -31,7 +31,16 @@ async function uninstallSkill(
   const spinner = ora(`Uninstalling "${name}"…`).start();
 
   if (options.global) {
-    await removeAgentSymlinks(name, Object.keys(AGENT_SKILL_DIRS));
+    // removeAgentSymlinks returns false when a shared-path confirmation was
+    // declined — then nothing at all was removed, and deleting the store
+    // content the kept symlink points at would leave a corpse link. Abort
+    // the whole uninstall instead (docs/decisions.md, 2026-08-13).
+    const removed = await removeAgentSymlinks(name, Object.keys(AGENT_SKILL_DIRS));
+    if (!removed) {
+      spinner.warn(`Uninstall cancelled — nothing was removed for "${name}"`);
+      return;
+    }
+
     removeFromStore(name);
 
     const goodboyHome = getGoodboyHome();

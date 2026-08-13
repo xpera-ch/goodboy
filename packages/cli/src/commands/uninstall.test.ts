@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'node:path';
+import ora from 'ora';
 
 vi.mock('ora', () => ({
   default: vi.fn(() => ({
@@ -20,10 +21,17 @@ vi.mock('../lib/goodboy-file.js', () => ({
   removeSkillFromManifest: vi.fn().mockResolvedValue(undefined),
   removeSkillFromLock: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../lib/agents.js', () => ({
-  removeAgentSymlinks: vi.fn().mockResolvedValue(undefined),
-  AGENT_SKILL_DIRS: { 'claude-code': '/mock/.claude/skills', codex: '/mock/.codex/skills' },
-}));
+vi.mock('../lib/agents.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/agents.js')>();
+  return {
+    ...actual,
+    // Only the side-effecting function is mocked. AGENT_SKILL_DIRS comes
+    // through from the real module, so Object.keys(...) in uninstall.ts can
+    // never drift from the real key set again (a hand-copied map here is a
+    // second source of truth that already went stale once).
+    removeAgentSymlinks: vi.fn().mockResolvedValue(true),
+  };
+});
 vi.mock('../lib/store.js', () => ({
   removeFromStore: vi.fn(),
   getStorePath: vi.fn().mockReturnValue('/mock/.goodboy/skills'),
@@ -106,16 +114,47 @@ describe('uninstall command — global (-g)', () => {
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
+    // clearAllMocks does not reset mockResolvedValue implementations — a
+    // test that declines the shared-path prompt must not leak its false
+    // into the tests that follow.
+    mockRemoveAgentSymlinks.mockResolvedValue(true);
   });
 
   it('removes agent symlinks for all agents', async () => {
     await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
-    expect(mockRemoveAgentSymlinks).toHaveBeenCalledWith('my-skill', ['claude-code', 'codex']);
+    // The real four-key map — not the pre-list-map two-key shape.
+    expect(mockRemoveAgentSymlinks).toHaveBeenCalledWith('my-skill', [
+      'claude-code',
+      'codex',
+      'gemini',
+      'agents',
+    ]);
   });
 
   it('removes from the global store', async () => {
     await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
     expect(mockRemoveFromStore).toHaveBeenCalledWith('my-skill');
+  });
+
+  it('aborts with no removal anywhere when the shared-path confirmation is declined', async () => {
+    mockRemoveAgentSymlinks.mockResolvedValue(false);
+
+    await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
+
+    // All three explicitly: a test checking only one could pass while the
+    // other two still ran. Also implicitly no process.exit(1) — the exit
+    // spy throws, so parseAsync resolving is itself the proof of "nothing
+    // failed, nothing happened".
+    expect(mockRemoveFromStore).not.toHaveBeenCalled();
+    expect(mockRemoveSkillFromManifest).not.toHaveBeenCalled();
+    expect(mockRemoveSkillFromLock).not.toHaveBeenCalled();
+
+    const spinnerInstance = vi.mocked(ora).mock.results[0]?.value as {
+      warn: ReturnType<typeof vi.fn>;
+    };
+    expect(spinnerInstance.warn).toHaveBeenCalledWith(
+      'Uninstall cancelled — nothing was removed for "my-skill"',
+    );
   });
 
   it('removes skill from the global goodboy.json/lock (in ~/.goodboy)', async () => {
