@@ -173,8 +173,11 @@ to the slots idea below: three skills don't need hierarchy.
   and into `SKILL.md` frontmatter under namespaced keys (e.g.
   `metadata.goodboy-version`, `metadata.goodboy-tags`) — a larger schema
   migration, not yet started.
-- Deploy to `.agents/skills/` as the default install target (in addition to
-  or instead of the current per-agent directories in `agents.ts`).
+- ~~Deploy to `.agents/skills/` as the default install target (in addition
+  to or instead of the current per-agent directories in `agents.ts`)~~ —
+  **done 2026-08-13**: `AGENT_SKILL_DIRS` is now list-valued; `codex`,
+  `gemini` and the standalone `--agents` flag install to
+  `~/.agents/skills/` (see `docs/decisions.md`, 2026-08-13).
 - Wrap `skills-ref validate` for open-standard spec validation rather than
   reimplementing spec compliance checks in-house.
 - Adopt the `evals/evals.json` convention inside skill directories so a
