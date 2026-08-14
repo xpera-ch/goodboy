@@ -10,8 +10,10 @@ When a version tag (v*.*.*) is pushed to GitHub, the release
 workflow:
 1. Runs tests on Node.js 24 and 26
 2. Builds all packages
-3. Publishes @goodboyjs/schema, @goodboyjs/registry-client,
-   and @goodboyjs/cli to npm using OIDC authentication
+3. Publishes @goodboyjs/schema and @goodboyjs/cli to npm
+   using OIDC authentication (@goodboyjs/registry-client stays in
+   the monorepo but is not published — see `docs/backlog.md`,
+   "packages/registry-client is a 44-line stub")
 4. Creates a GitHub Release with the changelog excerpt
 
 npm verifies the publish request came from the exact workflow
@@ -75,8 +77,8 @@ packages appear on npmjs.com.
 
 ### Step 6 — Configure Trusted Publishing on npmjs.com
 
-Do this for each of the three packages.
-Repeat these steps three times:
+Do this for each of the two packages.
+Repeat these steps twice:
 
 For @goodboyjs/schema:
 1. Go to npmjs.com/package/@goodboyjs/schema
@@ -91,14 +93,17 @@ For @goodboyjs/schema:
    - Allowed actions: npm publish
 6. Click Save
 
-Repeat for @goodboyjs/registry-client and @goodboyjs/cli.
+Repeat for @goodboyjs/cli.
 
 ### Step 7 — Confirm release.yml is already on OIDC
 
 release.yml already uses OIDC Trusted Publishing (no NPM_TOKEN,
-no NODE_AUTH_TOKEN, id-token: write permission, --provenance on
-every publish step). Nothing to change here — it's ready for
-all future releases as soon as Step 6 is done.
+no NODE_AUTH_TOKEN, id-token: write permission). Nothing to change
+here — it's ready for all future releases as soon as Step 6 is done.
+
+Note: --provenance is intentionally absent while the repository is
+private (npm provenance requires a public source repo). It returns
+with the go-public flip — see `docs/go-public-checklist.md`.
 
 ### Step 8 — Clean up temporary credentials
 
@@ -111,8 +116,7 @@ all future releases as soon as Step 6 is done.
    → Find the token created in Step 2 → Delete
 
 3. Delete .github/workflows/release-first-publish.yml
-   (or leave it disabled — it only runs via manual
-   workflow_dispatch, never on a tag push).
+   (already deleted with the C5 release-prep phase, 2026-08-14).
 
 After this point no long-lived npm token exists anywhere.
 All future releases are fully automated via OIDC.
@@ -141,10 +145,11 @@ After a release workflow completes:
 2. Check npm packages:
    npmjs.com/package/@goodboyjs/cli
    npmjs.com/package/@goodboyjs/schema
-   npmjs.com/package/@goodboyjs/registry-client
 
 3. Verify provenance attestation on each package page
-   ("Built and signed on GitHub Actions" badge)
+   ("Built and signed on GitHub Actions" badge) — only after
+   --provenance is re-added at the go-public flip; absent while
+   the repository is private
 
 4. Test the published CLI:
    npm install -g @goodboyjs/cli
@@ -153,7 +158,7 @@ After a release workflow completes:
 ## Troubleshooting
 
 OIDC auth fails — "Trusted Publisher not configured":
-- Verify Trusted Publishing is set up for all three packages
+- Verify Trusted Publishing is set up for both packages
 - Verify workflow filename matches exactly: release.yml
 - Verify org name matches exactly: xpera-ch
 - Verify repo name matches exactly: goodboy

@@ -21,6 +21,29 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-14 — `versions/vN/` is keyed by each schema family's own major, not the package's
+
+**Decided (Bruno, 2026-08-12; recorded by C5):** frozen schema copies live
+under `versions/vN/` where `N` is the **family's** own schema major,
+matching the `$id`s (`…/manifest/v2`, `…/goodboy-json/v1`,
+`…/goodboy-lock/v1`). The alternative — keying by the schema *package*
+major, i.e. `versions/v2/` for the two new families because the package is
+at 2.0.0 — was rejected: it contradicts the `$id`-is-major-keyed
+convention and gets confusing at the next package major.
+
+**Consequence, now explicit:** the schema package and the families version
+independently. `@goodboyjs/schema` 2.0.0 ships three families whose own
+identities are v2 (manifest) and v1 (goodboy-json, goodboy-lock). The skew
+is correct — the CLI already assumes it, via a separate
+`KNOWN_*_SCHEMA_VERSION` constant per file — and is now stated in
+`packages/schema/versions/README.md`.
+
+**What would reopen this:** nothing short of a reason to key frozen copies
+by package version rather than schema identity — i.e. the `$id` convention
+itself changing.
+
+---
+
 ## 2026-08-13 — Agent skill directories: flags name intent, a list-valued map is the mechanism
 
 **Decided (Bruno):** `AGENT_SKILL_DIRS` moves from one path per agent to one
