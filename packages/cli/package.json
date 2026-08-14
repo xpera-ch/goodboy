@@ -1,6 +1,6 @@
 {
   "name": "@goodboyjs/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem",
   "keywords": [
     "claude-code",
@@ -47,7 +47,7 @@
     "link": "npm run build && npm link"
   },
   "dependencies": {
-    "@goodboyjs/schema": "*",
+    "@goodboyjs/schema": "^2.0.0",
     "@inquirer/prompts": "^8.5.0",
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.1",
