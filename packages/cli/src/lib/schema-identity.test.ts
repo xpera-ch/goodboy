@@ -223,3 +223,41 @@ describe('repo-wide domain guard: goodboyjs.io and goodboy.dev never appear', ()
     expect(violations).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Frozen-copy byte identity (C5, 2026-08-14): the versions/v1/ copies of the
+// two new schema families are immutable records of what gets published, while
+// src/ stays the working copy — the same fact stored twice, a pattern this
+// repo has been bitten by three times. While v1 is the current major, the
+// frozen copy and the working copy must not drift; a drift is a test failure.
+//
+// MAINTENANCE: when a family majors to v2, the frozen v1 copy stays in place
+// (it is the historical record), src/ moves on, and this test must be updated
+// to compare src/ against the new frozen current-major copy instead —
+// mirroring the legacy-manifest fixture guard's instruction from B2b.
+// ---------------------------------------------------------------------------
+
+const FROZEN_CURRENT_MAJOR_COPIES = [
+  {
+    frozen: join('packages', 'schema', 'versions', 'v1', 'goodboy-json.schema.json'),
+    src: 'goodboy-json.schema.json',
+  },
+  {
+    frozen: join('packages', 'schema', 'versions', 'v1', 'goodboy-lock.schema.json'),
+    src: 'goodboy-lock.schema.json',
+  },
+];
+
+describe('frozen schema copies stay byte-identical to src/', () => {
+  it('finds at least one frozen copy to check', () => {
+    expect(FROZEN_CURRENT_MAJOR_COPIES.length).toBeGreaterThan(0);
+  });
+
+  for (const { frozen, src } of FROZEN_CURRENT_MAJOR_COPIES) {
+    it(`${frozen} matches ${src} byte-for-byte`, () => {
+      const frozenBytes = readFileSync(join(REPO_ROOT, frozen));
+      const srcBytes = readFileSync(join(SCHEMA_SRC, src));
+      expect(frozenBytes.equals(srcBytes)).toBe(true);
+    });
+  }
+});
