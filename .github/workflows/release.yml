@@ -34,9 +34,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm run test
-
       - name: Coverage
         run: npm run test:coverage
 
@@ -78,8 +75,10 @@ jobs:
       # NOTE: --provenance is intentionally absent while this repository is
       # private (npm provenance requires a public source repo — it writes to
       # Sigstore's public transparency log). When the repo goes public
-      # (see docs/go-public-checklist.md), re-add --provenance to all three
-      # publish commands below.
+      # (see docs/go-public-checklist.md), re-add --provenance to both
+      # publish commands below. @goodboyjs/registry-client is not published
+      # at all — see docs/backlog.md, "packages/registry-client is a
+      # 44-line stub".
       - name: Publish @goodboyjs/schema
         run: |
           VERSION=$(node -p "require('./packages/schema/package.json').version")
@@ -87,15 +86,6 @@ jobs:
             echo "@goodboyjs/schema@$VERSION already published — skipping"
           else
             npm publish --workspace packages/schema --access public
-          fi
-
-      - name: Publish @goodboyjs/registry-client
-        run: |
-          VERSION=$(node -p "require('./packages/registry-client/package.json').version")
-          if npm view "@goodboyjs/registry-client@$VERSION" version >/dev/null 2>&1; then
-            echo "@goodboyjs/registry-client@$VERSION already published — skipping"
-          else
-            npm publish --workspace packages/registry-client --access public
           fi
 
       - name: Publish @goodboyjs/cli

@@ -15,9 +15,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "publish:schema": "npm publish --workspace packages/schema --access public",
-    "publish:registry-client": "npm publish --workspace packages/registry-client --access public",
     "publish:cli": "npm publish --workspace packages/cli --access public",
-    "publish:all": "npm run publish:schema && npm run publish:registry-client && npm run publish:cli"
+    "publish:all": "npm run publish:schema && npm run publish:cli"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
