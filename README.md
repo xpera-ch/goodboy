@@ -107,6 +107,27 @@ goodboy search git
 supported; clone or download the skill first, then point either command at
 the local directory.
 
+## Shell completion
+
+Tab completion covers subcommands, options, and skill names. Print the
+template for your shell and source it — add the line to your rc file to
+persist it:
+
+```bash
+# bash — the file-based route, which also works on macOS's stock bash 3.2
+# (process substitution there can misbehave in interactive sessions)
+goodboy completion bash > ~/.goodboy-completion && source ~/.goodboy-completion
+
+# zsh
+source <(goodboy completion zsh)
+
+# fish
+goodboy completion fish | source
+```
+
+With no argument, `goodboy completion` picks the shell from `$SHELL`
+(bash is the fallback).
+
 ## Skill lifecycle
 
 Treat `.claude/skills/` (and `~/.goodboy/skills/`) the way you'd treat `node_modules/`: GoodBoy owns it, and `goodboy upgrade` will silently overwrite anything you edit there. If you want to change a skill, edit the registry copy, not the installed one.
