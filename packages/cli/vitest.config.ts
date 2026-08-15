@@ -64,6 +64,8 @@ export default defineConfig({
         'src/lib/logger.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/gitignore.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/lib/schema-version.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/lib/completion.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/commands/completion.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

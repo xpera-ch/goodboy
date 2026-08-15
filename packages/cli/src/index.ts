@@ -12,6 +12,11 @@ import { addCommand } from './commands/add.js';
 import { adoptCommand } from './commands/adopt.js';
 import { registryCommand } from './commands/registry-cmd.js';
 import { verifyCommand } from './commands/verify.js';
+import {
+  completionCommand,
+  completeCommand,
+  attachProgram,
+} from './commands/completion.js';
 
 const _require = createRequire(import.meta.url);
 const pkg = _require('../package.json') as { version: string };
@@ -35,6 +40,9 @@ program.addCommand(addCommand);
 program.addCommand(adoptCommand);
 program.addCommand(registryCommand);
 program.addCommand(verifyCommand);
+attachProgram(program);
+program.addCommand(completionCommand, { hidden: true });
+program.addCommand(completeCommand, { hidden: true });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   process.stderr.write(
