@@ -21,6 +21,53 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-15 — Terminal tab-completion: self-generated templates + a hidden `__complete` protocol
+
+**Decided (Bruno, 2026-08-15):** GoodBoy gets shell tab-completion for
+subcommands, options, and skill names. The user-side cost is one line of
+shell config; everything else is GoodBoy code.
+
+**Mechanism, after checking the facts rather than assuming them:**
+Commander 12.1.0 (the version GoodBoy installs) has **no** completion API.
+The ecosystem libraries are abandoned — `tabtab` (3.0.2), `omelette`
+(0.4.17), `commander-completion` (1.0.1) were all last modified
+2022–2023 — and pulling one in would contradict the dependency hygiene C0
+just established. Chosen instead, the yargs/oclif architecture in GoodBoy's
+own style:
+
+- a hidden `__complete` command — the completion engine — walks the live
+  commander program tree for subcommand/option names (so new commands get
+  completions automatically, no hand-maintained list) and reads the local
+  registry listing / `goodboy.json` / `goodboy.lock` for skill names;
+- a hidden `completion [bash|zsh|fish]` command emitting three small,
+  exact-text-tested shell templates that call back into `__complete`
+  (zsh reuses the bash function via `bashcompinit` — no second engine
+  binding);
+- `-o default` keeps ordinary file completion as the fallback, so path
+  arguments (`add`, `adopt`) keep working.
+
+**Scope (full surface, Bruno):** skill names complete on `install`,
+`upgrade`, `skill diff`, `skill version` (registry listing) and
+`uninstall`, `verify`, `skill open` (installed state — `-g` honored when
+present in the typed words, matching each command's own scope rules).
+Subcommands and options everywhere. **Not doing:** auto-install into rc
+files (atomic-commands principle), any network call, path completion for
+`add`/`adopt` beyond the shell's own file fallback, `search` queries.
+
+**Shells:** bash, zsh, fish — three fixed template strings, one engine.
+
+**Coverage:** the completion engine (`lib/`) and the command file are both
+pinned at 100%, matching the other command files that surface user data.
+Templates are asserted as exact text. The dogfooding test is the
+acceptance test: tab-completion works in a real zsh session before the
+phase is done.
+
+**What would reopen this:** commander gaining first-class completion
+support, or a maintained completion library appearing — the templates
+would be replaced, the `__complete` engine and its tests would survive.
+
+---
+
 ## 2026-08-14 — `versions/vN/` is keyed by each schema family's own major, not the package's
 
 **Decided (Bruno, 2026-08-12; recorded by C5):** frozen schema copies live
