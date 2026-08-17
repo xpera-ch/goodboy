@@ -44,7 +44,7 @@
     },
     {
       "pattern": "packages/cli/src/lib/agents.ts",
-      "reason": "Symlinks installed skills into agent skill directories — each agent maps to a list of paths (~/.claude/skills/, the shared ~/.agents/skills/ convention, ~/.gemini/skills/), and shared paths prompt before removal.",
+      "reason": "Symlinks installed skills into agent skill directories — each agent maps to a list of paths (~/.claude/skills/, the shared ~/.agents/skills/ convention, ~/.codex/skills/, ~/.gemini/skills/), and shared paths prompt before removal.",
       "invariants": [
         "Symlink targets stay within the resolved store/registry path",
         "No symlink is created pointing outside its intended base directory — the traversal guard runs per directory, for every path in every agent's list",

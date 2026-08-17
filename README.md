@@ -24,7 +24,7 @@ Every skill GoodBoy manages is described by two separate files, each with a diff
 GoodBoy installs skills into one of two scopes:
 
 - **Project** — `.claude/skills/` inside the current directory, tracked alongside your project (not gitignored by default; pass `--no-commit` if you'd rather exclude the installed files and rely on `goodboy.json` to restore them).
-- **Global** — `~/.goodboy/skills/`, symlinked into whichever agents you tell it to (`~/.claude/skills/`, `~/.agents/skills/` — the shared cross-agent convention Codex reads — `~/.gemini/skills/`, or all of them with `--all-agents`).
+- **Global** — `~/.goodboy/skills/`, symlinked into whichever agents you tell it to (`~/.claude/skills/`, `~/.codex/skills/` — Codex's own skills dir — `~/.agents/skills/` — the shared cross-agent convention — `~/.gemini/skills/`, or all of them with `--all-agents`).
 
 ## Installation
 

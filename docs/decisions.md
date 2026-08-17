@@ -158,6 +158,46 @@ a standing background scan.
 
 ---
 
+## 2026-08-17 — Codex dual-link: `--codex` maps to `~/.agents/skills/` and `~/.codex/skills/`; the stale-Codex notice is retired
+
+**Decided (Bruno):** `AGENT_SKILL_DIRS['codex']` becomes
+`[~/.agents/skills, ~/.codex/skills]` — flags keep meaning "make visible
+to Codex", the list is the mechanism. This **supersedes** the 2026-08-13
+decision's notice ("Closed same day" above) — that design rested on a
+premise, "Codex never reads `~/.codex/skills/`", that is false for
+codex-cli 0.147.
+
+**What changed the premise — verified, not assumed (2026-08-17):**
+codex-cli 0.147 scans **both** `~/.codex/skills/` (its own skills home —
+the bundled `.system/` skills live there, and session context blocks list
+locators from it) **and** `~/.agents/skills/` (the shared cross-vendor
+convention — a probe skill placed there appeared in the next session's
+`<skills_instructions>` block with its locator). Vendor scan paths move;
+the 2026-08-13 decision even predicted that risk.
+
+**Consequences folded in:**
+
+- **The stale-Codex notice is retired entirely, not reworded.** GoodBoy
+  actively manages `~/.codex/skills/` again, so "no longer read by Codex"
+  would be a false claim; and 0.2.0-era links already in that dir become
+  valid managed targets — the next install reports them as "already linked
+  correctly". Nothing to migrate, no cleanup logic (see
+  `docs/backlog.md`'s codex entry for the follow-through).
+- **`~/.agents/skills/` stays shared** (codex, gemini, `agents`) — the
+  uninstall confirmation prompt is unchanged, derived live from the map;
+  the message still names only real co-readers (`gemini`), never the
+  internal `agents` key.
+- **`~/.codex/skills/` is codex-exclusive** — it is planned without a
+  prompt on uninstall; a declined shared-path confirmation still aborts
+  the whole removal with zero unlinks (the F1 contract, unchanged).
+
+**Not changed:** `claude-code`, `gemini`, and the `agents` key; the
+already-linked log line gains its path (message polish folded in from
+`docs/backlog.md`). Completion is untouched — the engine does not
+reference agent directories.
+
+---
+
 ## 2026-08-12 — One domain: `goodboyjs.com`. Extends the 2026-08-11 entry
 
 **Decided (Bruno):** `goodboyjs.com` is the project's only referenced
