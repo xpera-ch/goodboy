@@ -313,6 +313,11 @@ describe('removeAgentSymlinks', () => {
 
     expect(mockConfirm).not.toHaveBeenCalled();
     expect(mockUnlink).toHaveBeenCalledWith(join(CLAUDE_SKILLS, 'my-skill'));
+    // Exclusive paths have exactly one possible owner — the agent-named line
+    // is accurate there and stays (only shared paths go generic).
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed claude-code symlink: ${join(CLAUDE_SKILLS, 'my-skill')}`,
+    );
   });
 
   it('is a no-op when the symlink does not exist — still reports completion', async () => {
@@ -416,6 +421,51 @@ describe('removeAgentSymlinks', () => {
     expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
     expect(mockUnlink).toHaveBeenCalledWith(join(CODEX_SKILLS, 'my-skill'));
     expect(mockUnlink).toHaveBeenCalledWith(join(GEMINI_SKILLS, 'my-skill'));
+    // Removal log lines: the shared path is never attributed to an agent —
+    // codex is always first in plan order for ~/.agents/skills/, so the old
+    // "Removed codex symlink" line was wrong even for skills installed with
+    // --agents alone. Exclusive paths keep naming their unambiguous agent.
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed shared symlink: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
+      `Removed codex symlink: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed claude-code symlink: ${join(CLAUDE_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed codex symlink: ${join(CODEX_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed gemini symlink: ${join(GEMINI_SKILLS, 'my-skill')}`,
+    );
+  });
+
+  it('regression: skill installed only for --agents — the shared removal line names no agent', async () => {
+    // Bruno's repro: `goodboy uninstall -g` on a skill whose only symlink is
+    // the shared ~/.agents/skills/ path (as if installed with --agents
+    // alone); nothing exists under codex's, gemini's, or claude-code's own
+    // directories.
+    mockUnlink.mockResolvedValue(undefined);
+    mockLstat.mockImplementation((p: string) =>
+      String(p) === join(AGENTS_SKILLS, 'my-skill')
+        ? Promise.resolve(SYMLINK_STAT)
+        : Promise.reject(ENOENT()),
+    );
+
+    await expect(
+      removeAgentSymlinks('my-skill', Object.keys(AGENT_SKILL_DIRS)),
+    ).resolves.toBe(true);
+
+    // Exactly one removal, and its single log line is the generic shared
+    // one — no agent name appears anywhere in it.
+    expect(mockUnlink).toHaveBeenCalledTimes(1);
+    expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
+    expect(vi.mocked(logger.info)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Removed shared symlink: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
   });
 
   it('uninstall -g call shape: shared path declined — nothing removed anywhere, not even exclusive paths', async () => {

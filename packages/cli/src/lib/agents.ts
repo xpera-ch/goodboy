@@ -121,9 +121,11 @@ export function formatOtherReaders(): string {
 
 // What the plan pass of removeAgentSymlinks records about one existing
 // symlink. agent is the first one (in argument order) whose list referenced
-// the path — it determines the prompt's perspective and the "Removed <agent>
-// symlink" log line. otherReaders is precomputed at plan time so the prompt
-// and the abort message always show the same wording.
+// the path — it names the "Removed <agent> symlink" log line for non-shared
+// removals, where the attribution is unambiguous; shared paths are never
+// attributed to an agent in any message. otherReaders is precomputed at
+// plan time so the prompt and the abort message always show the same
+// wording.
 interface PlannedRemoval {
   path: string;
   agent: string;
@@ -201,7 +203,15 @@ export async function removeAgentSymlinks(skillName: string, agents: string[]): 
     const stat = await lstat(item.path).catch(() => null);
     if (stat === null || !stat.isSymbolicLink()) continue;
     await unlink(item.path);
-    logger.info(`Removed ${item.agent} symlink: ${item.path}`);
+    if (item.shared) {
+      // Shared paths are never attributed to an agent in any message:
+      // whichever agent referenced the path first during planning is an
+      // artifact of argument order, not of how the skill was installed
+      // (docs/decisions.md, 2026-08-17).
+      logger.info(`Removed shared symlink: ${item.path}`);
+    } else {
+      logger.info(`Removed ${item.agent} symlink: ${item.path}`);
+    }
   }
   return true;
 }
