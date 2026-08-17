@@ -269,21 +269,21 @@ describe('agentsSharingPath', () => {
 // ---------------------------------------------------------------------------
 
 describe('formatOtherReaders', () => {
-  it('lists the real co-readers, excluding the current agent and the internal agents key', () => {
-    expect(formatOtherReaders(['codex', 'gemini', 'agents'], 'codex')).toBe(
-      'also read by: gemini',
-    );
-    expect(formatOtherReaders(['codex', 'gemini'], 'gemini')).toBe(
-      'also read by: codex',
+  it('describes the shared convention directory — never names a co-reader agent', () => {
+    expect(formatOtherReaders()).toBe(
+      `part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention`,
     );
   });
 
-  it('falls back to describing the shared convention when the agents key is the only other owner', () => {
-    // Fabricated owner list: with today's map 'agents' is never the sole
-    // co-owner, but the guard must hold anyway — never an empty reader list.
-    const phrase = formatOtherReaders(['codex', 'agents'], 'codex');
-    expect(phrase).toBe(`part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention`);
-    expect(phrase).not.toMatch(/read by:\s*$/);
+  it('returns the same message no matter which agents share the path', () => {
+    // The naming branch and the parameters it depended on were removed
+    // (2026-08-17): "multiple real co-readers" and "only the internal agents
+    // key differs" now produce the same message by construction — the
+    // message never varies with the owner list, because GoodBoy cannot know
+    // which other tools actually read a directory.
+    const message = formatOtherReaders();
+    expect(message).not.toMatch(/claude-code|codex|gemini/);
+    expect(message).toBe(`part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention`);
   });
 });
 
@@ -349,14 +349,15 @@ describe('removeAgentSymlinks', () => {
 
     await expect(removeAgentSymlinks('my-skill', ['codex'])).resolves.toBe(true);
 
-    // The shared ~/.agents/skills/ target prompts once — naming only the real
-    // co-reader (gemini), never the internal 'agents' key; the exclusive
+    // The shared ~/.agents/skills/ target prompts once, describing the shared
+    // convention — never naming a co-reader agent, since GoodBoy cannot know
+    // which other tools actually read the directory; the exclusive
     // ~/.codex/skills/ target needs no confirmation. Exact equality pins all
     // of that at once.
     expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: `${join(AGENTS_SKILLS, 'my-skill')} is also read by: gemini. Remove anyway?`,
+        message: `${join(AGENTS_SKILLS, 'my-skill')} is part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention. Remove anyway?`,
       }),
     );
     expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
@@ -375,8 +376,11 @@ describe('removeAgentSymlinks', () => {
     // false.
     expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(mockUnlink).not.toHaveBeenCalled();
+    // The decline-abort log reads the same PlannedRemoval.otherReaders as the
+    // prompt — exact equality pins that the convention wording (never a
+    // co-reader name) reaches the log line too.
     expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      expect.stringContaining('Nothing was uninstalled'),
+      `Removal declined: ${join(AGENTS_SKILLS, 'my-skill')} is part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention. Nothing was uninstalled.`,
     );
   });
 

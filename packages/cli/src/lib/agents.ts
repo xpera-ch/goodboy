@@ -111,15 +111,11 @@ export function agentsSharingPath(path: string): string[] {
     .map(([name]) => name);
 }
 
-// What to tell the user a shared path is also read by. 'agents' is GoodBoy's
-// internal key for the shared-convention target, not a tool a user installed
-// for — it counts toward whether a path is shared (the gate above) but never
-// appears in what's displayed. If filtering leaves no real names — only
-// possible when 'agents' is the sole other owner — describe the shared
-// convention itself rather than naming no one.
-export function formatOtherReaders(owners: string[], selfAgent: string): string {
-  const others = owners.filter((name) => name !== selfAgent && name !== 'agents');
-  if (others.length > 0) return `also read by: ${others.join(', ')}`;
+// What to tell the user a shared path is: a description of the shared
+// convention directory, never a list of co-reader agents — GoodBoy cannot
+// know which other tools actually read a directory (docs/decisions.md,
+// 2026-08-17).
+export function formatOtherReaders(): string {
   return `part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention`;
 }
 
@@ -127,7 +123,7 @@ export function formatOtherReaders(owners: string[], selfAgent: string): string 
 // symlink. agent is the first one (in argument order) whose list referenced
 // the path — it determines the prompt's perspective and the "Removed <agent>
 // symlink" log line. otherReaders is precomputed at plan time so the prompt
-// and the abort message always name the same set.
+// and the abort message always show the same wording.
 interface PlannedRemoval {
   path: string;
   agent: string;
@@ -174,7 +170,7 @@ export async function removeAgentSymlinks(skillName: string, agents: string[]): 
         path: symlinkTarget,
         agent,
         shared,
-        otherReaders: shared ? formatOtherReaders(sharedOwners, agent) : '',
+        otherReaders: shared ? formatOtherReaders() : '',
       });
       plannedPaths.add(symlinkTarget);
     }
