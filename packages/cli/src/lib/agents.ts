@@ -1,5 +1,4 @@
-import { mkdir, lstat, symlink, unlink, readlink, readdir } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
+import { mkdir, lstat, symlink, unlink, readlink } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { confirm } from '@inquirer/prompts';
@@ -8,22 +7,18 @@ import { logger } from './logger.js';
 // Each agent maps to a LIST of directories. A flag names an intent — "make
 // this visible to X" — and the list is the current mechanism for satisfying
 // it, so it can gain or lose entries later without the flag's meaning
-// changing. ~/.agents/skills/ is the emerging cross-vendor convention (Codex
-// reads only it; Gemini reads it with precedence over its own path), so
-// 'codex' and 'gemini' share it. 'agents' is the generic escape hatch for
-// agents GoodBoy has no dedicated flag for yet (see docs/decisions.md,
-// 2026-08-13).
+// changing. ~/.agents/skills/ is the emerging cross-vendor convention
+// (Codex and Gemini both scan it), and ~/.codex/skills/ is Codex's own
+// skills home — codex-cli 0.147 scans both (verified 2026-08-17 from
+// session context blocks; see docs/decisions.md, 2026-08-17). 'agents' is
+// the generic escape hatch for agents GoodBoy has no dedicated flag for
+// yet (see docs/decisions.md, 2026-08-13).
 export const AGENT_SKILL_DIRS: Record<string, string[]> = {
   'claude-code': [join(homedir(), '.claude', 'skills')],
-  'codex':       [join(homedir(), '.agents', 'skills')],
+  'codex':       [join(homedir(), '.agents', 'skills'), join(homedir(), '.codex', 'skills')],
   'gemini':      [join(homedir(), '.agents', 'skills'), join(homedir(), '.gemini', 'skills')],
   'agents':      [join(homedir(), '.agents', 'skills')],
 };
-
-// The pre-0.3.0 mapping of codex -> ~/.codex/skills/, a directory Codex
-// never read. Kept only so noticeStaleCodexDir() can point at it; the map
-// above deliberately no longer contains this path.
-const CODEX_LEGACY_DIR = join(homedir(), '.codex', 'skills');
 
 const DEFAULT_AGENT = 'claude-code';
 
@@ -73,8 +68,6 @@ export async function createAgentSymlinks(options: AgentLinkOptions): Promise<vo
       throw new Error(`Unknown agent: "${agent}"`);
     }
 
-    if (agent === 'codex') await noticeStaleCodexDir();
-
     for (const agentDir of AGENT_SKILL_DIRS[agent]) {
       const symlinkTarget = join(agentDir, skillName);
 
@@ -91,7 +84,7 @@ export async function createAgentSymlinks(options: AgentLinkOptions): Promise<vo
         if (stat.isSymbolicLink()) {
           const existing = await readlink(symlinkTarget);
           if (existing === storePath) {
-            logger.info(`${agent}: already linked correctly`);
+            logger.info(`${agent}: already linked correctly: ${symlinkTarget}`);
             continue;
           }
           await unlink(symlinkTarget);
@@ -158,11 +151,6 @@ export async function removeAgentSymlinks(skillName: string, agents: string[]): 
       continue;
     }
 
-    // Informational, and about a different directory than this uninstall's
-    // targets — fire during planning so it appears even when a later decline
-    // aborts the run.
-    if (agent === 'codex') await noticeStaleCodexDir();
-
     for (const agentDir of AGENT_SKILL_DIRS[agent]) {
       const symlinkTarget = join(agentDir, skillName);
 
@@ -220,32 +208,4 @@ export async function removeAgentSymlinks(skillName: string, agents: string[]): 
     logger.info(`Removed ${item.agent} symlink: ${item.path}`);
   }
   return true;
-}
-
-// One lstat on the known legacy path, then one readdir: 0.2.0 installed codex
-// skills to ~/.codex/skills/, which Codex never read. When codex is actually
-// processed, point at any leftovers — no cleanup, no walking the directory
-// (see docs/decisions.md, 2026-08-13, "Closed same day"). "Safe to delete" is
-// only claimed after checking the entries are themselves symlinks (the
-// withFileTypes readdir answers that in the same call): a blanket rm -rf of
-// the legacy dir would otherwise destroy whatever else lives there.
-async function noticeStaleCodexDir(): Promise<void> {
-  const stat = await lstat(CODEX_LEGACY_DIR).catch(() => null);
-  if (stat === null || !stat.isDirectory()) return;
-  const entries = await readdir(CODEX_LEGACY_DIR, { withFileTypes: true }).catch(
-    () => [] as Dirent[],
-  );
-  if (entries.length === 0) return;
-
-  if (entries.every((entry) => entry.isSymbolicLink())) {
-    logger.info(
-      'Note: ~/.codex/skills/ is no longer read by Codex (it reads ~/.agents/skills/ now). ' +
-        'It is safe to delete.',
-    );
-  } else {
-    logger.info(
-      'Note: ~/.codex/skills/ is no longer read by Codex (it reads ~/.agents/skills/ now). ' +
-        'Any GoodBoy-created links there are safe to delete.',
-    );
-  }
 }

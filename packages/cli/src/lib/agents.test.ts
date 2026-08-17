@@ -8,7 +8,7 @@ vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), success: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { mkdir, lstat, symlink, unlink, readlink, readdir } from 'node:fs/promises';
+import { mkdir, lstat, symlink, unlink, readlink } from 'node:fs/promises';
 import { confirm } from '@inquirer/prompts';
 import {
   resolveAgentFlags,
@@ -25,28 +25,23 @@ const mockLstat    = vi.mocked(lstat);
 const mockSymlink  = vi.mocked(symlink);
 const mockUnlink   = vi.mocked(unlink);
 const mockReadlink = vi.mocked(readlink);
-const mockReaddir  = vi.mocked(readdir);
 const mockConfirm  = vi.mocked(confirm);
 
 const HOME          = homedir();
 const CLAUDE_SKILLS = join(HOME, '.claude', 'skills');
 const AGENTS_SKILLS = join(HOME, '.agents', 'skills');
 const GEMINI_SKILLS = join(HOME, '.gemini', 'skills');
-const CODEX_LEGACY  = join(HOME, '.codex', 'skills');
+const CODEX_SKILLS  = join(HOME, '.codex', 'skills');
 const STORE_PATH    = join(HOME, '.goodboy', 'skills', 'my-skill');
 
 const ENOENT = () => Object.assign(new Error(), { code: 'ENOENT' });
 const SYMLINK_STAT = { isSymbolicLink: () => true } as never;
-// Dirent-shaped entries for noticeStaleCodexDir's withFileTypes readdir.
-const SYMLINK_ENTRY = { name: 'stale-skill', isSymbolicLink: () => true };
-const REAL_ENTRY = { name: 'notes.txt', isSymbolicLink: () => false };
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockMkdir.mockResolvedValue(undefined as never);
   mockSymlink.mockResolvedValue(undefined);
   mockUnlink.mockResolvedValue(undefined);
-  mockReaddir.mockResolvedValue([] as never);
   mockConfirm.mockResolvedValue(true);
 });
 
@@ -57,7 +52,7 @@ beforeEach(() => {
 describe('AGENT_SKILL_DIRS', () => {
   it('maps each agent to exactly its list of directories', () => {
     expect(AGENT_SKILL_DIRS['claude-code']).toEqual([CLAUDE_SKILLS]);
-    expect(AGENT_SKILL_DIRS['codex']).toEqual([AGENTS_SKILLS]);
+    expect(AGENT_SKILL_DIRS['codex']).toEqual([AGENTS_SKILLS, CODEX_SKILLS]);
     expect(AGENT_SKILL_DIRS['gemini']).toEqual([AGENTS_SKILLS, GEMINI_SKILLS]);
     expect(AGENT_SKILL_DIRS['agents']).toEqual([AGENTS_SKILLS]);
   });
@@ -121,13 +116,42 @@ describe('createAgentSymlinks', () => {
     );
   });
 
-  it('installing for codex alone creates exactly one symlink, to ~/.agents/skills/', async () => {
+  it('installing for codex alone creates exactly two symlinks, in list order, both logged with paths', async () => {
     mockLstat.mockRejectedValue(ENOENT());
 
     await createAgentSymlinks({ ...OPTS, agents: ['codex'] });
 
-    expect(mockSymlink).toHaveBeenCalledTimes(1);
-    expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(AGENTS_SKILLS, 'my-skill'));
+    // Shared convention first, then Codex's own skills home (map order).
+    expect(mockSymlink).toHaveBeenCalledTimes(2);
+    expect(mockSymlink).toHaveBeenNthCalledWith(1, STORE_PATH, join(AGENTS_SKILLS, 'my-skill'));
+    expect(mockSymlink).toHaveBeenNthCalledWith(2, STORE_PATH, join(CODEX_SKILLS, 'my-skill'));
+    expect(vi.mocked(logger.success)).toHaveBeenNthCalledWith(
+      1,
+      `Linked to codex: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.success)).toHaveBeenNthCalledWith(
+      2,
+      `Linked to codex: ${join(CODEX_SKILLS, 'my-skill')}`,
+    );
+  });
+
+  it('second codex run: both targets already linked — two distinguishable lines, each with its own path', async () => {
+    mockLstat.mockResolvedValue(SYMLINK_STAT);
+    mockReadlink.mockResolvedValue(STORE_PATH);
+
+    await createAgentSymlinks({ ...OPTS, agents: ['codex'] });
+
+    expect(mockSymlink).not.toHaveBeenCalled();
+    expect(mockUnlink).not.toHaveBeenCalled();
+    // The polish: each already-linked line carries its own path, so the two
+    // codex lines are distinguishable instead of two identical "codex:
+    // already linked correctly" lines.
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `codex: already linked correctly: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `codex: already linked correctly: ${join(CODEX_SKILLS, 'my-skill')}`,
+    );
   });
 
   it('installing for gemini alone creates exactly two symlinks, to both paths', async () => {
@@ -140,7 +164,7 @@ describe('createAgentSymlinks', () => {
     expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(GEMINI_SKILLS, 'my-skill'));
   });
 
-  it('links to all agents: one call per path in each list (4 paths across 3 agents)', async () => {
+  it('links to all agents: one call per path in each list (5 paths across 3 agents)', async () => {
     mockLstat.mockRejectedValue(ENOENT());
 
     await createAgentSymlinks({
@@ -148,13 +172,14 @@ describe('createAgentSymlinks', () => {
       agents: ['claude-code', 'codex', 'gemini'],
     });
 
-    // claude-code: 1 path, codex: 1 path, gemini: 2 paths = 4 calls. The
+    // claude-code: 1 path, codex: 2 paths, gemini: 2 paths = 5 calls. The
     // shared ~/.agents/skills/ path is written by both codex and gemini —
     // overlapping writes are safe because each path is idempotent (the
     // already-linked check below), not because they are deduplicated.
-    expect(mockSymlink).toHaveBeenCalledTimes(4);
+    expect(mockSymlink).toHaveBeenCalledTimes(5);
     expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(CLAUDE_SKILLS, 'my-skill'));
     expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(AGENTS_SKILLS, 'my-skill'));
+    expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(CODEX_SKILLS, 'my-skill'));
     expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(GEMINI_SKILLS, 'my-skill'));
     expect(mockUnlink).not.toHaveBeenCalled();
   });
@@ -172,25 +197,30 @@ describe('createAgentSymlinks', () => {
     );
   });
 
-  it('does not re-link a shared path already correctly linked — both agents report already-linked', async () => {
-    mockLstat.mockImplementation((p: string) =>
-      p === CODEX_LEGACY ? Promise.reject(ENOENT()) : Promise.resolve(SYMLINK_STAT),
-    );
+  it('does not re-link already-correct targets — one distinguishable line per (agent, path)', async () => {
+    mockLstat.mockResolvedValue(SYMLINK_STAT);
     mockReadlink.mockResolvedValue(STORE_PATH);
 
     await createAgentSymlinks({ ...OPTS, agents: ['codex', 'gemini'] });
 
-    // Both agents hit the shared path, both see it correctly linked: the
-    // idempotency check is what makes the overlapping codex/gemini lists safe.
-    // One "already linked" per path processed — codex has 1, gemini has 2.
+    // All four targets (codex: 2 paths, gemini: 2) exist and point at the
+    // store: the idempotency check is what makes the overlapping codex/gemini
+    // lists safe, and every already-linked line carries its own path so the
+    // two codex lines and the shared-path line are distinguishable.
     expect(mockSymlink).not.toHaveBeenCalled();
     expect(mockUnlink).not.toHaveBeenCalled();
-    expect(vi.mocked(logger.info)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(logger.info)).toHaveBeenCalledTimes(4);
     expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining('codex: already linked correctly'),
+      `codex: already linked correctly: ${join(AGENTS_SKILLS, 'my-skill')}`,
     );
     expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining('gemini: already linked correctly'),
+      `codex: already linked correctly: ${join(CODEX_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `gemini: already linked correctly: ${join(AGENTS_SKILLS, 'my-skill')}`,
+    );
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `gemini: already linked correctly: ${join(GEMINI_SKILLS, 'my-skill')}`,
     );
   });
 
@@ -222,6 +252,7 @@ describe('agentsSharingPath', () => {
   it('returns the single owner for a path present in only one list', () => {
     expect(agentsSharingPath(CLAUDE_SKILLS)).toEqual(['claude-code']);
     expect(agentsSharingPath(GEMINI_SKILLS)).toEqual(['gemini']);
+    expect(agentsSharingPath(CODEX_SKILLS)).toEqual(['codex']);
   });
 
   it('returns every owner for a path shared by two or more lists', () => {
@@ -261,8 +292,7 @@ describe('formatOtherReaders', () => {
 // ---------------------------------------------------------------------------
 
 describe('removeAgentSymlinks', () => {
-  // Targets exist as symlinks unless the mock says otherwise; the legacy
-  // codex dir is absent unless a test opts into the notice. `unlinked`
+  // Targets exist as symlinks unless the mock says otherwise. `unlinked`
   // mirrors the real filesystem so later lstat calls see the symlink gone.
   let unlinked: Set<string>;
   function mockExistingSymlinks(): void {
@@ -271,7 +301,6 @@ describe('removeAgentSymlinks', () => {
       unlinked.add(String(p));
     });
     mockLstat.mockImplementation((p: string) => {
-      if (String(p) === CODEX_LEGACY) return Promise.reject(ENOENT());
       if (unlinked.has(String(p))) return Promise.reject(ENOENT());
       return Promise.resolve(SYMLINK_STAT);
     });
@@ -314,29 +343,37 @@ describe('removeAgentSymlinks', () => {
     );
   });
 
-  it('prompts before removing a shared path and unlinks on confirmation', async () => {
+  it('dual-link removal: one prompt for the shared path only; both codex links unlinked on confirm', async () => {
     mockExistingSymlinks();
     mockConfirm.mockResolvedValue(true);
 
     await expect(removeAgentSymlinks('my-skill', ['codex'])).resolves.toBe(true);
 
-    // 'agents' is GoodBoy's internal map key, not a tool — the message names
-    // only the real co-reader (gemini) and never the internal key. Exact
-    // equality pins both properties at once.
+    // The shared ~/.agents/skills/ target prompts once — naming only the real
+    // co-reader (gemini), never the internal 'agents' key; the exclusive
+    // ~/.codex/skills/ target needs no confirmation. Exact equality pins all
+    // of that at once.
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({
         message: `${join(AGENTS_SKILLS, 'my-skill')} is also read by: gemini. Remove anyway?`,
       }),
     );
     expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
+    expect(mockUnlink).toHaveBeenCalledWith(join(CODEX_SKILLS, 'my-skill'));
   });
 
-  it('declining a shared path aborts the whole call: returns false, unlinks nothing', async () => {
+  it('declining the shared path aborts the whole call: zero unlinks, even the exclusive codex link', async () => {
     mockExistingSymlinks();
     mockConfirm.mockResolvedValue(false);
 
     await expect(removeAgentSymlinks('my-skill', ['codex'])).resolves.toBe(false);
 
+    // F1 contract under the dual-link map: ~/.codex/skills/ needed no
+    // confirmation, but removing it while the shared symlink stays would be
+    // a partial uninstall of one physical skill. Zero unlinks, one prompt,
+    // false.
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(mockUnlink).not.toHaveBeenCalled();
     expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
       expect.stringContaining('Nothing was uninstalled'),
@@ -350,9 +387,10 @@ describe('removeAgentSymlinks', () => {
       removeAgentSymlinks('my-skill', ['claude-code', 'codex']),
     ).resolves.toBe(true);
 
-    expect(mockUnlink).toHaveBeenCalledTimes(2);
+    expect(mockUnlink).toHaveBeenCalledTimes(3);
     expect(mockUnlink).toHaveBeenCalledWith(join(CLAUDE_SKILLS, 'my-skill'));
     expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
+    expect(mockUnlink).toHaveBeenCalledWith(join(CODEX_SKILLS, 'my-skill'));
   });
 
   it('uninstall -g call shape: full real key set, shared path confirmed once, no double prompt', async () => {
@@ -366,11 +404,13 @@ describe('removeAgentSymlinks', () => {
 
     // One prompt for the shared path (first hit via codex); gemini's and
     // agents' later hits of the same physical path are deduplicated in the
-    // plan rather than re-prompted or unlinked.
+    // plan rather than re-prompted or unlinked. The exclusive codex path is
+    // planned without a prompt and unlinked in the commit pass.
     expect(mockConfirm).toHaveBeenCalledTimes(1);
-    expect(mockUnlink).toHaveBeenCalledTimes(3);
+    expect(mockUnlink).toHaveBeenCalledTimes(4);
     expect(mockUnlink).toHaveBeenCalledWith(join(CLAUDE_SKILLS, 'my-skill'));
     expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
+    expect(mockUnlink).toHaveBeenCalledWith(join(CODEX_SKILLS, 'my-skill'));
     expect(mockUnlink).toHaveBeenCalledWith(join(GEMINI_SKILLS, 'my-skill'));
   });
 
@@ -416,162 +456,5 @@ describe('removeAgentSymlinks', () => {
     await expect(removeAgentSymlinks('my-skill', ['claude-code'])).resolves.toBe(true);
 
     expect(mockUnlink).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Codex stale-symlink notice
-// ---------------------------------------------------------------------------
-
-describe('Codex stale-symlink notice', () => {
-  const NOTICE = 'no longer read by Codex';
-  const OPTS = { agents: ['codex'], skillName: 'my-skill', storePath: STORE_PATH };
-
-  // Legacy dir lstat + readdir resolve per the given readdir result; the
-  // target symlink lstat is ENOENT unless the test says otherwise. Entries
-  // are Dirent-shaped (noticeStaleCodexDir reads withFileTypes).
-  function mockLegacyDir(
-    entries: Array<typeof SYMLINK_ENTRY | typeof REAL_ENTRY> | 'absent' | 'not-dir' | 'readdir-error',
-  ): void {
-    mockLstat.mockImplementation((p: string) => {
-      if (String(p) === CODEX_LEGACY) {
-        if (entries === 'absent') return Promise.reject(ENOENT());
-        if (entries === 'not-dir') return Promise.resolve({ isDirectory: () => false } as never);
-        return Promise.resolve({ isDirectory: () => true } as never);
-      }
-      return Promise.reject(ENOENT());
-    });
-    if (entries === 'readdir-error') {
-      mockReaddir.mockRejectedValue(ENOENT());
-    } else if (Array.isArray(entries)) {
-      mockReaddir.mockResolvedValue(entries as never);
-    }
-  }
-
-  it('prints the notice and touches nothing in ~/.codex/skills/ when it still has entries', async () => {
-    mockLegacyDir([SYMLINK_ENTRY]);
-
-    await createAgentSymlinks(OPTS);
-
-    expect(mockReaddir).toHaveBeenCalledWith(CODEX_LEGACY, { withFileTypes: true });
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-    // All entries verified as symlinks — the blanket claim is honest.
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining('It is safe to delete.'),
-    );
-    expect(mockUnlink).not.toHaveBeenCalled();
-    // The new install still proceeds to the real target.
-    expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(AGENTS_SKILLS, 'my-skill'));
-  });
-
-  it('qualifies the notice, not blanket safety, when the legacy directory holds non-symlink entries', async () => {
-    mockLegacyDir([REAL_ENTRY]);
-
-    await createAgentSymlinks(OPTS);
-
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining('Any GoodBoy-created links'),
-    );
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining('It is safe to delete.'),
-    );
-  });
-
-  it('prints no notice when the legacy directory is empty', async () => {
-    mockLegacyDir([]);
-
-    await createAgentSymlinks(OPTS);
-
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-  });
-
-  it('prints no notice when the legacy directory does not exist', async () => {
-    mockLegacyDir('absent');
-
-    await createAgentSymlinks(OPTS);
-
-    expect(mockReaddir).not.toHaveBeenCalled();
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-  });
-
-  it('prints no notice when the legacy path is not a directory', async () => {
-    mockLegacyDir('not-dir');
-
-    await createAgentSymlinks(OPTS);
-
-    expect(mockReaddir).not.toHaveBeenCalled();
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-  });
-
-  it('tolerates a readdir failure on the legacy directory', async () => {
-    mockLegacyDir('readdir-error');
-
-    await createAgentSymlinks(OPTS);
-
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-    expect(mockSymlink).toHaveBeenCalledWith(STORE_PATH, join(AGENTS_SKILLS, 'my-skill'));
-  });
-
-  it('does not fire when only claude-code or gemini are processed', async () => {
-    mockLstat.mockRejectedValue(ENOENT());
-
-    await createAgentSymlinks({ ...OPTS, agents: ['claude-code', 'gemini'] });
-
-    expect(mockReaddir).not.toHaveBeenCalled();
-    expect(vi.mocked(logger.info)).not.toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-  });
-
-  it('fires on removal too, when codex is processed', async () => {
-    mockLstat.mockImplementation((p: string) => {
-      if (String(p) === CODEX_LEGACY) return Promise.resolve({ isDirectory: () => true } as never);
-      return Promise.resolve(SYMLINK_STAT);
-    });
-    mockReaddir.mockResolvedValue([SYMLINK_ENTRY] as never);
-
-    await expect(removeAgentSymlinks('my-skill', ['codex'])).resolves.toBe(true);
-
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      expect.stringContaining(NOTICE),
-    );
-    expect(mockUnlink).toHaveBeenCalledWith(join(AGENTS_SKILLS, 'my-skill'));
-  });
-
-  it('fires exactly once during planning, even when the uninstall is later aborted by a decline', async () => {
-    // Every target exists as a symlink; the legacy dir exists holding a
-    // symlink entry; every confirmation is declined.
-    mockLstat.mockImplementation((p: string) => {
-      if (String(p) === CODEX_LEGACY) return Promise.resolve({ isDirectory: () => true } as never);
-      return Promise.resolve(SYMLINK_STAT);
-    });
-    mockReaddir.mockResolvedValue([SYMLINK_ENTRY] as never);
-    mockConfirm.mockResolvedValue(false);
-
-    const result = await removeAgentSymlinks('my-skill', Object.keys(AGENT_SKILL_DIRS));
-
-    // The notice is about a different, legacy directory than this
-    // uninstall's targets — informational, so it fires during planning and
-    // survives the abort. Exactly once for the single codex in the list.
-    expect(result).toBe(false);
-    expect(mockUnlink).not.toHaveBeenCalled();
-    expect(mockConfirm).toHaveBeenCalledTimes(1);
-    const notices = vi
-      .mocked(logger.info)
-      .mock.calls.filter(([msg]) => String(msg).includes('no longer read by Codex'));
-    expect(notices).toHaveLength(1);
   });
 });

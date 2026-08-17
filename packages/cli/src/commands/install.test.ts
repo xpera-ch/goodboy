@@ -479,9 +479,10 @@ describe('installCommand — Commander registration', () => {
     expect(opt?.description).toContain('~/.agents/skills/');
   });
 
-  it('describes --codex by the directory Codex actually reads, not the stale ~/.codex/skills/', () => {
+  it('describes --codex by the two directories Codex reads, shared convention included', () => {
     const opt = installCommand.options.find((o) => o.long === '--codex');
+    expect(opt?.description).toContain('~/.codex/skills/');
     expect(opt?.description).toContain('~/.agents/skills/');
-    expect(opt?.description).not.toContain('~/.codex/skills/');
+    expect(opt?.description).toContain('shared cross-agent convention');
   });
 });
