@@ -34,12 +34,19 @@ async function uninstallSkill(
     // removeAgentSymlinks returns false when a shared-path confirmation was
     // declined — then nothing at all was removed, and deleting the store
     // content the kept symlink points at would leave a corpse link. Abort
-    // the whole uninstall instead (docs/decisions.md, 2026-08-13).
+    // the whole uninstall instead (docs/decisions.md, 2026-08-13). The
+    // confirmation is interactive, so the spinner stops first — otherwise
+    // its redraw and inquirer's prompt fight for the same terminal line
+    // (the stop/start shape mirrors install.ts's consent prompt).
+    spinner.stop();
     const removed = await removeAgentSymlinks(name, Object.keys(AGENT_SKILL_DIRS));
     if (!removed) {
       spinner.warn(`Uninstall cancelled — nothing was removed for "${name}"`);
       return;
     }
+    spinner.start(
+      `Removing "${name}" from the store and updating goodboy.json/goodboy.lock…`,
+    );
 
     removeFromStore(name);
 

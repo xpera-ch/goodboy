@@ -157,6 +157,44 @@ describe('uninstall command — global (-g)', () => {
     );
   });
 
+  it('stops the spinner before the shared-path prompt and warns on decline', async () => {
+    mockRemoveAgentSymlinks.mockResolvedValue(false);
+
+    await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
+
+    type SpinnerMock = { stop: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
+    const spinnerInstance = vi.mocked(ora).mock.results[0]?.value as SpinnerMock;
+    const stopOrder = spinnerInstance.stop.mock.invocationCallOrder[0]!;
+    const callOrder = mockRemoveAgentSymlinks.mock.invocationCallOrder[0]!;
+    const warnOrder = spinnerInstance.warn.mock.invocationCallOrder[0]!;
+    expect(stopOrder).toBeLessThan(callOrder);
+    expect(callOrder).toBeLessThan(warnOrder);
+  });
+
+  it('stops the spinner before the prompt and restarts it after approval, before success', async () => {
+    await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
+
+    type SpinnerMock = {
+      stop: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      succeed: ReturnType<typeof vi.fn>;
+    };
+    const spinnerInstance = vi.mocked(ora).mock.results[0]?.value as SpinnerMock;
+    const stopOrder    = spinnerInstance.stop.mock.invocationCallOrder[0]!;
+    const callOrder    = mockRemoveAgentSymlinks.mock.invocationCallOrder[0]!;
+    const restartOrder = spinnerInstance.start.mock.invocationCallOrder[1]!;
+    const succeedOrder = spinnerInstance.succeed.mock.invocationCallOrder[0]!;
+    expect(stopOrder).toBeLessThan(callOrder);
+    expect(callOrder).toBeLessThan(restartOrder);
+    expect(restartOrder).toBeLessThan(succeedOrder);
+    // start call #1 is the initial ora(...).start(); #2 is the restart with
+    // the remaining work after the confirmation is through.
+    expect(spinnerInstance.start).toHaveBeenNthCalledWith(
+      2,
+      'Removing "my-skill" from the store and updating goodboy.json/goodboy.lock…',
+    );
+  });
+
   it('removes skill from the global goodboy.json/lock (in ~/.goodboy)', async () => {
     await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' });
     expect(mockRemoveSkillFromManifest).toHaveBeenCalledWith('/mock/.goodboy', 'my-skill');
