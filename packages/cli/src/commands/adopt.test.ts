@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import type { GoodBoyManifest } from '../types/index.js';
 
@@ -13,23 +13,51 @@ vi.mock('ora', () => ({
 }));
 vi.mock('@inquirer/prompts', () => ({
   input: vi.fn(),
+  confirm: vi.fn(),
 }));
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   statSync: vi.fn(),
   cpSync: vi.fn(),
   readFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }));
 vi.mock('../lib/fs-security.js', () => ({
   scanForSymlinks: vi.fn(),
 }));
+// manifest.js is NOT auto-mocked: validateManifest forwards to the real
+// Ajv schema check, so a broken synthesis is actually caught by the schema
+// — while still being a mock, so a test can force it to throw a non-Error
+// (mirroring how add.test.ts covers its equivalent fallback branch).
 vi.mock('../lib/manifest.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/manifest.js')>();
   return {
     ...actual,
+    validateManifest: vi.fn((data: unknown) => actual.validateManifest(data)),
     writeManifest: vi.fn().mockResolvedValue(undefined),
   };
 });
+// registry.js is NOT mocked at all: adopt writes through the real
+// writeSkillVersionToRegistry (extracted to registry.ts in C5f), whose path
+// is controlled via the GOODBOY_REGISTRY env var (set in beforeEach).
+vi.mock('../lib/registry-entry.js', () => ({
+  readRegistryEntry: vi.fn(),
+  writeRegistryEntry: vi.fn(),
+  createRegistryEntry: vi.fn((name: string, version: string, path: string) => ({
+    name,
+    latest: version,
+    versions: {
+      [version]: { path, addedAt: '2026-01-01T00:00:00Z', yanked: false },
+    },
+  })),
+  addVersionToEntry: vi.fn(
+    (entry: { name: string; versions: Record<string, unknown> }, version: string, path: string) => ({
+      ...entry,
+      latest: version,
+      versions: { ...entry.versions, [version]: { path, addedAt: '2026-01-01T00:00:00Z', yanked: false } },
+    }),
+  ),
+}));
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   // Mirrors sanitiseError()'s real three-way branch (Error / string / other)
@@ -41,28 +69,37 @@ vi.mock('../lib/logger.js', () => ({
   ),
 }));
 
-import { input } from '@inquirer/prompts';
-import { existsSync, statSync, cpSync, readFileSync } from 'node:fs';
+import { input, confirm } from '@inquirer/prompts';
+import { existsSync, statSync, cpSync, readFileSync, mkdirSync } from 'node:fs';
 import { scanForSymlinks } from '../lib/fs-security.js';
 import { writeManifest, validateManifest } from '../lib/manifest.js';
+import {
+  readRegistryEntry,
+  writeRegistryEntry,
+} from '../lib/registry-entry.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import { adoptCommand } from './adopt.js';
 
 const mockInput = vi.mocked(input);
+const mockConfirm = vi.mocked(confirm);
 const mockExistsSync = vi.mocked(existsSync);
 const mockStatSync = vi.mocked(statSync);
 const mockCpSync = vi.mocked(cpSync);
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockMkdirSync = vi.mocked(mkdirSync);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
 const mockWriteManifest = vi.mocked(writeManifest);
+const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
+const mockWriteRegistryEntry = vi.mocked(writeRegistryEntry);
 const mockLogger = vi.mocked(logger);
 const mockSanitiseError = vi.mocked(sanitiseError);
 
-const CWD = process.cwd();
+const REGISTRY_PATH = '/registry';
 const SOURCE_PATH = '/home/user/some-skill';
 const SKILL_MD_PATH = join(SOURCE_PATH, 'SKILL.md');
 const MANIFEST_PATH = join(SOURCE_PATH, 'manifest.json');
-const TARGET_DIR = join(CWD, 'my-skill');
+const SKILL_REGISTRY_DIR = join(REGISTRY_PATH, 'my-skill');
+const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '0.1.0');
 
 const SKILL_MD_WITH_LICENSE = `---
 name: my-skill
@@ -85,18 +122,17 @@ const SKILL_MD_NO_CLOSING_DELIMITER =
 const SKILL_MD_MISSING_NAME = '---\ndescription: A description\n---\n\nBody content here.';
 const SKILL_MD_MISSING_DESCRIPTION = '---\nname: my-skill\n---\n\nBody content here.';
 
-/** Configures existsSync per-path: source dir, SKILL.md, manifest.json, target dir. */
+/** Configures existsSync per-path: source dir, SKILL.md, manifest.json. */
 function mockFsForHappyPath(opts: {
   manifestExists?: boolean;
-  targetExists?: boolean;
   skillMdExists?: boolean;
   skillMdSize?: number;
 } = {}): void {
   mockExistsSync.mockImplementation((p: unknown) => {
+    if (p === REGISTRY_PATH) return true; // real getRegistryPath() env check
     if (p === SOURCE_PATH) return true;
     if (p === SKILL_MD_PATH) return opts.skillMdExists ?? true;
     if (p === MANIFEST_PATH) return opts.manifestExists ?? false;
-    if (p === TARGET_DIR) return opts.targetExists ?? false;
     return false;
   });
   mockStatSync.mockImplementation((p: unknown) => {
@@ -114,18 +150,27 @@ describe('adopt command', () => {
       throw new Error('process.exit called');
     });
 
+    process.env['GOODBOY_REGISTRY'] = REGISTRY_PATH;
     mockFsForHappyPath();
     mockReadFileSync.mockReturnValue(SKILL_MD_WITH_LICENSE);
     mockScanForSymlinks.mockResolvedValue(undefined);
     mockWriteManifest.mockResolvedValue(undefined);
+    mockReadRegistryEntry.mockResolvedValue(null);
+    mockWriteRegistryEntry.mockResolvedValue(undefined);
     mockInput.mockResolvedValueOnce('Test Author').mockResolvedValueOnce('');
+    mockConfirm.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    // Env leaks across test files sharing a worker process.
+    delete process.env['GOODBOY_REGISTRY'];
   });
 
   // -------------------------------------------------------------------------
   // Happy path
   // -------------------------------------------------------------------------
 
-  it('adopts a skill whose SKILL.md declares a license without prompting for one', async () => {
+  it('registers the skill: copies into the registry version dir and writes a synthesized manifest', async () => {
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
     // Exactly two prompts: author name, author email. No license prompt.
@@ -133,12 +178,34 @@ describe('adopt command', () => {
     expect(mockInput.mock.calls[0]![0]).toMatchObject({ message: 'Author name:' });
     expect(mockInput.mock.calls[1]![0]).toMatchObject({ message: 'Author email (optional):' });
 
-    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, TARGET_DIR, { recursive: true });
+    // One confirmation, defaulting to No.
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockConfirm.mock.calls[0]![0]).toMatchObject({
+      message: 'Register this skill?',
+      default: false,
+    });
+
+    expect(mockMkdirSync).toHaveBeenCalledWith(VERSION_ABS_PATH, {
+      recursive: true,
+      mode: 0o700,
+    });
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
     expect(mockWriteManifest).toHaveBeenCalledOnce();
     const [manifestPath, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
-    expect(manifestPath).toBe(join(TARGET_DIR, 'manifest.json'));
+    expect(manifestPath).toBe(join(VERSION_ABS_PATH, 'manifest.json'));
     expect(manifest.license).toBe('MIT');
     expect(() => validateManifest(manifest)).not.toThrow();
+    expect(mockWriteRegistryEntry).toHaveBeenCalledWith(
+      SKILL_REGISTRY_DIR,
+      expect.objectContaining({ name: 'my-skill', latest: '0.1.0' }),
+    );
+
+    // The source directory is untouched — the only write targeting its
+    // subtree would be a manifest.json written into it, and none is.
+    for (const call of mockWriteManifest.mock.calls) {
+      expect(call[0]).not.toContain(SOURCE_PATH);
+    }
+    expect(process.exit).not.toHaveBeenCalled();
   });
 
   it('prompts for a license only when SKILL.md declares none', async () => {
@@ -184,6 +251,81 @@ describe('adopt command', () => {
     expect(manifest.author).toMatchObject({ name: 'Test Author', email: 'author@example.com' });
   });
 
+  it('adopts a skill whose directory name matches the frontmatter name, run from its parent (the old collision case)', async () => {
+    // The regression this phase exists for: adopt run from the source's
+    // parent used to compute targetDir = join(cwd, name) == the source
+    // itself and refuse 100% of the time (backlog: "adopt collides with its
+    // own source"). No cwd target exists anymore — the registry is the
+    // destination — so this adoption must simply succeed.
+    const sourceInParent = '/tmp/scratch/my-skill';
+    mockExistsSync.mockImplementation((p: unknown) =>
+      p === REGISTRY_PATH ||
+      p === sourceInParent ||
+      p === join(sourceInParent, 'SKILL.md'),
+    );
+    mockStatSync.mockImplementation((p: unknown) =>
+      p === join(sourceInParent, 'SKILL.md')
+        ? ({ size: 1024 } as ReturnType<typeof statSync>)
+        : ({ isDirectory: () => true } as ReturnType<typeof statSync>),
+    );
+
+    await adoptCommand.parseAsync([sourceInParent], { from: 'user' });
+
+    expect(mockCpSync).toHaveBeenCalledWith(sourceInParent, VERSION_ABS_PATH, {
+      recursive: true,
+    });
+    expect(mockWriteRegistryEntry).toHaveBeenCalled();
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Decline — zero writes, exit 0
+  // -------------------------------------------------------------------------
+
+  it('declining registers nothing: zero filesystem writes anywhere, exit 0', async () => {
+    mockConfirm.mockResolvedValue(false);
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
+
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Nothing was registered — the source directory was not modified.',
+    );
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Already in the registry — refuse before any interaction
+  // -------------------------------------------------------------------------
+
+  it('refuses with a pointer to skill version --bump when the skill already has any registry entry', async () => {
+    mockReadRegistryEntry.mockResolvedValue({
+      name: 'my-skill',
+      latest: '0.9.0',
+      versions: { '0.9.0': { path: 'versions/0.9.0', addedAt: '2026-01-01T00:00:00Z', yanked: false } },
+    });
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('already in the local registry'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining("goodboy skill version my-skill --bump <patch|minor|major>"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    // Refusal happens before prompts, scan, or any write.
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
   // -------------------------------------------------------------------------
   // validate closures passed to input() — extracted from the mock's
   // recorded call arguments and invoked directly, since input() itself is
@@ -191,25 +333,29 @@ describe('adopt command', () => {
   // -------------------------------------------------------------------------
 
   describe('validate closures', () => {
-    it('author name: rejects empty and whitespace-only, accepts non-empty', async () => {
+    it('author name: rejects empty and whitespace-only, accepts non-empty (C3: 128-char bound)', async () => {
       await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
       const validate = mockInput.mock.calls[0]![0].validate!;
       expect(validate('')).toBe('Author name is required');
       expect(validate('   ')).toBe('Author name is required');
+      expect(validate('x'.repeat(129))).toBe('Author name must be 128 characters or fewer');
+      expect(validate('x'.repeat(128))).toBe(true);
       expect(validate('Test Author')).toBe(true);
     });
 
-    it('author email: accepts empty (optional), rejects malformed, accepts well-formed', async () => {
+    it('author email: accepts empty (optional), rejects malformed, accepts well-formed (C3: 254-char bound)', async () => {
       await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
       const validate = mockInput.mock.calls[1]![0].validate!;
       expect(validate('')).toBe(true);
+      expect(validate('a'.repeat(255))).toBe('Email address must be 254 characters or fewer');
       expect(validate('not-an-email')).toBe('"not-an-email" is not a valid email address');
+      expect(validate(`${'a'.repeat(200)}@example.com`)).toBe(true);
       expect(validate('author@example.com')).toBe(true);
     });
 
-    it('license: rejects empty, accepts non-empty — only reachable when SKILL.md declares none', async () => {
+    it('license: rejects empty, accepts non-empty — only reachable when SKILL.md declares none (C3: 64-char bound)', async () => {
       mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
       mockInput
         .mockReset()
@@ -221,8 +367,71 @@ describe('adopt command', () => {
 
       const validate = mockInput.mock.calls[2]![0].validate!;
       expect(validate('')).toBe('License is required');
+      expect(validate('x'.repeat(65))).toBe('License must be 64 characters or fewer');
+      expect(validate('x'.repeat(64))).toBe(true);
       expect(validate('MIT')).toBe(true);
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // Synthesized-manifest schema gate (C5f; C5f-b: input pre-checks first)
+  // -------------------------------------------------------------------------
+
+  it('rejects a description over 1024 characters with an input-attributed error before any prompt (C3)', async () => {
+    mockReadFileSync.mockReturnValue(
+      `---\nname: my-skill\ndescription: ${'x'.repeat(1100)}\nlicense: MIT\n---\n\nBody content here.`,
+    );
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'The description in SKILL.md exceeds the 1024-character limit for manifest descriptions',
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it('rejects a broken synthesis against the schema when every pre-check passes', async () => {
+    vi.mocked(validateManifest).mockImplementationOnce(() => {
+      throw new Error('schema blew up');
+    });
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Synthesized manifest failed schema validation'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('schema blew up'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it('handles a non-Error thrown by the synthesis gate with the String fallback (C5f)', async () => {
+    vi.mocked(validateManifest).mockImplementationOnce(() => {
+      throw 'boom';
+    });
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Synthesized manifest failed schema validation'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('boom'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockCpSync).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -264,6 +473,7 @@ describe('adopt command', () => {
       await adoptCommand.parseAsync(['https://github.com/foo/bar'], { from: 'user' }).catch(() => {});
 
       expect(mockInput).not.toHaveBeenCalled();
+      expect(mockConfirm).not.toHaveBeenCalled();
     });
   });
 
@@ -308,7 +518,7 @@ describe('adopt command', () => {
 
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
-    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, TARGET_DIR, { recursive: true });
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
   });
 
   it('rejects a SKILL.md over the 512 KB size limit, with no directory created and no prompts run', async () => {
@@ -374,7 +584,7 @@ describe('adopt command', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Name validation and target-directory collision
+  // Name validation
   // -------------------------------------------------------------------------
 
   it('rejects an invalid name before creating any directory', async () => {
@@ -387,16 +597,36 @@ describe('adopt command', () => {
     expect(mockInput).not.toHaveBeenCalled();
   });
 
-  it('refuses when ./<name>/ already exists in the current directory', async () => {
-    mockFsForHappyPath({ targetExists: true });
-
+  it('rejects a name over 64 characters with an input-attributed error before any prompt (C3)', async () => {
+    mockReadFileSync.mockReturnValue(
+      `---\nname: ${'a'.repeat(65)}\ndescription: A well-described skill for testing purposes\n---\n\nBody content here that is longer than fifty characters for sure.`,
+    );
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
-
     expect(mockLogger.error).toHaveBeenCalledWith(
-      expect.stringContaining('already exists in the current directory'),
+      `Skill name "${'a'.repeat(65)}" in SKILL.md frontmatter exceeds the 64-character limit`,
     );
     expect(mockCpSync).not.toHaveBeenCalled();
     expect(mockInput).not.toHaveBeenCalled();
+  });
+
+  it('rejects a frontmatter license over 64 characters with an input-attributed error after the author prompts (C3)', async () => {
+    mockReadFileSync.mockReturnValue(
+      `---\nname: my-skill\ndescription: A well-described skill for testing purposes\nlicense: ${'a'.repeat(65)}\n---\n\nBody content here that is longer than fifty characters for sure.`,
+    );
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'The license in SKILL.md exceeds the 64-character limit for manifest licenses',
+    );
+    // The frontmatter-license check sits after the author prompts (the user
+    // cannot fix the frontmatter from inside them), but the confirmation and
+    // every write come later and must not run.
+    expect(mockInput).toHaveBeenCalledTimes(2);
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -423,23 +653,41 @@ describe('adopt command', () => {
     expect(mockCpSync).not.toHaveBeenCalled();
     expect(mockWriteManifest).not.toHaveBeenCalled();
     expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
-  // Source directory is never written to
+  // The source directory is never written to
   // -------------------------------------------------------------------------
 
-  it('never targets the source directory in any write/copy call, across every failure path', async () => {
+  it('never writes to the source directory, across every failure path', async () => {
     const scenarios: Array<() => void> = [
       () => mockExistsSync.mockReturnValue(false),
       () => mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>),
       () => mockFsForHappyPath({ skillMdExists: false }),
       () => mockFsForHappyPath({ manifestExists: true }),
       () => mockReadFileSync.mockReturnValue(SKILL_MD_NO_OPENING_DELIMITER),
-      () => mockFsForHappyPath({ targetExists: true }),
       () =>
         mockScanForSymlinks.mockRejectedValue(
           new Error('Security: skill contains a symlink pointing outside its directory'),
+        ),
+      () =>
+        mockReadRegistryEntry.mockResolvedValue({
+          name: 'my-skill',
+          latest: '0.9.0',
+          versions: { '0.9.0': { path: 'versions/0.9.0', addedAt: '2026-01-01T00:00:00Z', yanked: false } },
+        }),
+      () =>
+        mockReadFileSync.mockReturnValue(
+          `---\nname: my-skill\ndescription: ${'x'.repeat(1100)}\nlicense: MIT\n---\n\nBody content here.`,
+        ),
+      () =>
+        mockReadFileSync.mockReturnValue(
+          `---\nname: ${'a'.repeat(65)}\ndescription: A well-described skill for testing purposes\n---\n\nBody content here.`,
+        ),
+      () =>
+        mockReadFileSync.mockReturnValue(
+          `---\nname: my-skill\ndescription: A well-described skill for testing purposes\nlicense: ${'a'.repeat(65)}\n---\n\nBody content here.`,
         ),
     ];
 
@@ -448,6 +696,7 @@ describe('adopt command', () => {
       mockFsForHappyPath();
       mockReadFileSync.mockReturnValue(SKILL_MD_WITH_LICENSE);
       mockScanForSymlinks.mockResolvedValue(undefined);
+      mockReadRegistryEntry.mockResolvedValue(null);
       setup();
 
       await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
@@ -462,15 +711,16 @@ describe('adopt command', () => {
         expect(call[1]).not.toBe(SOURCE_PATH);
       }
       expect(mockWriteManifest).not.toHaveBeenCalled();
+      expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
     }
   });
 
-  it('only reads from the source path on the happy path (existsSync, statSync, readFileSync, scanForSymlinks) — the one write call targets the copy', async () => {
+  it('only reads from the source path on the happy path (existsSync, statSync, readFileSync, scanForSymlinks) — the one write call targets the registry', async () => {
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
     expect(mockCpSync).toHaveBeenCalledTimes(1);
     expect(mockCpSync.mock.calls[0]![0]).toBe(SOURCE_PATH);
-    expect(mockCpSync.mock.calls[0]![1]).toBe(TARGET_DIR);
+    expect(mockCpSync.mock.calls[0]![1]).toBe(VERSION_ABS_PATH);
     expect(mockCpSync.mock.calls[0]![1]).not.toBe(SOURCE_PATH);
   });
 
@@ -499,13 +749,23 @@ describe('adopt command', () => {
     expect(mockLogger.error).toHaveBeenCalledWith('SANITISED:disk full');
   });
 
-  it('exits 0 without an error message when the prompt is force-closed', async () => {
+  it('exits 0 without an error message when an input prompt is force-closed', async () => {
     mockInput.mockReset().mockRejectedValueOnce(new Error('User force closed the prompt'));
 
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
 
     expect(mockLogger.error).not.toHaveBeenCalled();
     expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  it('exits 0 without an error message when the confirmation prompt is force-closed', async () => {
+    mockConfirm.mockRejectedValueOnce(new Error('User force closed the prompt'));
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(mockCpSync).not.toHaveBeenCalled();
   });
 
   it('logs sanitiseError()\'s fallback text and exits 1 when a non-Error value is thrown (C3)', async () => {
@@ -518,18 +778,42 @@ describe('adopt command', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Trailer / success message (required behavior #11, C2)
+  // Manifest display + trailer / success message
   // -------------------------------------------------------------------------
 
-  it('prints the trailer with name, version, path, and the goodboy add follow-up (C2)', async () => {
+  it('shows the synthesized manifest before asking for confirmation', async () => {
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
+
+    const infoLines = mockLogger.info.mock.calls.map((c) => c[0]).join('\n');
+    expect(infoLines).toContain('Name:            my-skill');
+    expect(infoLines).toContain('Version:         0.1.0');
+    expect(infoLines).toContain('Description:     A well-described skill for testing purposes');
+    expect(infoLines).toContain('Author:          Test Author');
+    expect(infoLines).toContain('License:         MIT');
+    expect(infoLines).toContain('Schema version:  2.0.0');
+    expect(infoLines).toContain('Status:          experimental');
+    expect(infoLines).toContain('Category:        other');
+  });
+
+  it('includes author email in the displayed manifest when provided', async () => {
+    mockInput.mockReset().mockResolvedValueOnce('Test Author').mockResolvedValueOnce('author@example.com');
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
+
+    const infoLines = mockLogger.info.mock.calls.map((c) => c[0]).join('\n');
+    expect(infoLines).toContain('Author:          Test Author <author@example.com>');
+  });
+
+  it('prints the trailer with name, version, registry path, source-unmodified, and the install follow-up (C2)', async () => {
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' });
 
     const infoLines = mockLogger.info.mock.calls.map((c) => c[0]).join('\n');
     expect(infoLines).toContain('Name:    my-skill');
     expect(infoLines).toContain('Version: 0.1.0');
-    expect(infoLines).toContain(`Path:    ${TARGET_DIR}`);
+    expect(infoLines).toContain(`Registry: ${SKILL_REGISTRY_DIR}`);
     expect(infoLines).toContain('manifest.json synthesized from SKILL.md');
-    expect(infoLines).toContain("Run 'goodboy add ./my-skill' to add this skill to your local registry.");
+    expect(infoLines).toContain('the source directory was not modified');
+    expect(infoLines).toContain("Next: run 'goodboy install my-skill' to install this skill.");
+    expect(infoLines).not.toContain('goodboy add');
     expect(mockLogger.success).toHaveBeenCalledWith('Adopted skill "my-skill"');
   });
 });

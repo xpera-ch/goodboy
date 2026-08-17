@@ -1,11 +1,13 @@
 import { Command } from 'commander';
-import { input } from '@inquirer/prompts';
+import { input, confirm } from '@inquirer/prompts';
 import ora from 'ora';
-import { existsSync, statSync, cpSync, readFileSync } from 'node:fs';
+import { existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { parseFrontmatter } from '../lib/skill-validator.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
-import { writeManifest } from '../lib/manifest.js';
+import { validateManifest } from '../lib/manifest.js';
+import { getRegistryPath, writeSkillVersionToRegistry } from '../lib/registry.js';
+import { readRegistryEntry } from '../lib/registry-entry.js';
 import { SKILL_NAME_RE, isRemoteRefArgument } from '../lib/validation.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 import type { GoodBoyManifest } from '../types/index.js';
@@ -82,18 +84,34 @@ async function run(pathArg: string): Promise<void> {
     logger.error('SKILL.md frontmatter is missing the description field');
     throw new HandledFailure();
   }
+  if (fm.description.length > 1024) {
+    logger.error(
+      'The description in SKILL.md exceeds the 1024-character limit for manifest descriptions',
+    );
+    throw new HandledFailure();
+  }
 
   const name = fm.name;
   if (!SKILL_NAME_RE.test(name)) {
     logger.error(`Invalid skill name "${name}" in SKILL.md frontmatter: must match ^[a-z0-9-]+$`);
     throw new HandledFailure();
   }
+  if (name.length > 64) {
+    logger.error(`Skill name "${name}" in SKILL.md frontmatter exceeds the 64-character limit`);
+    throw new HandledFailure();
+  }
 
-  const targetDir = join(process.cwd(), name);
-  if (existsSync(targetDir)) {
+  // Refuse before any interaction: adopt onboards a skill the registry does
+  // not know yet. If registry-entry.json already exists for this name — any
+  // version — the user wants a new version, which is `skill version`'s job
+  // (docs/decisions.md, 2026-08-17). No --force for adopt, by design.
+  const registryPath = getRegistryPath();
+  const skillRegistryDir = join(registryPath, name);
+  const existingEntry = await readRegistryEntry(skillRegistryDir);
+  if (existingEntry) {
     logger.error(
-      `Directory "${name}" already exists in the current directory. ` +
-        `Choose a different skill name or remove the existing directory.`,
+      `Skill "${name}" is already in the local registry. ` +
+        `To add a new version, run 'goodboy skill version ${name} --bump <patch|minor|major>'.`,
     );
     throw new HandledFailure();
   }
@@ -110,7 +128,11 @@ async function run(pathArg: string): Promise<void> {
 
   const authorName = await input({
     message: 'Author name:',
-    validate: (v) => (v.trim().length > 0 ? true : 'Author name is required'),
+    validate: (v) => {
+      const t = v.trim();
+      if (t.length === 0) return 'Author name is required';
+      return t.length <= 128 ? true : 'Author name must be 128 characters or fewer';
+    },
   });
 
   const authorEmail = await input({
@@ -118,6 +140,7 @@ async function run(pathArg: string): Promise<void> {
     validate: (v) => {
       const t = v.trim();
       if (t.length === 0) return true;
+      if (t.length > 254) return 'Email address must be 254 characters or fewer';
       return EMAIL_RE.test(t) ? true : `"${t}" is not a valid email address`;
     },
   });
@@ -126,8 +149,16 @@ async function run(pathArg: string): Promise<void> {
   if (!license) {
     license = await input({
       message: 'License:',
-      validate: (v) => (v.trim().length > 0 ? true : 'License is required'),
+      validate: (v) => {
+        const t = v.trim();
+        if (t.length === 0) return 'License is required';
+        return t.length <= 64 ? true : 'License must be 64 characters or fewer';
+      },
     });
+  }
+  if (license.trim().length > 64) {
+    logger.error('The license in SKILL.md exceeds the 64-character limit for manifest licenses');
+    throw new HandledFailure();
   }
 
   const manifest: GoodBoyManifest = {
@@ -144,28 +175,78 @@ async function run(pathArg: string): Promise<void> {
     category: 'other',
   };
 
-  const copySpinner = ora('Copying skill files...').start();
+  // Schema-check the synthesis in memory before showing it. Note:
+  // validateSkillDirectory() is deliberately NOT used here — it reads
+  // manifest.json from disk, and the source has none; the schema check on
+  // the in-memory object is the applicable gate (and a construction bug in
+  // the synthesis above fails here, never reaching the registry). Every
+  // schema-bounded input (name, description, author name/email, license)
+  // is pre-checked with its own input-attributed error above, so a failure
+  // at this gate genuinely is a GoodBoy bug, not user input.
+  let validated: GoodBoyManifest;
   try {
-    cpSync(sourcePath, targetDir, { recursive: true });
-    await writeManifest(join(targetDir, 'manifest.json'), manifest);
-    copySpinner.succeed('Adopted skill');
+    validated = validateManifest(manifest);
   } catch (err) {
-    copySpinner.fail('Failed to adopt skill');
+    logger.error(
+      `Synthesized manifest failed schema validation (this is a GoodBoy bug, not a problem with the skill): ` +
+        (err instanceof Error ? err.message : String(err)),
+    );
+    throw new HandledFailure();
+  }
+
+  logger.info('');
+  logger.info('  Registering the following manifest:');
+  logger.info(`  Name:            ${validated.name}`);
+  logger.info(`  Version:         ${validated.version}`);
+  logger.info(`  Description:     ${validated.description}`);
+  logger.info(
+    `  Author:          ${validated.author.name}${validated.author.email ? ` <${validated.author.email}>` : ''}`,
+  );
+  logger.info(`  License:         ${validated.license}`);
+  logger.info(`  Schema version:  ${validated.schema_version}`);
+  logger.info(`  Status:          ${validated.status}`);
+  logger.info(`  Category:        ${validated.category}`);
+
+  // Registry versions are immutable — a wrong license or typo'd author
+  // would cost a `registry remove` or a version bump, so the confirmation
+  // defaults to No (decisions.md, 2026-08-17).
+  const confirmed = await confirm({
+    message: 'Register this skill?',
+    default: false,
+  });
+  if (!confirmed) {
+    logger.info('Nothing was registered — the source directory was not modified.');
+    return;
+  }
+
+  const writeSpinner = ora('Copying skill files...').start();
+  let result: Awaited<ReturnType<typeof writeSkillVersionToRegistry>>;
+  try {
+    result = await writeSkillVersionToRegistry({
+      sourceDir: sourcePath,
+      manifest: validated,
+      manifestToWrite: true,
+      mustBeNew: true,
+    });
+    writeSpinner.succeed('Adopted skill');
+  } catch (err) {
+    writeSpinner.fail('Failed to adopt skill');
     throw err;
   }
 
   logger.info('');
-  logger.info(`  Name:    ${manifest.name}`);
-  logger.info(`  Version: ${manifest.version}`);
-  logger.info(`  Path:    ${targetDir}`);
+  logger.info(`  Name:    ${validated.name}`);
+  logger.info(`  Version: ${validated.version}`);
+  logger.info(`  Registry: ${result.skillRegistryDir}`);
   logger.info('  Created: manifest.json synthesized from SKILL.md, plus copied skill files');
+  logger.info('  Source:  the source directory was not modified');
   logger.info('');
-  logger.info(`  Run 'goodboy add ./${manifest.name}' to add this skill to your local registry.`);
-  logger.success(`Adopted skill "${manifest.name}"`);
+  logger.info(`  Next: run 'goodboy install ${validated.name}' to install this skill.`);
+  logger.success(`Adopted skill "${validated.name}"`);
 }
 
 export const adoptCommand = new Command('adopt')
-  .description('Onboard an existing SKILL.md-only skill (no manifest.json) into a new local skill directory')
+  .description('Onboard an existing SKILL.md-only skill (no manifest.json) into the local registry')
   .argument('<path>', 'Local path to an existing skill directory containing SKILL.md but no manifest.json')
   .action(async (pathArg: string) => {
     try {
