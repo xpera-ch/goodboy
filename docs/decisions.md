@@ -21,6 +21,122 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-17 — Shared-path uninstall message describes the convention, never names a co-reader agent
+
+**Decided (Bruno):** when `removeAgentSymlinks` asks for confirmation
+before removing a symlink under a path more than one agent's entry in
+`AGENT_SKILL_DIRS` points at, the message must describe the shared
+convention directory (e.g. "part of the shared `~/.agents/skills`
+convention") and never name a specific agent product (the previous
+wording: `"also read by: gemini"`).
+
+**What prompted it.** Found by Bruno running the C6 checklist's §11
+(agent visibility) against a Codex uninstall. Two objections, one style
+and one substantive: naming products creates a list GoodBoy would have to
+keep accurate as more `--<agent>` flags are added — exactly the
+maintenance burden the `agents` escape-hatch key was already invented to
+avoid elsewhere in this file (`AGENT_SKILL_DIRS`). More importantly,
+`agentsSharingPath`'s own comment already states GoodBoy "cannot know
+which other tools actually read a directory" — the map records which
+agent flags *could* point at a path, not which ones are actually
+installed for a given skill. `"also read by: gemini"` can print even when
+gemini was never installed for that skill, which is a correctness problem
+dressed as a wording problem, not merely a preference.
+
+**Not changed:** the `shared` classification itself (`agentsSharingPath`,
+more than one agent's list containing the path) and the confirmation
+gate's behavior (decline still aborts the whole removal with zero side
+effects) — this only changes what the message *says*, not when it's shown
+or what happens on decline. Exact string left to the implementer;
+Bruno explicitly does not want to gate this on wording review.
+
+**Bundled with an unrelated fix in the same phase:** the confirmation
+prompt was also unreadable/unanswerable in a real terminal — `uninstall.ts`
+never stops its `ora` spinner before the interactive prompt runs, unlike
+`install.ts`'s already-correct `spinner.stop()`/`spinner.start()` pattern
+around its own consent prompt. Both fixes live in the shared-path uninstall
+flow and ship together as `C5g-fix-uninstall-confirmation-prompt.md`.
+
+---
+
+## 2026-08-17 — `adopt` writes to the registry, not the cwd; and the registry path becomes configurable. Supersedes part of the 2026-08-05 adopt design
+
+**Decided (Bruno, 2026-08-17), in two sequenced phases, and this
+*blocks the 0.3.0 tag*.**
+
+**What prompted it.** The C6 manual checklist failed on its first step:
+`goodboy adopt <dir>` run from the skill's parent directory always
+collides with its own source, because the Agent Skills standard requires
+the frontmatter `name` to equal the directory name and adopt copies to
+`join(cwd, name)`. See `docs/backlog.md`. Bruno's framing of the
+underlying problem, which is the part worth recording: the cwd copy is
+the wrong destination — *"either the adopt command should be done inside
+the private registry, but that would be bad UX if we have to navigate to
+the private registry."*
+
+**Phase 1 — `getRegistryPath()` reads `goodboy.json`'s `registry`
+field.** The field exists and `init --registry` writes it; nothing reads
+it. A consumer now exists, so it gets read rather than removed.
+**Open security question, deliberately unresolved here:** `goodboy.json`
+is untrusted input arriving in every clone, unlike the deliberately-set
+`GOODBOY_REGISTRY` env var, so letting it choose the registry path is a
+trust-boundary change. The scope/validation/precedence questions are
+listed in the backlog entry and **must be settled before the phase prompt
+is drafted**.
+
+**Phase 2 — `adopt` synthesizes the manifest, shows it, asks for
+confirmation, and writes into the local registry.** No stray copy in the
+cwd, no collision, no mandatory second command.
+
+**What this supersedes.** The 2026-08-05 adopt design chose *not* to
+chain into `add`, "so the user gets a chance to inspect the synthesized
+manifest before it's registered" — the atomic-commands principle. That
+reasoning is respected, not discarded: **the inspection chance does not
+require a stray directory.** A confirmation prompt showing the
+synthesized manifest preserves the user's agency and removes the litter.
+Writing to the registry is adopt's actual job, so doing it is not the
+"magic" the principle guards against.
+
+**Still true, not reopened:** `add` and `adopt` stay separate commands
+(different inputs — manifest-carrying vs. not); adopt never mutates the
+source directory; the never-overwrite guard on an existing target is a
+security invariant and stays.
+
+**Phase 2 concept questions — settled 2026-08-17 (Bruno):**
+
+1. **Inspection:** adopt prints the synthesized manifest and asks for
+   confirmation before writing; on decline nothing is written and nothing
+   is left behind. **No copy anywhere** — the cwd copy existed solely as
+   staging for the `add` step that no longer exists. The confirmation is
+   the natural close of a dialogue adopt already has (it prompts for
+   author, email, license), and it matters more than it looks because
+   **registry versions are immutable**: a wrong license or typo'd author
+   otherwise costs a `registry remove` or a version bump.
+2. **Skill already in the registry: refuse with a pointer.** Stricter
+   than `add`, which refuses only on a colliding *version* and offers
+   `--force`. adopt is an onboarding command — if the skill is already
+   known, the user wants a new version, not an adoption. **No `--force`
+   for adopt.**
+3. **Reuse, don't duplicate.** adopt and `add` share one registry-write
+   path. The seam needs care: `add` reads `manifest.json` from disk, adopt
+   builds it in memory, so the shared function takes the manifest as an
+   argument rather than re-reading it — and `add`'s observable behavior
+   must not change (its existing tests are the proof).
+
+**Sequencing correction, same day:** the registry-path-from-config work
+(Phase 1) was originally sequenced first, but **the dependency is not
+real** — adopt can write to the registry path as it already resolves
+(`GOODBOY_REGISTRY` or the default). Phase 1 carries an unresolved
+untrusted-input security question; decoupling it keeps that question from
+blocking the release-blocking fix. Phase 2 goes first and alone.
+
+**Release timing (Bruno):** this blocks the 0.3.0 tag. `adopt` was
+promoted to a go-public gate precisely because it is "the first thing a
+visitor arriving from an external catalog tries" — shipping it broken in
+its most natural invocation is worse than delaying the tag.
+
+---
+
 ## 2026-08-15 — Terminal tab-completion: self-generated templates + a hidden `__complete` protocol
 
 **Decided (Bruno, 2026-08-15):** GoodBoy gets shell tab-completion for
