@@ -31,7 +31,11 @@ complete -o default -F _goodboy_complete goodboy
 `;
 
 export const FISH_TEMPLATE = `function __goodboy_complete
-  goodboy __complete -- (commandline -opc)
+  # -xpc: every completed token before the cursor, excluding the in-progress
+  # one; the first is the program name, dropped like bash/zsh's slice from
+  # index 1. -ct fetches the (possibly empty) in-progress token separately.
+  set -l tokens (commandline -xpc)
+  goodboy __complete -- $tokens[2..] "$(commandline -ct)"
 end
 complete -c goodboy -f -a "(__goodboy_complete)"
 `;

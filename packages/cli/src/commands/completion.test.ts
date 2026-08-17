@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { execFileSync } from 'node:child_process';
 
 vi.mock('../lib/completion.js', () => ({
   complete: vi.fn(),
@@ -167,6 +168,49 @@ describe('completion command — templates', () => {
     expect(process.stdout.listenerCount('error')).toBe(1);
     // An EPIPE on stdout must be swallowed — never an unhandled crash.
     expect(() => process.stdout.emit('error', new Error('EPIPE'))).not.toThrow();
+  });
+});
+
+// Every other test in this file compares template strings against the
+// exported constants themselves — never through a real shell. This describe
+// closes that gap for fish: FISH_TEMPLATE is sourced into a real fish
+// process and exercised via fish's own scripted-completion entry point
+// (`complete -C STRING`), with `goodboy` stubbed as a fish function so no
+// linked CLI is needed on PATH.
+describe('completion command — real fish', () => {
+  const hasFish = (() => {
+    try {
+      execFileSync('fish', ['--version'], { stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  // The stub echoes the arguments __goodboy_complete passes it, joined with
+  // "|" so empty elements stay visible: `ARGS:[__complete|]` is
+  // ["__complete", ""] — the empty final word survives. A literal `--`
+  // separator never appears: fish strips it when calling a function, though
+  // it reaches external commands like the real goodboy binary.
+  function capturedArgs(buffer: string): string {
+    const script = [
+      'function goodboy; echo "ARGS:["(string join "|" $argv)"]"; end',
+      FISH_TEMPLATE,
+      buffer,
+    ].join('\n');
+    return execFileSync('fish', ['-c', script], { encoding: 'utf8' }).trim();
+  }
+
+  it.skipIf(!hasFish)('"goodboy " + tab → empty final word', () => {
+    expect(capturedArgs('complete -C "goodboy "')).toContain('ARGS:[__complete|]');
+  });
+
+  it.skipIf(!hasFish)('"goodboy ins" + tab → ins as the final word', () => {
+    expect(capturedArgs('complete -C "goodboy ins"')).toContain('ARGS:[__complete|ins]');
+  });
+
+  it.skipIf(!hasFish)('"goodboy install " + tab → install, then empty final word', () => {
+    expect(capturedArgs('complete -C "goodboy install "')).toContain('ARGS:[__complete|install|]');
   });
 });
 
