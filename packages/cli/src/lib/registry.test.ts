@@ -11,10 +11,11 @@ vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, cpSync } from 'node:fs';
 import { readManifest, validateManifest } from './manifest.js';
 import {
   readRegistryEntry,
+  writeRegistryEntry,
   resolveLatestVersion,
   resolveVersionPath,
 } from './registry-entry.js';
@@ -26,16 +27,20 @@ import {
   ensureRegistryExists,
   listRegistry,
   listInstalled,
+  writeSkillVersionToRegistry,
 } from './registry.js';
 import type { RegistryEntry } from './registry-entry.js';
+import type { GoodBoyManifest } from '../types/index.js';
 import { loadFixture } from '../__fixtures__/index.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
+const mockCpSync = vi.mocked(cpSync);
 const mockReaddirSync = vi.mocked(readdirSync);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
 const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
+const mockWriteRegistryEntry = vi.mocked(writeRegistryEntry);
 const mockResolveLatestVersion = vi.mocked(resolveLatestVersion);
 const mockResolveVersionPath = vi.mocked(resolveVersionPath);
 const mockLoggerWarn = vi.mocked(logger.warn);
@@ -503,5 +508,163 @@ describe('listInstalled()', () => {
     expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('invalid manifest'),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// writeSkillVersionToRegistry()
+// ---------------------------------------------------------------------------
+
+describe('writeSkillVersionToRegistry()', () => {
+  const SOURCE_DIR = '/src';
+  const SKILL_REGISTRY_DIR = join(DEFAULT_REGISTRY, 'my-skill');
+  const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '1.0.0');
+
+  const MANIFEST: GoodBoyManifest = {
+    name: 'my-skill',
+    version: '1.0.0',
+    description: 'A test skill',
+    author: { name: 'Test' },
+    license: 'MIT',
+    schema_version: '2.0.0',
+    status: 'experimental',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env['GOODBOY_REGISTRY'];
+    mockExistsSync.mockReturnValue(true);
+    mockReadRegistryEntry.mockResolvedValue(null);
+  });
+
+  it('rejects an invalid name before any filesystem or registry access', async () => {
+    await expect(
+      writeSkillVersionToRegistry({
+        sourceDir: SOURCE_DIR,
+        manifest: { ...MANIFEST, name: 'Bad_Name' },
+      }),
+    ).rejects.toThrow('Invalid skill name "Bad_Name": must match ^[a-z0-9-]+$');
+
+    expect(mockExistsSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockReadRegistryEntry).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  // F2 regression: the review's probe wrote a manifest with
+  // version: '../../../escaped2' and observed files land outside the
+  // registry root. The guard must reject it before any filesystem call.
+  it('F2 regression — rejects version "../../../escaped2" before any filesystem access', async () => {
+    await expect(
+      writeSkillVersionToRegistry({
+        sourceDir: SOURCE_DIR,
+        manifest: { ...MANIFEST, version: '../../../escaped2' },
+      }),
+    ).rejects.toThrow('Invalid version "../../../escaped2"');
+
+    expect(mockExistsSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockReadRegistryEntry).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it.each(['1.0', 'latest', 'v1.0.0'])(
+    'rejects non-semver version "%s" before any filesystem access',
+    async (version) => {
+      await expect(
+        writeSkillVersionToRegistry({
+          sourceDir: SOURCE_DIR,
+          manifest: { ...MANIFEST, version },
+        }),
+      ).rejects.toThrow('Invalid version');
+      expect(mockMkdirSync).not.toHaveBeenCalled();
+      expect(mockCpSync).not.toHaveBeenCalled();
+      expect(mockReadRegistryEntry).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses an orphaned version directory (exists on disk, no entry) unless force', async () => {
+    // existsSync defaults to true in beforeEach: the version dir is on disk.
+    await expect(
+      writeSkillVersionToRegistry({ sourceDir: SOURCE_DIR, manifest: MANIFEST }),
+    ).rejects.toThrow(
+      'exists on disk but has no registry entry — a previous write may have failed partway',
+    );
+
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it('refuses an orphaned version directory even when the entry lists other versions', async () => {
+    mockReadRegistryEntry.mockResolvedValue(makeRegistryEntry('my-skill', '0.9.0'));
+
+    await expect(
+      writeSkillVersionToRegistry({ sourceDir: SOURCE_DIR, manifest: MANIFEST }),
+    ).rejects.toThrow('exists on disk but has no registry entry');
+
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it('writes over an orphaned version directory when force is set', async () => {
+    await writeSkillVersionToRegistry({
+      sourceDir: SOURCE_DIR,
+      manifest: MANIFEST,
+      force: true,
+    });
+
+    expect(mockMkdirSync).toHaveBeenCalledWith(
+      VERSION_ABS_PATH,
+      expect.objectContaining({ recursive: true, mode: 0o700 }),
+    );
+    expect(mockCpSync).toHaveBeenCalledWith(
+      SOURCE_DIR,
+      VERSION_ABS_PATH,
+      { recursive: true },
+    );
+    expect(mockWriteRegistryEntry).toHaveBeenCalledWith(SKILL_REGISTRY_DIR, undefined);
+  });
+
+  it('mustBeNew refuses an existing entry of any version, even with force', async () => {
+    mockReadRegistryEntry.mockResolvedValue(makeRegistryEntry('my-skill', '0.9.0'));
+
+    await expect(
+      writeSkillVersionToRegistry({
+        sourceDir: SOURCE_DIR,
+        manifest: MANIFEST,
+        mustBeNew: true,
+        force: true,
+      }),
+    ).rejects.toThrow(
+      'Skill "my-skill" is already in the local registry — adopt only registers skills the registry does not know yet',
+    );
+
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+  });
+
+  it('adds a new version to an existing entry when mustBeNew is absent (add path)', async () => {
+    mockReadRegistryEntry.mockResolvedValue(makeRegistryEntry('my-skill', '0.9.0'));
+    mockExistsSync.mockReturnValue(false);
+
+    const result = await writeSkillVersionToRegistry({
+      sourceDir: SOURCE_DIR,
+      manifest: MANIFEST,
+    });
+
+    expect(result.skillRegistryDir).toBe(SKILL_REGISTRY_DIR);
+    expect(result.versionAbsPath).toBe(VERSION_ABS_PATH);
+    expect(result.overwritten).toBe(false);
+    expect(mockMkdirSync).toHaveBeenCalledWith(
+      VERSION_ABS_PATH,
+      expect.objectContaining({ recursive: true, mode: 0o700 }),
+    );
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_DIR, VERSION_ABS_PATH, { recursive: true });
+    expect(mockWriteRegistryEntry).toHaveBeenCalledWith(SKILL_REGISTRY_DIR, undefined);
   });
 });

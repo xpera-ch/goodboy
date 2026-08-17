@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import type { GoodBoyManifest } from '../types/index.js';
 
@@ -23,7 +23,24 @@ vi.mock('../lib/validation.js', async (importOriginal) => {
 vi.mock('../lib/skill-validator.js');
 vi.mock('../lib/manifest.js');
 vi.mock('../lib/fs-security.js');
-vi.mock('../lib/registry.js');
+// registry.js is NOT auto-mocked: `add` now delegates the whole write to
+// the real writeSkillVersionToRegistry (extracted to registry.ts in C5f),
+// so these tests exercise the real shared write path under mocked fs —
+// the existing cpSync/mkdirSync/writeRegistryEntry assertions are the
+// proof that the extraction did not change add's behavior. The registry
+// path itself is controlled the way the real module reads it: the
+// GOODBOY_REGISTRY env var (set in beforeEach; the exported
+// getRegistryPath is the real one — stubbing the export would not affect
+// the real function's internal calls anyway).
+vi.mock('../lib/registry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/registry.js')>();
+  return {
+    ...actual,
+    // Kept as a mock only so the remote-ref tests' "not called" assertions
+    // stay meaningful on a callable mock rather than a real function.
+    ensureRegistryExists: vi.fn(),
+  };
+});
 vi.mock('../lib/registry-entry.js');
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
@@ -32,9 +49,9 @@ vi.mock('../lib/logger.js', () => ({
 import ora from 'ora';
 import { existsSync, mkdirSync, cpSync } from 'node:fs';
 import { validateSkillDirectory, formatValidationResult } from '../lib/skill-validator.js';
-import { readManifest, validateManifest } from '../lib/manifest.js';
+import { readManifest, validateManifest, writeManifest } from '../lib/manifest.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
-import { getRegistryPath, ensureRegistryExists } from '../lib/registry.js';
+import { ensureRegistryExists } from '../lib/registry.js';
 import {
   readRegistryEntry,
   writeRegistryEntry,
@@ -53,7 +70,6 @@ const mockFormatValidationResult = vi.mocked(formatValidationResult);
 const mockReadManifest = vi.mocked(readManifest);
 const mockValidateManifest = vi.mocked(validateManifest);
 const mockScanForSymlinks = vi.mocked(scanForSymlinks);
-const mockGetRegistryPath = vi.mocked(getRegistryPath);
 const mockEnsureRegistryExists = vi.mocked(ensureRegistryExists);
 const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
 const mockWriteRegistryEntry = vi.mocked(writeRegistryEntry);
@@ -63,6 +79,8 @@ const mockLogger = vi.mocked(logger);
 
 const REGISTRY_PATH = '/registry';
 const SKILL_PATH = '/home/user/my-skill';
+const SKILL_REGISTRY_DIR = join(REGISTRY_PATH, 'my-skill');
+const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '1.0.0');
 
 const MANIFEST: GoodBoyManifest = {
   name: 'my-skill',
@@ -86,20 +104,33 @@ describe('add command', () => {
       throw new Error('process.exit called');
     });
 
-    mockExistsSync.mockReturnValue(true);
+    // C1 orphan check: writeSkillVersionToRegistry refuses when the version
+    // directory exists on disk with no entry for it. The default test state
+    // is a clean registry — no version dir on disk — so existsSync answers
+    // false for exactly that path and true everywhere else.
+    mockExistsSync.mockImplementation((p: unknown) => p !== VERSION_ABS_PATH);
     mockValidateSkillDirectory.mockResolvedValue(validResult());
     mockReadManifest.mockResolvedValue({});
     mockValidateManifest.mockReturnValue(MANIFEST);
     mockScanForSymlinks.mockResolvedValue(undefined);
-    mockGetRegistryPath.mockReturnValue(REGISTRY_PATH);
+    process.env['GOODBOY_REGISTRY'] = REGISTRY_PATH;
     mockEnsureRegistryExists.mockReturnValue(undefined);
     mockReadRegistryEntry.mockResolvedValue(null);
+    // Registry-entry write defaults belong in setup: the first test of the
+    // file must run with them configured, not inherit them from the
+    // previous test (C5 review finding — they sat in afterEach and
+    // configured the *next* test).
     mockWriteRegistryEntry.mockResolvedValue(undefined);
     mockCreateRegistryEntry.mockReturnValue({
       name: 'my-skill',
       latest: '1.0.0',
       versions: { '1.0.0': { path: 'versions/1.0.0', addedAt: '2026-01-01T00:00:00Z', yanked: false } },
     });
+  });
+
+  afterEach(() => {
+    // Env leaks across test files sharing a worker process.
+    delete process.env['GOODBOY_REGISTRY'];
   });
 
   describe('remote-ref rejection', () => {
@@ -260,6 +291,15 @@ describe('add command', () => {
     );
   });
 
+  it('leaves the copied manifest byte-identical — never re-serializes it (C5f)', async () => {
+    await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
+    // writeManifest is only called by the shared function when
+    // manifestToWrite is set, which `add` never passes: the copied tree
+    // already carries its own manifest.json and rewriting it would change
+    // bytes for no reason.
+    expect(writeManifest).not.toHaveBeenCalled();
+  });
+
   it('creates versioned directory with 0o700', async () => {
     await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
     const expectedPath = join(REGISTRY_PATH, 'my-skill', 'versions', '1.0.0');
@@ -303,9 +343,6 @@ describe('add command', () => {
   });
 
   describe('skill registry directory creation', () => {
-    const SKILL_REGISTRY_DIR = join(REGISTRY_PATH, 'my-skill');
-    const VERSION_ABS_PATH = join(SKILL_REGISTRY_DIR, 'versions', '1.0.0');
-
     // The skill's registry directory is never created on its own: it is an
     // ancestor of the version directory, so the single recursive mkdirSync
     // brings it into being with the same 0o700 mode. An explicit
@@ -314,7 +351,11 @@ describe('add command', () => {
     // passed because node:fs is fully mocked here, letting existsSync
     // contradict the mkdirSync that had just run.
     it('creates the version directory and its ancestors when the skill directory does not yet exist', async () => {
-      mockExistsSync.mockImplementation((path) => path !== SKILL_REGISTRY_DIR);
+      // The version dir must answer false too: if its parent does not exist,
+      // neither does it — and the orphan check (C1) reads exactly that path.
+      mockExistsSync.mockImplementation(
+        (path) => path !== SKILL_REGISTRY_DIR && path !== VERSION_ABS_PATH,
+      );
 
       await addCommand.parseAsync([SKILL_PATH], { from: 'user' });
 

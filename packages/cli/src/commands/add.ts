@@ -1,18 +1,12 @@
 import { Command } from 'commander';
-import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
 import ora from 'ora';
 import { SKILL_NAME_RE, isRemoteRefArgument } from '../lib/validation.js';
 import { validateSkillDirectory, formatValidationResult } from '../lib/skill-validator.js';
 import { readManifest, validateManifest } from '../lib/manifest.js';
 import { scanForSymlinks } from '../lib/fs-security.js';
-import { getRegistryPath, ensureRegistryExists } from '../lib/registry.js';
-import {
-  readRegistryEntry,
-  writeRegistryEntry,
-  createRegistryEntry,
-  addVersionToEntry,
-} from '../lib/registry-entry.js';
+import { writeSkillVersionToRegistry } from '../lib/registry.js';
 import { logger } from '../lib/logger.js';
 
 /**
@@ -91,36 +85,18 @@ export const addCommand = new Command('add')
       spinner.text = 'Scanning for symlinks...';
       await scanForSymlinks(skillPath);
 
-      ensureRegistryExists();
-      const registryPath = getRegistryPath();
-      const skillRegistryDir = join(registryPath, manifest.name);
-      const versionRelPath = join('versions', version);
-      const versionAbsPath = join(skillRegistryDir, versionRelPath);
+      spinner.text = 'Copying skill files...';
+      const { overwritten } = await writeSkillVersionToRegistry({
+        sourceDir: skillPath,
+        manifest,
+        force: options.force,
+      });
 
-      const existingEntry = await readRegistryEntry(skillRegistryDir);
-
-      if (existingEntry?.versions[version] !== undefined) {
-        if (!options.force) {
-          spinner.fail();
-          logger.error(
-            `Version "${version}" of skill "${manifest.name}" already exists. Use --force to overwrite.`,
-          );
-          throw new HandledFailure();
-        }
+      if (overwritten) {
         logger.warn(
           `Overwriting existing version "${version}" of skill "${manifest.name}".`,
         );
       }
-
-      spinner.text = 'Copying skill files...';
-      mkdirSync(versionAbsPath, { recursive: true, mode: 0o700 });
-      cpSync(skillPath, versionAbsPath, { recursive: true });
-
-      const entry = existingEntry
-        ? addVersionToEntry(existingEntry, version, versionRelPath)
-        : createRegistryEntry(manifest.name, version, versionRelPath);
-
-      await writeRegistryEntry(skillRegistryDir, entry);
 
       spinner.succeed(`Skill "${manifest.name}@${version}" added to registry`);
     } catch (err) {

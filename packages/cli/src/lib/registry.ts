@@ -1,14 +1,24 @@
 /**
- * Internal module — do not import directly from command files.
- * Use RegistryAdapter via createRegistryAdapter() instead.
+ * Internal module — command files should prefer RegistryAdapter via
+ * createRegistryAdapter() for the reads it covers (listing, resolution).
+ * Two deliberate direct-use exceptions, both because the adapter has no
+ * equivalent: writeSkillVersionToRegistry (no write method — `add` and
+ * `adopt` share this one write path, see docs/decisions.md, 2026-08-17),
+ * and a by-name registry-entry read (no read-by-name; the adapter offers
+ * only listRegistry()), which is how `adopt` checks whether a skill is
+ * already registered.
  * @internal
  */
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readdirSync } from 'node:fs';
 import { join, resolve, isAbsolute, sep } from 'node:path';
 import { homedir } from 'node:os';
-import { readManifest, validateManifest } from './manifest.js';
+import { readManifest, validateManifest, writeManifest } from './manifest.js';
+import { SEMVER_VERSION_PATTERN } from './schema-version.js';
 import {
   readRegistryEntry,
+  writeRegistryEntry,
+  createRegistryEntry,
+  addVersionToEntry,
   resolveLatestVersion,
   resolveVersionPath,
 } from './registry-entry.js';
@@ -47,6 +57,113 @@ export function ensureRegistryExists(): void {
   if (!existsSync(registryPath)) {
     mkdirSync(registryPath, { recursive: true, mode: 0o700 });
   }
+}
+
+export interface WriteSkillVersionResult {
+  skillRegistryDir: string;
+  versionAbsPath: string;
+  overwritten: boolean;
+}
+
+/**
+ * Shared by `add` and `adopt`: writes one version of a skill into the local
+ * registry. The manifest is passed in, never re-read from disk — that is the
+ * seam that lets adopt write a synthesized in-memory manifest. When
+ * `manifestToWrite` is set, the manifest is written into the copied tree
+ * (adopt: the source has none); when absent, the copied tree's own
+ * manifest.json is left byte-identical (add).
+ *
+ * This function is the security boundary of the exported write API, not the
+ * callers: `manifest.name` is validated against SKILL_NAME_RE and
+ * `manifest.version` against SEMVER_VERSION_PATTERN before any filesystem
+ * call (ensureRegistryExists included), and the resolved version path is
+ * asserted to stay inside the registry root. Callers may pre-validate for
+ * better messages, but must not rely on having done so. A colliding version
+ * throws unless `force` is set; `overwritten` reports it so the caller can
+ * surface it in its own words. A version directory on disk with no entry
+ * for it (what a failed write leaves behind) is refused rather than merged
+ * over, again unless `force` is set. `mustBeNew` refuses any pre-existing
+ * entry regardless of version — adopt's write-time backstop against an
+ * entry appearing between its pre-check and the write.
+ */
+export async function writeSkillVersionToRegistry(opts: {
+  sourceDir: string;
+  manifest: GoodBoyManifest;
+  force?: boolean;
+  manifestToWrite?: boolean;
+  mustBeNew?: boolean;
+}): Promise<WriteSkillVersionResult> {
+  // The two manifest fields that become filesystem paths are validated here
+  // before anything touches disk — security-sensitive.json: "All resolved
+  // paths are checked with startsWith(base + sep) before use".
+  if (!SKILL_NAME_RE.test(opts.manifest.name)) {
+    throw new Error(
+      `Invalid skill name "${opts.manifest.name}": must match ^[a-z0-9-]+$`,
+    );
+  }
+  if (!SEMVER_VERSION_PATTERN.test(opts.manifest.version)) {
+    throw new Error(
+      `Invalid version "${opts.manifest.version}": must match ^\\d+\\.\\d+\\.\\d+$`,
+    );
+  }
+
+  ensureRegistryExists();
+  const registryPath = getRegistryPath();
+  const skillRegistryDir = join(registryPath, opts.manifest.name);
+  const versionRelPath = join('versions', opts.manifest.version);
+  const versionAbsPath = join(skillRegistryDir, versionRelPath);
+
+  // Traversal guard, mirroring resolveSkill()'s: the resolved version path
+  // must stay inside the registry root. The name/version checks above
+  // already block every traversal character, so this is unreachable —
+  // defense-in-depth for the exported API.
+  const expectedPrefix = registryPath + sep;
+
+  /* c8 ignore next 3 — defense-in-depth: SKILL_NAME_RE + SEMVER_VERSION_PATTERN above block all traversal chars, this is unreachable through the exported API */
+  if (!versionAbsPath.startsWith(expectedPrefix) || !resolve(versionAbsPath).startsWith(expectedPrefix)) {
+    throw new Error(`Refused: resolved skill path escapes the registry directory`);
+  }
+
+  const existingEntry = await readRegistryEntry(skillRegistryDir);
+
+  if (opts.mustBeNew && existingEntry) {
+    throw new Error(
+      `Skill "${opts.manifest.name}" is already in the local registry — adopt only registers skills the registry does not know yet. Use 'goodboy skill version' to add a new version.`,
+    );
+  }
+
+  const overwritten = existingEntry?.versions[opts.manifest.version] !== undefined;
+
+  if (overwritten && !opts.force) {
+    throw new Error(
+      `Version "${opts.manifest.version}" of skill "${opts.manifest.name}" already exists. Use --force to overwrite.`,
+    );
+  }
+
+  // Orphaned state: the version directory exists on disk but the entry does
+  // not list it — exactly what a failed write leaves behind (copy
+  // succeeded, manifest/entry write did not). Refuse to silently merge over
+  // it; force is add's deliberate escape hatch.
+  if (existsSync(versionAbsPath) && !overwritten && !opts.force) {
+    throw new Error(
+      `Version "${opts.manifest.version}" of skill "${opts.manifest.name}" exists on disk but has no registry entry — a previous write may have failed partway. Use --force to replace it.`,
+    );
+  }
+
+  mkdirSync(versionAbsPath, { recursive: true, mode: 0o700 });
+  cpSync(opts.sourceDir, versionAbsPath, { recursive: true });
+
+  if (opts.manifestToWrite) {
+    await writeManifest(join(versionAbsPath, 'manifest.json'), opts.manifest);
+  }
+
+  const entry = existingEntry
+    ? addVersionToEntry(existingEntry, opts.manifest.version, versionRelPath)
+    : createRegistryEntry(opts.manifest.name, opts.manifest.version, versionRelPath);
+
+  await writeRegistryEntry(skillRegistryDir, entry);
+
+  return { skillRegistryDir, versionAbsPath, overwritten };
 }
 
 export async function resolveSkill(name: string, version?: string): Promise<string> {
