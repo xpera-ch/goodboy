@@ -133,13 +133,13 @@
     },
     {
       "pattern": "packages/cli/src/commands/adopt.ts",
-      "reason": "Takes a user-supplied path argument and a third-party SKILL.md with no manifest.json, parses its untrusted frontmatter to synthesise a manifest, and copies the source directory into a new local directory.",
+      "reason": "Takes a user-supplied path argument and a third-party SKILL.md with no manifest.json, parses its untrusted frontmatter to synthesise a manifest, shows it for confirmation, and writes the skill into the local registry.",
       "invariants": [
         "isRemoteRefArgument() rejects a URL-shaped or scp-style argument before resolve() is ever called on it",
         "scanForSymlinks() runs on the source directory before any cpSync of its contents",
-        "The frontmatter-declared name is validated against SKILL_NAME_RE before being used to construct the target directory path",
+        "The frontmatter-declared name is validated against SKILL_NAME_RE before being used to construct any registry path",
         "MAX_SKILL_MD_BYTES (mirroring manifest.ts's size ceiling) is not raised without an explicit decision",
-        "An existing target directory is never overwritten — existsSync(targetDir) is checked and rejected before any cpSync"
+        "An existing registry skill is never overwritten or appended to — if registry-entry.json already exists for the name, adopt refuses with a pointer to `goodboy skill version --bump` before any write"
       ]
     },
     {

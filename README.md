@@ -97,7 +97,7 @@ goodboy search git
 | --- | --- |
 | `goodboy add <path>` | Add and validate a skill |
 | `goodboy add <path> --force` | Replace an existing version |
-| `goodboy adopt <path>` | Onboard an existing `SKILL.md`-only skill (no `manifest.json`) into a new local skill directory |
+| `goodboy adopt <path>` | Onboard an existing `SKILL.md`-only skill (no `manifest.json`) directly into the local registry |
 | `goodboy registry list` | Show registry contents |
 | `goodboy registry info <name>` | Show skill details |
 | `goodboy registry validate <name>` | Validate skill integrity |
