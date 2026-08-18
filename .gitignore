@@ -6,7 +6,7 @@ dist/
 coverage/
 .env
 .DS_Store
-docs/prompts/
-docs/reviews/
+docs/
+_to_delete/
 .claude/skills/engineering-principles/
 vitest.config.ts.timestamp-*
