@@ -14,7 +14,7 @@ import { registryCommand } from './commands/registry-cmd.js';
 import { verifyCommand } from './commands/verify.js';
 import {
   completionCommand,
-  completeCommand,
+  completeProtocolCommand,
   attachProgram,
 } from './commands/completion.js';
 
@@ -42,7 +42,7 @@ program.addCommand(registryCommand);
 program.addCommand(verifyCommand);
 attachProgram(program);
 program.addCommand(completionCommand, { hidden: true });
-program.addCommand(completeCommand, { hidden: true });
+program.addCommand(completeProtocolCommand, { hidden: true });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   process.stderr.write(

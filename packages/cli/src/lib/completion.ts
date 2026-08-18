@@ -52,9 +52,7 @@ export async function complete(
   }
   const source = SKILL_SOURCES[cmd.name()];
   if (source !== undefined && positionals < cmd.registeredArguments.length) {
-    return [...new Set(await skillNames(source, words))]
-      .filter((name) => name.startsWith(prefix))
-      .sort();
+    return matchesPrefix([...new Set(await skillNames(source, words))], prefix);
   }
   return [];
 }
@@ -102,24 +100,28 @@ function findOption(cmd: Command, flag: string): Option | undefined {
 }
 
 function subcommandCandidates(cmd: Command, prefix: string): string[] {
-  return cmd.commands
-    .map((c) => c.name())
-    .filter(
-      (name) => name.startsWith(prefix) && !HIDDEN_FROM_COMPLETION.has(name),
-    )
-    .sort();
+  return matchesPrefix(
+    cmd.commands
+      .map((c) => c.name())
+      .filter((name) => !HIDDEN_FROM_COMPLETION.has(name)),
+    prefix,
+  );
 }
 
 function optionCandidates(cmd: Command, prefix: string): string[] {
   const names = cmd.options.flatMap((o) => {
     const forms = [o.long, o.short];
     // Most options carry both forms; long-only options (e.g. --no-commit)
-    // exercise the drop side.
+    // have no short form, so the filter drops the undefined entry.
     return forms.filter((form): form is string => form !== undefined);
   });
-  return [...new Set(names)]
-    .filter((name) => name.startsWith(prefix))
-    .sort();
+  return matchesPrefix([...new Set(names)], prefix);
+}
+
+/** The narrowing contract of this engine: the last word is the partial
+ * prefix being completed, and candidates are the names it starts. */
+function matchesPrefix(names: string[], prefix: string): string[] {
+  return names.filter((name) => name.startsWith(prefix)).sort();
 }
 
 async function skillNames(
@@ -145,7 +147,9 @@ async function skillNames(
   }
 }
 
-/** `-g` detection is a plain substring check over the typed words. */
+/** `-g`/`--global` detection, by exact token match — a skill name like
+ * `skill-g` in the typed words must never flip the resolution to the
+ * global store. */
 function hasGlobalFlag(words: string[]): boolean {
-  return words.some((word) => word.includes('-g'));
+  return words.some((word) => word === '-g' || word === '--global');
 }

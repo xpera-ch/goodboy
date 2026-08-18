@@ -201,7 +201,7 @@ describe('complete — skill names by source', () => {
     expect(mockReadGoodBoyJson).toHaveBeenCalledWith(GLOBAL);
   });
 
-  it('uninstall --global flips scope through the substring check', async () => {
+  it('uninstall --global flips scope through an exact flag match', async () => {
     mockReadGoodBoyJson.mockResolvedValue({
       schema: '1.0.0',
       skills: { 'global-skill': '^1.0.0' },
@@ -211,6 +211,18 @@ describe('complete — skill names by source', () => {
       'global-skill',
     ]);
     expect(mockReadGoodBoyJson).toHaveBeenCalledWith(GLOBAL);
+  });
+
+  it('a skill name containing -g does not flip scope to the global store', async () => {
+    mockReadGoodBoyJson.mockResolvedValue({
+      schema: '1.0.0',
+      skills: { 'skill-g': '^1.0.0' },
+    });
+    const program = createCompletionProgram();
+    expect(await complete(program, ['uninstall', 'skill-g'])).toEqual([
+      'skill-g',
+    ]);
+    expect(mockReadGoodBoyJson).toHaveBeenCalledWith(CWD);
   });
 
   it('skill open reads goodboy.json keys', async () => {

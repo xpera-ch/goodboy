@@ -13,7 +13,7 @@ import { complete } from '../lib/completion.js';
 import { logger } from '../lib/logger.js';
 import {
   completionCommand,
-  completeCommand,
+  completeProtocolCommand,
   attachProgram,
   BASH_TEMPLATE,
   ZSH_TEMPLATE,
@@ -217,7 +217,7 @@ describe('completion command — real fish', () => {
 describe('__complete command — protocol', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetCommandOptions(completeCommand);
+    resetCommandOptions(completeProtocolCommand);
     process.exitCode = undefined;
     attachProgram(createCompletionProgram());
   });
@@ -234,7 +234,7 @@ describe('__complete command — protocol', () => {
       return true;
     });
     mockComplete.mockResolvedValue(['skill-a', 'skill-b']);
-    await run(completeCommand, ['--', 'install', 'de']);
+    await run(completeProtocolCommand, ['--', 'install', 'de']);
     expect(chunks.join('')).toBe('skill-a\nskill-b\n');
     expect(process.exitCode).toBeUndefined();
   });
@@ -243,7 +243,7 @@ describe('__complete command — protocol', () => {
     const program = createCompletionProgram();
     attachProgram(program);
     mockComplete.mockResolvedValue([]);
-    await run(completeCommand, ['--', 'install', '-g', '--c']);
+    await run(completeProtocolCommand, ['--', 'install', '-g', '--c']);
     expect(mockComplete).toHaveBeenCalledWith(program, ['install', '-g', '--c']);
   });
 
@@ -254,7 +254,7 @@ describe('__complete command — protocol', () => {
       return true;
     });
     mockComplete.mockResolvedValue([]);
-    await run(completeCommand, ['--', 'install', 'zzz']);
+    await run(completeProtocolCommand, ['--', 'install', 'zzz']);
     expect(chunks.join('')).toBe('');
   });
 
@@ -265,7 +265,7 @@ describe('__complete command — protocol', () => {
       return true;
     });
     mockComplete.mockRejectedValue(new Error('engine exploded'));
-    await run(completeCommand, ['--', 'install', '']);
+    await run(completeProtocolCommand, ['--', 'install', '']);
     expect(chunks.join('')).toBe('');
     expect(process.exitCode).toBeUndefined();
   });
@@ -277,14 +277,14 @@ describe('__complete command — protocol', () => {
       chunks.push(String(chunk));
       return true;
     });
-    await run(completeCommand, ['--', 'install', '']);
+    await run(completeProtocolCommand, ['--', 'install', '']);
     expect(chunks.join('')).toBe('');
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
   it('never touches the logger', async () => {
     mockComplete.mockResolvedValue(['skill-a']);
-    await run(completeCommand, ['--', 'install', '']);
+    await run(completeProtocolCommand, ['--', 'install', '']);
     expect(mockLogger.error).not.toHaveBeenCalled();
     expect(mockLogger.warn).not.toHaveBeenCalled();
     expect(mockLogger.info).not.toHaveBeenCalled();
@@ -298,8 +298,8 @@ describe('__complete command — protocol', () => {
       return true;
     });
     mockComplete.mockResolvedValue(['skill-a']);
-    await run(completeCommand, ['--', 'install', '']);
-    await run(completeCommand, ['--', 'install', '']);
+    await run(completeProtocolCommand, ['--', 'install', '']);
+    await run(completeProtocolCommand, ['--', 'install', '']);
     expect(process.stdout.listenerCount('error')).toBe(1);
     // An EPIPE on stdout must be swallowed — never an unhandled crash.
     expect(() => process.stdout.emit('error', new Error('EPIPE'))).not.toThrow();

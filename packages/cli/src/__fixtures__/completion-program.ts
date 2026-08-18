@@ -12,7 +12,7 @@ import { verifyCommand } from '../commands/verify.js';
 import { registerSkillCommand } from '../commands/skill.js';
 import {
   completionCommand,
-  completeCommand,
+  completeProtocolCommand,
 } from '../commands/completion.js';
 
 /**
@@ -38,6 +38,6 @@ export function createCompletionProgram(): Command {
   program.addCommand(verifyCommand);
   registerSkillCommand(program);
   program.addCommand(completionCommand, { hidden: true });
-  program.addCommand(completeCommand, { hidden: true });
+  program.addCommand(completeProtocolCommand, { hidden: true });
   return program;
 }

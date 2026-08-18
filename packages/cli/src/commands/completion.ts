@@ -78,7 +78,7 @@ export const completionCommand = new Command('completion')
     process.stdout.write(template);
   });
 
-export const completeCommand = new Command('__complete')
+export const completeProtocolCommand = new Command('__complete')
   .argument('[words...]', 'Typed words including the partial current word')
   .action(async (words: string[]) => {
     guardStdout();
