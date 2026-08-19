@@ -1,0 +1,21 @@
+{
+  "$comment": "Template only — not a real config. Copy to <repo-root>/security-sensitive.json in the target project and replace every entry with that project's actual sensitive files. This file is the machine-read source of truth for the security-impact skill; a project's CONTRIBUTING.md may restate this in prose for humans, but nothing should ever parse that prose.",
+  "sensitive_files": [
+    {
+      "pattern": "src/lib/example-untrusted-input-parser.ts",
+      "reason": "Parses untrusted input before validation. Size limits, schema enforcement, and error handling must be preserved.",
+      "invariants": [
+        "Untrusted input always goes through the size/nesting-limit check before JSON.parse",
+        "Never parse the raw input a second time through a different path"
+      ]
+    },
+    {
+      "pattern": "src/lib/**/*-path-resolver.ts",
+      "reason": "Resolves filesystem paths from names that may be attacker- or user-influenced. Path traversal guards must be preserved.",
+      "invariants": [
+        "All resolved paths are checked with startsWith(base + sep) before use",
+        "Names are validated against the project's name-pattern regex before any filesystem operation"
+      ]
+    }
+  ]
+}

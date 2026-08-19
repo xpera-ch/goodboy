@@ -1,0 +1,11 @@
+{
+  "name": "security-impact",
+  "version": "1.0.0",
+  "description": "Use this skill when a diff touches a security-sensitive file and a PR or commit needs a security-impact callout — trigger phrases like \"write the security-impact section\", \"draft the security callout\", \"does this need a security note\", or \"check if this touches sensitive files\". Runs the bundled scripts/check-sensitive-files.mjs detection script against a dedicated structured config (security-sensitive.json at the project root) — never against CONTRIBUTING.md or any other prose file — and drafts the callout plus an invariants-unchanged checklist from its output. Small, mechanical, and deliberately decoupled from any CI enforcement gate.",
+  "author": {
+    "name": "Bruno Schriber"
+  },
+  "license": "MIT",
+  "schema_version": "2.0.0",
+  "status": "stable"
+}

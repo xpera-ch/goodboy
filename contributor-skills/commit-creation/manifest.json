@@ -1,0 +1,11 @@
+{
+  "name": "commit-creation",
+  "version": "1.0.0",
+  "description": "Use this skill whenever the user wants to commit code changes, create a git commit, stage files, write a commit message, or prepare changes for version control. Trigger for phrases like \"commit this\", \"make a commit\", \"stage and commit\", \"create commits for these changes\", \"write a commit message\", \"git commit\", or any request involving committing work to a repository. Also trigger when the user says things like \"save my changes to git\", \"push this to git\", or \"let's commit what we have\". This skill enforces professional commit hygiene: atomic commits, clean history, no AI attribution, and senior-engineer-quality messages.",
+  "author": {
+    "name": "Bruno Schriber"
+  },
+  "license": "MIT",
+  "schema_version": "2.0.0",
+  "status": "stable"
+}

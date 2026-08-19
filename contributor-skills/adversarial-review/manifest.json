@@ -1,0 +1,11 @@
+{
+  "name": "adversarial-review",
+  "version": "1.0.0",
+  "description": "Use this skill when explicitly asked to perform an adversarial review of code before a merge, tag, or release — trigger phrases like \"adversarial review\", \"review this before we merge/tag\", \"review this phase\", \"review before release\", \"pre-merge review\", or \"pre-tag review\". This is a deliberate, explicitly-invoked review discipline for phase boundaries, not an automatic code-review pass — do not trigger it for casual \"can you check this\" requests or as a background habit. It produces a PASS/FAIL/CONCERN verdict built from re-derived, live evidence (commands actually run, tests actually written and executed) rather than the implementer's self-report, fixes nothing during the review, and stops after the report to wait for instructions.",
+  "author": {
+    "name": "Bruno Schriber"
+  },
+  "license": "MIT",
+  "schema_version": "2.0.0",
+  "status": "stable"
+}

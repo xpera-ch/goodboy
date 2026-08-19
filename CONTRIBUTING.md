@@ -24,6 +24,36 @@ cd goodboy
 npm install
 ```
 
+## This repo's workflow skills
+
+Contributing to this repo (beyond a trivial fix) assumes four skills
+built on the open Agent Skills standard (agentskills.io) — they work the
+same way in Claude Code, Codex, Gemini, or any other compliant agent.
+They're described in `CLAUDE.md`'s "Standard workflow" section:
+`commit-creation`, `phase-prompt`, `adversarial-review`, `security-impact`.
+There's no public GoodBoy registry yet, so they ship here, ready to
+install, as a stopgap:
+
+```sh
+goodboy add contributor-skills/commit-creation
+goodboy add contributor-skills/phase-prompt
+goodboy add contributor-skills/adversarial-review
+goodboy add contributor-skills/security-impact
+goodboy install commit-creation
+goodboy install phase-prompt
+goodboy install adversarial-review
+goodboy install security-impact
+```
+
+No prompts, nothing to fill in — the manifests are already authored. A
+couple of "no keywords" / "no category" warnings are expected and
+harmless. Four separate `install` calls: the command takes one skill name
+at a time.
+
+This is a workaround, stated plainly: once GoodBoy has a public registry
+(`docs/roadmap.md`, "Exploratory: a hosted registry"), this becomes
+`goodboy install` from it directly, and this section shrinks to one line.
+
 ## Common tasks
 
 ```sh

@@ -1,0 +1,11 @@
+{
+  "name": "phase-prompt",
+  "version": "1.0.0",
+  "description": "Use this skill when drafting an implementation prompt for a discrete phase of work that will later be checked by the adversarial-review skill — trigger phrases like \"write the phase prompt\", \"draft an implementation prompt\", \"scaffold the next phase prompt\", or \"write the prompt for the next phase\". Produces a structured prompt with context and a concept-doc reference, an inspect-before-editing checklist, required behavior, explicit non-goals, a test matrix tied to the repo's coverage bar, verification commands, commit granularity that defers message-writing to the commit-creation skill, and a required final report format. Do not use this to write the implementation itself — it produces the prompt that will later drive the implementation.",
+  "author": {
+    "name": "Bruno Schriber"
+  },
+  "license": "MIT",
+  "schema_version": "2.0.0",
+  "status": "stable"
+}
