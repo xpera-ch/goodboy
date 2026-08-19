@@ -6,10 +6,6 @@ export interface GoodBoyJSON {
    */
   schema: string;
   /**
-   * Registry URL or path override for this project.
-   */
-  registry?: string;
-  /**
    * Installed skills as a name-to-semver-range map. Names must match the skill-name pattern; ranges are the pinned-or-caret form GoodBoy writes (e.g. ^1.2.0).
    */
   skills: {
