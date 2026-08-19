@@ -42,24 +42,15 @@ describe('goodboy init', () => {
     await initCommand.parseAsync([], { from: 'user' });
     const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
     expect(written.schema).toBe('1.0.0');
+    // The removed --registry option must not resurface as a written field —
+    // a regression reintroducing it fails here, at the write boundary.
+    expect(written).not.toHaveProperty('registry');
   });
 
   it('writes goodboy.json with an empty skills object', async () => {
     await initCommand.parseAsync([], { from: 'user' });
     const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
     expect(written.skills).toEqual({});
-  });
-
-  it('does not set a registry field when --registry is not passed', async () => {
-    await initCommand.parseAsync([], { from: 'user' });
-    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
-    expect(written).not.toHaveProperty('registry');
-  });
-
-  it('sets the registry field when --registry is passed', async () => {
-    await initCommand.parseAsync(['--registry', 'https://example.com'], { from: 'user' });
-    const written = mockWriteGoodBoyJson.mock.calls[0]![1] as GoodBoyJson;
-    expect(written.registry).toBe('https://example.com');
   });
 
   it('exits cleanly with code 0 when goodboy.json already exists', async () => {

@@ -2,14 +2,9 @@ import { Command } from 'commander';
 import { readGoodBoyJson, writeGoodBoyJson, type GoodBoyJson } from '../lib/goodboy-file.js';
 import { logger, sanitiseError } from '../lib/logger.js';
 
-interface InitOptions {
-  registry?: string;
-}
-
 export const initCommand = new Command('init')
   .description('Initialise GoodBoy in the current directory (creates goodboy.json)')
-  .option('--registry <url>', 'Set a custom registry URL in goodboy.json')
-  .action(async (options: InitOptions) => {
+  .action(async () => {
     const cwd = process.cwd();
     const existing = await readGoodBoyJson(cwd);
 
@@ -22,7 +17,6 @@ export const initCommand = new Command('init')
 
     const data: GoodBoyJson = {
       schema: '1.0.0',
-      ...(options.registry ? { registry: options.registry } : {}),
       skills: {},
     };
 

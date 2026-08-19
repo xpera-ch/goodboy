@@ -29,7 +29,6 @@ const DIR = '/project';
 
 const VALID_JSON: GoodBoyJson = {
   schema: '1.0.0',
-  registry: 'https://example.com',
   skills: { 'my-skill': '^1.0.0' },
 };
 
@@ -90,6 +89,15 @@ describe('readGoodBoyJson', () => {
     await expect(readGoodBoyJson(DIR)).rejects.toThrow(/Invalid goodboy\.json:\n {2}\(root\):/);
   });
 
+  it('throws on a document carrying the removed registry field', async () => {
+    (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+      JSON.stringify({ schema: '1.0.0', registry: 'https://example.com', skills: {} }),
+    );
+    await expect(readGoodBoyJson(DIR)).rejects.toThrow(
+      /Invalid goodboy\.json:\n {2}\(root\): must NOT have additional properties/,
+    );
+  });
+
   it('rejects a newer-major schema with an upgrade hint', async () => {
     (mockReadFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({ schema: '2.0.0', skills: {} }),
@@ -112,7 +120,6 @@ describe('readGoodBoyJson', () => {
   it('validates a stripped copy but returns the original for a newer-minor schema', async () => {
     const newer = {
       schema: '1.1.0',
-      registry: 'https://example.com',
       skills: { 'my-skill': '^1.0.0' },
       futureField: { whatever: true },
     };
@@ -305,7 +312,6 @@ describe('addSkillToManifest', () => {
   it('preserves a newer-minor goodboy.json\'s unknown top-level fields through a read-modify-write', async () => {
     const newer = {
       schema: '1.1.0',
-      registry: 'https://example.com',
       skills: { 'my-skill': '^1.0.0' },
       futureField: { whatever: true },
     };
@@ -318,7 +324,6 @@ describe('addSkillToManifest', () => {
     const parsed = JSON.parse(content) as GoodBoyJson;
     expect(parsed).toEqual({
       schema: '1.1.0',
-      registry: 'https://example.com',
       skills: { 'my-skill': '^1.0.0', 'another-skill': '^2.0.0' },
       futureField: { whatever: true },
     });
@@ -327,7 +332,6 @@ describe('addSkillToManifest', () => {
   it('keeps a newer-minor goodboy.json\'s unknown top-level field across two full round trips', async () => {
     const newer = {
       schema: '1.1.0',
-      registry: 'https://example.com',
       skills: { 'my-skill': '^1.0.0' },
       futureField: { whatever: true },
     };
@@ -346,7 +350,6 @@ describe('addSkillToManifest', () => {
 
     expect(JSON.parse(pass2) as GoodBoyJson).toEqual({
       schema: '1.1.0',
-      registry: 'https://example.com',
       skills: { 'my-skill': '^1.0.0', 'second-skill': '^2.0.0', 'third-skill': '^3.0.0' },
       futureField: { whatever: true },
     });

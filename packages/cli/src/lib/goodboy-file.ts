@@ -11,7 +11,6 @@ const _require = createRequire(import.meta.url);
 
 export interface GoodBoyJson {
   schema: string;
-  registry?: string;
   skills: Record<string, string>;
 }
 
