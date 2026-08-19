@@ -20,116 +20,13 @@ npm verifies the publish request came from the exact workflow
 in this repository using a short-lived cryptographic token.
 No token is stored anywhere.
 
-## First publish (one-time setup for v0.1.0)
+## First publish
 
-npm Trusted Publishing requires each package to exist on npm
-before it can be configured. The very first publish must use
-a temporary token.
-
-**Already done, not pending.** This bootstrap (Steps 1-8) ran
-once, for `v0.1.0` (2026-07-15). Two ordinary releases have
-shipped since through the normal OIDC flow described below in
-"All future releases" — `v0.1.1` (2026-07-21) and `v0.2.0`
-(2026-07-22) — confirming Trusted Publishing has kept working,
-not repeats of this setup. The `v0.1.0` references in the
-steps below, including Step 5's tag example, are that
-historical run; substitute the real package and version the
-next time this bootstrap is actually needed.
-
-### Step 1 — Prerequisites
-
-- npm account with access to the goodboyjs organisation
-- Repository at github.com/xpera-ch/goodboy (already the case —
-  origin remote points there)
-- Local remote updated:
-  git remote set-url origin https://github.com/xpera-ch/goodboy.git
-
-### Step 2 — Create a temporary npm token
-
-1. Go to npmjs.com → Avatar → Access Tokens
-2. Click "Generate New Token" → "Classic Token"
-3. Type: Automation (bypasses 2FA for CI use)
-4. Scope: Read and Write
-5. Copy the token — you will use it once and then delete it
-
-### Step 3 — Add token to GitHub Secrets temporarily
-
-1. Go to github.com/xpera-ch/goodboy → Settings
-2. Secrets and variables → Actions → New repository secret
-3. Name: NPM_TOKEN
-4. Value: paste the token from Step 2
-
-### Step 4 — Use the temporary token-based workflow
-
-Do not edit release.yml for the first publish. Use
-.github/workflows/release-first-publish.yml instead — it is
-the token-based variant kept in the repo for exactly this
-purpose and is triggered manually via workflow_dispatch.
-
-### Step 5 — Tag and push v0.1.0
-
-  git tag -a v0.1.0 -m "GoodBoy v0.1.0
-
-  First public release. A personal skill manager —
-  registry and installer — for AI agents built on the
-  Agent Skills standard.
-
-  MIT License"
-
-  git push origin main
-  git push origin v0.1.0
-
-Then go to GitHub Actions → "Release (First Publish)" →
-Run workflow → enter tag v0.1.0 → Run.
-
-Wait for the workflow to complete and verify all three
-packages appear on npmjs.com.
-
-### Step 6 — Configure Trusted Publishing on npmjs.com
-
-Do this for each of the two packages.
-Repeat these steps twice:
-
-For @goodboyjs/schema:
-1. Go to npmjs.com/package/@goodboyjs/schema
-2. Click Settings
-3. Find "Trusted Publisher" section
-4. Click "GitHub Actions"
-5. Fill in:
-   - GitHub org or user: xpera-ch
-   - Repository: goodboy
-   - Workflow filename: release.yml
-   - Environment name: (leave blank)
-   - Allowed actions: npm publish
-6. Click Save
-
-Repeat for @goodboyjs/cli.
-
-### Step 7 — Confirm release.yml is already on OIDC
-
-release.yml already uses OIDC Trusted Publishing (no NPM_TOKEN,
-no NODE_AUTH_TOKEN, id-token: write permission). Nothing to change
-here — it's ready for all future releases as soon as Step 6 is done.
-
-Note: --provenance is intentionally absent while the repository is
-private (npm provenance requires a public source repo). It returns
-with the go-public flip — see `docs/go-public-checklist.md`.
-
-### Step 8 — Clean up temporary credentials
-
-1. Delete NPM_TOKEN from GitHub Secrets:
-   Settings → Secrets and variables → Actions
-   → NPM_TOKEN → Delete
-
-2. Delete the temporary npm token:
-   npmjs.com → Avatar → Access Tokens
-   → Find the token created in Step 2 → Delete
-
-3. Delete .github/workflows/release-first-publish.yml
-   (already deleted with the C5 release-prep phase, 2026-08-14).
-
-After this point no long-lived npm token exists anywhere.
-All future releases are fully automated via OIDC.
+The Trusted Publishing bootstrap (temporary npm token, one-time manual
+setup) ran once, for `v0.1.0` (2026-07-15) — see
+`docs/first-publish-bootstrap.md` for the generalized procedure if a new
+package ever needs this same setup again. Reference notes, not a
+maintained runbook.
 
 ## All future releases
 
