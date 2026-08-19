@@ -26,10 +26,21 @@ npm Trusted Publishing requires each package to exist on npm
 before it can be configured. The very first publish must use
 a temporary token.
 
+**Already done, not pending.** This bootstrap (Steps 1-8) ran
+once, for `v0.1.0` (2026-07-15). Two ordinary releases have
+shipped since through the normal OIDC flow described below in
+"All future releases" — `v0.1.1` (2026-07-21) and `v0.2.0`
+(2026-07-22) — confirming Trusted Publishing has kept working,
+not repeats of this setup. The `v0.1.0` references in the
+steps below, including Step 5's tag example, are that
+historical run; substitute the real package and version the
+next time this bootstrap is actually needed.
+
 ### Step 1 — Prerequisites
 
 - npm account with access to the goodboyjs organisation
-- Repository transferred to github.com/xpera-ch/goodboy
+- Repository at github.com/xpera-ch/goodboy (already the case —
+  origin remote points there)
 - Local remote updated:
   git remote set-url origin https://github.com/xpera-ch/goodboy.git
 
@@ -63,8 +74,7 @@ purpose and is triggered manually via workflow_dispatch.
   registry and installer — for AI agents built on the
   Agent Skills standard.
 
-  352 tests · 99.7% coverage · MIT License
-  https://goodboy.io"
+  MIT License"
 
   git push origin main
   git push origin v0.1.0
