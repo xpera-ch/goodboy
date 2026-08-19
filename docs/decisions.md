@@ -21,6 +21,63 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-19 — Contributor workflow skills shipped via GoodBoy itself, not `.claude/skills/`; committed and verified
+
+**Decided (Bruno):** `CLAUDE.md`'s "Standard workflow" section requires four
+skills (`commit-creation`, `phase-prompt`, `adversarial-review`,
+`security-impact`) that existed only as Bruno's personal account skills —
+false when the section claimed they're "installed globally, so any Claude
+session should already have them." Committing them straight into
+`.claude/skills/` was considered and rejected: GoodBoy's premise is that
+skills shouldn't be hand-placed folders you copy around, and shipping them
+that way in GoodBoy's own repo would contradict the product it builds.
+
+**Chosen instead:** ship each as a ready-to-install directory —
+`SKILL.md` plus a hand-authored `manifest.json` — under `contributor-skills/`,
+onboarded with `goodboy add` (not `goodboy adopt`: `adopt` interactively
+asks the person running it for their own name as "author," which would be
+wrong here — Bruno is the actual author, not whichever contributor runs the
+command; `add` reads an already-correct manifest, no prompts). Framed
+explicitly in `CONTRIBUTING.md` as a stopgap until a public registry exists
+(`docs/roadmap.md`, "Exploratory: a hosted registry").
+
+**Manifests:** `version: "1.0.0"`, `license: "MIT"`, `author: { name: "Bruno
+Schriber" }` (no email — avoids publishing one in a structured,
+machine-readable field; git history will carry it either way once public),
+`status: "stable"` (actively used, not experimental), `schema_version:
+"2.0.0"`. `category`/`keywords` deliberately omitted rather than guessed;
+proposed for later: `commit-creation` → other, `phase-prompt` → devops,
+`adversarial-review` → security, `security-impact` → security.
+
+**Reviewed before commit, independently:** diff read directly against the
+report's claims. `contributor-skills/phase-prompt/SKILL.md` matched the
+exact byte count (4345) observed from the source directory before the phase
+ran. `install.ts:232`'s `[skill-name]` argument confirmed non-variadic by
+reading the command definition — the implementer's correction (four
+separate `goodboy install` calls, not one) is accurate, not a
+workaround for nothing.
+
+**Wording follow-up, same session:** the first draft of the new
+`CONTRIBUTING.md` section called these "four Claude Code skills" — the same
+overclaim already fixed in `product-positioning.md` and the CLI description
+this same day. Corrected via a second, small phase-prompt before the commit
+landed, to lead with the open Agent Skills standard (agentskills.io) and
+name Codex/Gemini explicitly rather than implying portability by omission.
+
+**Committed:** `c69c0de` — one commit, `contributor-skills/` +
+`CONTRIBUTING.md` together, both edits included.
+
+**New finding, not yet actioned:** `packages/cli/src/lib/skill-validator.ts`'s
+`parseFrontmatter` is a naive line-by-line parser, not real YAML — it
+doesn't resolve YAML folded (`>`) or literal (`|`) block scalars. A
+`SKILL.md` using `description: >` (all four skills shipped here included)
+has its frontmatter description parsed as the literal `>` character, not
+the real text, which spuriously fails the "SKILL.md description matches
+manifest.json description" check on every `goodboy add`/`install`. Cosmetic
+today — a warning, not a hard error, confirmed by reading the parser
+directly — but a real pre-existing bug, unrelated to this phase.
+Backlog candidate.
+
 ## 2026-08-19 — Dead `--registry` option removed and the "for Claude Code" overclaim fixed everywhere it shipped; both independently verified and committed
 
 Two phase-prompts executed via Claude Code CLI, both reviewed here (diff
