@@ -59,9 +59,9 @@ purpose and is triggered manually via workflow_dispatch.
 
   git tag -a v0.1.0 -m "GoodBoy v0.1.0
 
-  First public release. A personal skill registry and
-  intelligent dispatcher for Claude Code and the Agent
-  Skills ecosystem.
+  First public release. A personal skill manager —
+  registry and installer — for AI agents built on the
+  Agent Skills standard.
 
   352 tests · 99.7% coverage · MIT License
   https://goodboy.io"

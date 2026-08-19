@@ -1,6 +1,6 @@
 # GoodBoy
 
-A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem.
+A personal skill manager — registry and installer — for AI agents built on the Agent Skills standard.
 
 [![CI](https://github.com/xpera-ch/goodboy/actions/workflows/ci.yml/badge.svg)](https://github.com/xpera-ch/goodboy/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

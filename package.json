@@ -2,7 +2,7 @@
   "name": "goodboy",
   "version": "0.1.0",
   "private": true,
-  "description": "A personal skill registry and package manager for Claude Code and the Agent Skills ecosystem",
+  "description": "A personal skill manager — registry and installer — for AI agents built on the Agent Skills standard",
   "workspaces": [
     "packages/cli",
     "packages/schema",

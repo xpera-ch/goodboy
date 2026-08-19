@@ -25,7 +25,7 @@ const program = new Command();
 
 program
   .name('goodboy')
-  .description('Personal skill registry and dispatcher for Claude Code')
+  .description('Personal skill manager — registry and installer — for AI agents built on the Agent Skills standard')
   .version(pkg.version, '-v, --version', 'Print version number')
   .addHelpText('after', '\nDocs: https://github.com/xpera-ch/goodboy');
 
