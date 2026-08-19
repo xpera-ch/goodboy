@@ -8,11 +8,17 @@ A personal skill manager — registry and installer — for AI agents built on t
 
 ## What is GoodBoy
 
-A skill for Claude Code — or any agent that supports the Agent Skills standard — is just a folder with a `SKILL.md` file. That's deliberately minimal, but it leaves a gap: there's no standard way to install one, keep it up to date, roll it back, or share it with a team. Skills tend to accumulate as copy-pasted folders with no version history and no way to tell whether the copy sitting in `.claude/skills/` still matches the one you meant to install. GoodBoy fills that gap.
+Installing and pinning skills is a solved problem. The harder question is what you actually have: an installed skill that silently no longer matches what you meant to install — edited by hand, drifted across projects and machines — is a skill you can't trust. `gh skill` and `npx skills` tell you when a newer version exists; neither asks whether the copy on disk is still the one you installed, or whether it has been tampered with or drifted since.
 
-Agent Skills is an open standard for portable agent capabilities, published by Anthropic and adopted across the ecosystem — Claude Code, Codex CLI, Gemini CLI, Cursor, and others all read the same `SKILL.md` format (see [agentskills.io](https://agentskills.io)). GoodBoy doesn't define its own skill format or compete with that standard; it manages skills that already conform to it. A skill you install with GoodBoy is a plain, standard skill — nothing GoodBoy-specific leaks into `SKILL.md` itself.
+GoodBoy does the same basic install job as those two tools — install, upgrade, uninstall — and isn't trying to out-compete them there. What's different:
 
-The rest of the model will be familiar if you've used npm, cargo, or any other package manager: a local registry holds every version of every skill you've published to it, versions are immutable once created, and `goodboy install` / `goodboy upgrade` move skills between that registry and the places an agent actually looks for them.
+- **Local integrity verification that fails closed.** `goodboy verify` and `goodboy skill status` answer a question neither `gh skill` nor `npx skills` asks: *has my installed copy been silently modified since I installed it?* `goodboy verify` recomputes the content hash recorded at install time and reports any mismatch; `goodboy skill status` shows every tracked skill with its version and drift state at a glance.
+- **A personal private registry with immutable versions.** `~/.goodboy/registry` is the centre of gravity: a skill is developed in its own source directory and published to the registry when it's ready to install somewhere; versions are immutable once created, and `goodboy upgrade` replaces installed copies from it deliberately.
+- **Registry resolution never touches the network.** The registry is a local directory; resolving or installing a skill never makes a network call. It works anywhere `gh skill` and `npx skills` can't: no GitHub access, or no network at all.
+
+## Agent Skills
+
+Agent Skills is an open standard for portable agent capabilities (agentskills.io): a skill is a folder with a `SKILL.md` file, read the same way by every compliant agent. GoodBoy doesn't define its own skill format or compete with that standard — it manages skills that already conform to it, and nothing GoodBoy-specific leaks into `SKILL.md` itself. The rest of the model is familiar from npm or cargo: a local registry holds every version of every skill you've published to it, versions are immutable once created, and `goodboy install` / `goodboy upgrade` move skills between that registry and the places an agent actually looks for them.
 
 ## How it works
 
@@ -57,7 +63,6 @@ goodboy search git
 | Command | Description |
 | --- | --- |
 | `goodboy init` | Initialise `goodboy.json` in the current directory |
-| `goodboy init --registry <url>` | Initialise with a custom registry URL |
 
 ### Installing skills
 
@@ -81,6 +86,7 @@ goodboy search git
 | `goodboy skill open <name>` | Open the registry version in `$EDITOR` |
 | `goodboy skill diff <name>` | Diff the installed copy against the registry |
 | `goodboy skill status` | Show every tracked skill with version and drift state |
+| `goodboy verify [skill-name]` | Verify installed skills against their recorded integrity hash (`-g` for global) |
 
 ### Discovery
 
@@ -145,7 +151,7 @@ goodboy skill open commit-creation
 goodboy upgrade commit-creation
 ```
 
-Registry versions are immutable — `--bump` always creates a new version rather than modifying an existing one. If you're not sure whether an installed skill still matches the registry (someone edited it directly, or you're not sure what you last installed), `goodboy skill diff <name>` shows the difference and `goodboy skill status` gives you an at-a-glance table across every skill you're tracking.
+Registry versions are immutable — `--bump` always creates a new version rather than modifying an existing one. If you're not sure whether an installed copy still matches the registry, `goodboy skill diff <name>` shows the difference and `goodboy skill status` gives you an at-a-glance table across every skill you're tracking.
 
 ## Security notice
 
