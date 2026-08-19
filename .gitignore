@@ -6,7 +6,10 @@ dist/
 coverage/
 .env
 .DS_Store
-docs/
+docs/*
+!docs/decisions.md
+!docs/product-positioning.md
+!docs/roadmap.md
 _to_delete/
 .claude/skills/engineering-principles/
 vitest.config.ts.timestamp-*
