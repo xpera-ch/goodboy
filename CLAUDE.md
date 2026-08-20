@@ -13,6 +13,13 @@ that didn't come from reading these files directly this session, treat it
 as possibly stale and re-verify against the repo rather than trusting a
 prior chat's memory or summary.
 
+The same applies to work in progress. A new session has no memory of the
+last one; the working tree does. Before proposing or implementing
+anything, establish what is already in flight — `git branch
+--show-current`, `git status --short`, and `git log main..HEAD --oneline`.
+If the checked-out branch is not `main`, that work is unfinished: continue
+it rather than opening a second front. See "Branching and pull requests".
+
 `docs/` — backlog, decision log, roadmap, go-public checklist, per-phase
 implementation prompts, and review reports — is the maintainer's own
 planning history. The whole directory is gitignored: present in the
@@ -280,6 +287,50 @@ already have them:
   root) gets a security-impact section drafted via the `security-impact`
   skill, which reads that file — never `CONTRIBUTING.md` — as source of
   truth.
+
+## Branching and pull requests
+
+`main` is protected. It takes no direct pushes, and every change lands
+through a pull request with CI green — this applies to the maintainer too.
+Admin bypass exists for emergencies, not for convenience.
+
+**One phase prompt is one branch is one pull request.** The branch is cut
+from fresh `main` before implementation starts, named `<type>/<slug>`,
+where `<type>` is the Conventional Commits type the work will use (`feat`,
+`fix`, `docs`, `chore`, `refactor`) and `<slug>` matches the phase
+prompt's filename in `docs/prompts/` — so the branch and the prompt that
+authorised it are recognisably the same work.
+
+```sh
+git switch main && git pull
+git switch -c docs/branching-strategy
+```
+
+Push and open the pull request **as a draft once the branch has its first
+commit**, not when the work is done. `docs/prompts/` is gitignored and
+never reaches GitHub; the pull request description is the public half of
+that record, and the only part of the intent that survives a lost chat
+context or a move to another machine. Paste the phase prompt's goal into
+it.
+
+Nothing else about the standard workflow changes: implementation still
+stops after verification for review, `commit-creation` still writes every
+commit, and `adversarial-review` still runs at the phase boundary — now
+immediately before the merge rather than before a push to `main`.
+
+Merge commits are disabled, so history stays linear either way. Which of
+the two remaining strategies applies depends on whose commits they are:
+
+- **Rebase-and-merge** for branches whose commits came through
+  `commit-creation`. They land on `main` individually, because the
+  per-commit reasoning is the point of the history, not noise to be
+  flattened. This is the default for the maintainer's own work.
+- **Squash-and-merge** for branches whose history is not worth preserving
+  — typically an outside contribution carrying work-in-progress commits.
+  Never make a contributor rebase or rewrite their history as a condition
+  of merging: squash it and write one good message instead.
+
+Branches are deleted after merge.
 
 ## Collaboration style
 

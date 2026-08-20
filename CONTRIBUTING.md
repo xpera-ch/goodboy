@@ -181,9 +181,30 @@ setup rather than pinning the order.
 
 ## Pull requests
 
+`main` is protected: it takes no direct pushes, and every change lands
+through a pull request with CI green.
+
+Branch off fresh `main`, one branch per logical change, named
+`<type>/<slug>` where `<type>` is the Conventional Commits type the work
+will use:
+
+```sh
+git switch main && git pull
+git switch -c fix/completion-fish-tokens
+```
+
+Open the pull request as a draft as soon as the branch has its first
+commit, rather than once the work is finished — the description is where
+the intent lives, and it is readable long before the diff is.
+
 - One logical change per PR
 - All TypeScript must compile without errors (`tsc --noEmit`)
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+- Keep commits atomic and well-messaged where you can. A branch whose
+  commits are already clean is rebased onto `main` so they land
+  individually; anything else is squashed into a single commit. Either way,
+  you are never asked to rebase or rewrite history to get a PR merged
+- Branches are deleted after merge
 
 ## Security
 
