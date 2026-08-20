@@ -161,6 +161,14 @@ Registry versions are immutable — `--bump` always creates a new version rather
 >
 > See [SECURITY.md](SECURITY.md) for the full security model and known limitations.
 
+## How this project is built
+
+GoodBoy is built AI-native. Claude Code is a primary tool in this repository, and `CLAUDE.md` and `contributor-skills/` are committed for exactly that reason — the workflow is deliberate and documented, not incidental. This is stated plainly because it is not something to work around: it is how the project gets built, and the same tools are offered to anyone contributing.
+
+Commits carry no `Co-Authored-By` trailer for the agent. A few early ones do — from before this was thought through — and they are left in the history rather than rewritten, because the point of the policy is transparency and quietly editing the record would defeat it.
+
+The reasoning: authorship in a git history is a claim of responsibility, and responsibility does not split. Whoever commits a change owns understanding it, owns defending it in review, and owns the consequences when it turns out to be wrong. A tool carries none of that, so naming one as co-author would misdescribe where accountability actually sits. Every commit here has a single accountable author who read it, reviewed it, and stands behind it — the same standard that applied before any of these tools existed.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
