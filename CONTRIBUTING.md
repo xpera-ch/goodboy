@@ -13,7 +13,7 @@ scripts/
 
 ## Prerequisites
 
-- Node.js ≥ 18
+- Node.js ≥ 24
 - npm ≥ 9 (workspaces support required)
 
 ## Setup
