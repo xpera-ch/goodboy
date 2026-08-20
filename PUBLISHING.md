@@ -30,17 +30,25 @@ maintained runbook.
 
 ## All future releases
 
-Every release after v0.1.0 is a single command:
+`main` is protected and takes no direct pushes, so the version bump lands
+through a pull request and the tag is pushed once it has merged.
 
   # Update CHANGELOG.md with the new version section
-  # Update version in all package.json files
+  # Update version in the package.json files being released
+  git switch main && git pull
+  git switch -c chore/release-vX.Y.Z
   git add .
   git commit -m "chore: release vX.Y.Z"
+  git push -u origin chore/release-vX.Y.Z
+  gh pr create --title "chore: release vX.Y.Z" --body "Version bump for vX.Y.Z"
+
+  # after CI is green and the pull request is merged:
+  git switch main && git pull
   git tag -a vX.Y.Z -m "GoodBoy vX.Y.Z"
-  git push origin main
   git push origin vX.Y.Z
 
-The release workflow handles everything else automatically.
+Branch protection covers branches, not tags — pushing the tag needs no
+pull request. The release workflow handles everything else automatically.
 
 ## Verifying a release
 
@@ -54,9 +62,10 @@ After a release workflow completes:
    npmjs.com/package/@goodboyjs/schema
 
 3. Verify provenance attestation on each package page
-   ("Built and signed on GitHub Actions" badge) — only after
-   --provenance is re-added at the go-public flip; absent while
-   the repository is private
+   ("Built and signed on GitHub Actions" badge). Versions published
+   before the repository went public (@goodboyjs/cli up to 0.2.0,
+   @goodboyjs/schema up to 1.1.0) carry no attestation and cannot
+   gain one — provenance is attached at publish time only
 
 4. Test the published CLI:
    npm install -g @goodboyjs/cli
