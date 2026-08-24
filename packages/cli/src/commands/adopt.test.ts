@@ -79,6 +79,7 @@ import {
   writeRegistryEntry,
 } from '../lib/registry-entry.js';
 import { logger, sanitiseError } from '../lib/logger.js';
+import { resetCommandOptions } from '../__fixtures__/index.js';
 import { adoptCommand } from './adopt.js';
 
 const mockInput = vi.mocked(input);
@@ -94,6 +95,11 @@ const mockReadRegistryEntry = vi.mocked(readRegistryEntry);
 const mockWriteRegistryEntry = vi.mocked(writeRegistryEntry);
 const mockLogger = vi.mocked(logger);
 const mockSanitiseError = vi.mocked(sanitiseError);
+
+// Captured before any test pins it — adopt's non-interactive gate reads
+// process.stdin.isTTY, and vitest's stdin is not a TTY, so every test pins
+// the interactive value it wants and restores the original afterwards.
+const ORIGINAL_STDIN_IS_TTY = process.stdin.isTTY;
 
 const REGISTRY_PATH = '/registry';
 const SOURCE_PATH = '/home/user/some-skill';
@@ -150,6 +156,13 @@ describe('adopt command', () => {
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
+    // adopt now has options; commander keeps parsed values on the singleton
+    // command instance, so a later parseAsync() that omits a flag would still
+    // see the earlier one (see resetCommandOptions' own comment).
+    resetCommandOptions(adoptCommand);
+    // The interactive default for every test; non-interactive tests pin
+    // process.stdin.isTTY = false themselves.
+    process.stdin.isTTY = true;
 
     process.env['GOODBOY_REGISTRY'] = REGISTRY_PATH;
     mockFsForHappyPath();
@@ -158,13 +171,18 @@ describe('adopt command', () => {
     mockWriteManifest.mockResolvedValue(undefined);
     mockReadRegistryEntry.mockResolvedValue(null);
     mockWriteRegistryEntry.mockResolvedValue(undefined);
-    mockInput.mockResolvedValueOnce('Test Author').mockResolvedValueOnce('');
-    mockConfirm.mockResolvedValue(true);
+    // mockReset (not just clearAllMocks) so the Once-queues start empty per
+    // test: clearAllMocks leaves unconsumed mockResolvedValueOnce entries
+    // queued, and the C9 flag tests consume a different number of prompts
+    // than the classic two-prompt tests, which would desynchronize the queue.
+    mockInput.mockReset().mockResolvedValueOnce('Test Author').mockResolvedValueOnce('');
+    mockConfirm.mockReset().mockResolvedValue(true);
   });
 
   afterEach(() => {
     // Env leaks across test files sharing a worker process.
     delete process.env['GOODBOY_REGISTRY'];
+    process.stdin.isTTY = ORIGINAL_STDIN_IS_TTY;
   });
 
   // -------------------------------------------------------------------------
@@ -372,6 +390,201 @@ describe('adopt command', () => {
       expect(validate('x'.repeat(64))).toBe(true);
       expect(validate('MIT')).toBe(true);
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // Flags (C9): each flag suppresses only its own prompt; validation reuses
+  // the prompt callbacks; --yes waives the confirmation.
+  // -------------------------------------------------------------------------
+
+  it('--author suppresses the author name prompt and feeds the manifest', async () => {
+    // The email prompt still runs — an empty answer, so no email lands in
+    // the synthesized manifest (a non-empty answer would fail the real
+    // schema check on email format).
+    mockInput.mockReset().mockResolvedValueOnce('');
+    await adoptCommand.parseAsync([SOURCE_PATH, '--author', 'Flag Author'], { from: 'user' });
+
+    expect(mockInput).toHaveBeenCalledTimes(1);
+    expect(mockInput.mock.calls[0]![0]).toMatchObject({ message: 'Author email (optional):' });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.author.name).toBe('Flag Author');
+  });
+
+  it('--email suppresses the email prompt and feeds the manifest', async () => {
+    await adoptCommand.parseAsync([SOURCE_PATH, '--email', 'flag@example.com'], { from: 'user' });
+
+    expect(mockInput).toHaveBeenCalledTimes(1);
+    expect(mockInput.mock.calls[0]![0]).toMatchObject({ message: 'Author name:' });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.author).toMatchObject({ name: 'Test Author', email: 'flag@example.com' });
+  });
+
+  it('--license suppresses the license prompt when SKILL.md declares none', async () => {
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+    mockInput.mockReset().mockResolvedValueOnce('Test Author').mockResolvedValueOnce('');
+
+    await adoptCommand.parseAsync([SOURCE_PATH, '--license', 'Apache-2.0'], { from: 'user' });
+
+    expect(mockInput).toHaveBeenCalledTimes(2);
+    expect(mockInput.mock.calls[1]![0]).toMatchObject({ message: 'Author email (optional):' });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.license).toBe('Apache-2.0');
+  });
+
+  it('--yes skips the final confirmation', async () => {
+    await adoptCommand.parseAsync([SOURCE_PATH, '--yes'], { from: 'user' });
+
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
+  });
+
+  it('all four flags with --yes construct no prompt at all', async () => {
+    await adoptCommand.parseAsync(
+      [SOURCE_PATH, '--author', 'A', '--email', 'a@b.com', '--license', 'MIT', '--yes'],
+      { from: 'user' },
+    );
+
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
+    // The fixture SKILL.md declares license: MIT, which wins over --license —
+    // the flag only fills the gap when SKILL.md declares none, mirroring the
+    // prompt it replaces (which is skipped in that case too).
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.license).toBe('MIT');
+  });
+
+  it('--author with an empty value fails with the author prompt\'s own message', async () => {
+    await adoptCommand.parseAsync([SOURCE_PATH, '--author', ''], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith('Author name is required');
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+  });
+
+  it('--email with a malformed value fails with the email prompt\'s own message', async () => {
+    await adoptCommand.parseAsync([SOURCE_PATH, '--email', 'not-an-email'], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith('"not-an-email" is not a valid email address');
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockCpSync).not.toHaveBeenCalled();
+  });
+
+  it('--license with an empty value fails with the license prompt\'s own message', async () => {
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+    await adoptCommand.parseAsync([SOURCE_PATH, '--license', ''], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith('License is required');
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockCpSync).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Non-interactive runs (C9): piped/closed stdin cannot answer prompts, so
+  // adopt proceeds only when fully specified — every needed value by flag
+  // plus --yes — and otherwise fails fast naming exactly what is missing,
+  // before any prompt or write.
+  // -------------------------------------------------------------------------
+
+  it('non-interactive run with no flags fails fast naming all three missing flags, before any write', async () => {
+    process.stdin.isTTY = false;
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+
+    await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('missing --author <name>, --license <spdx>, --yes'),
+    );
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockWriteRegistryEntry).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('non-interactive run names only the flags still missing (author and --yes supplied, license still missing)', async () => {
+    process.stdin.isTTY = false;
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+
+    await adoptCommand.parseAsync([SOURCE_PATH, '--author', 'A', '--yes'], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('missing --license <spdx>'),
+    );
+    expect(mockLogger.error).not.toHaveBeenCalledWith(expect.stringContaining('missing --author'));
+    expect(mockLogger.error).not.toHaveBeenCalledWith(expect.stringContaining('missing --yes'));
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('non-interactive run requires --yes even when every value is supplied by flag', async () => {
+    process.stdin.isTTY = false;
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+
+    await adoptCommand.parseAsync(
+      [SOURCE_PATH, '--author', 'A', '--email', 'a@b.com', '--license', 'MIT'],
+      { from: 'user' },
+    ).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('missing --yes'));
+    expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('non-interactive run with every flag and --yes completes with no prompts at all', async () => {
+    process.stdin.isTTY = false;
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+
+    await adoptCommand.parseAsync(
+      [
+        SOURCE_PATH,
+        '--author', 'Test Author',
+        '--email', 'author@example.com',
+        '--license', 'Apache-2.0',
+        '--yes',
+      ],
+      { from: 'user' },
+    );
+
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.license).toBe('Apache-2.0');
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  it('non-interactive run succeeds without --email — the email stays optional', async () => {
+    process.stdin.isTTY = false;
+    mockReadFileSync.mockReturnValue(SKILL_MD_NO_LICENSE);
+
+    await adoptCommand.parseAsync(
+      [SOURCE_PATH, '--author', 'Test Author', '--license', 'MIT', '--yes'],
+      { from: 'user' },
+    );
+
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.author).toMatchObject({ name: 'Test Author' });
+    expect(manifest.author).not.toHaveProperty('email');
+  });
+
+  it('non-interactive run whose SKILL.md declares a license needs no --license flag', async () => {
+    process.stdin.isTTY = false;
+
+    await adoptCommand.parseAsync(
+      [SOURCE_PATH, '--author', 'Test Author', '--email', 'a@b.com', '--yes'],
+      { from: 'user' },
+    );
+
+    expect(mockCpSync).toHaveBeenCalledWith(SOURCE_PATH, VERSION_ABS_PATH, { recursive: true });
+    const [, manifest] = mockWriteManifest.mock.calls[0]! as [string, GoodBoyManifest];
+    expect(manifest.license).toBe('MIT');
   });
 
   // -------------------------------------------------------------------------

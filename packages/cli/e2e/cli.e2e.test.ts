@@ -33,19 +33,14 @@ interface RunOptions {
   cwd: string;
   registry: string;
   /**
-   * Piped-stdin answers, one per prompt, written only once that prompt's
-   * marker text has appeared in the child's output. Keeps stdin open until
-   * the child exits: closing the pipe early would force-close any prompt
-   * whose readline has not started yet (observed empirically — a
-   * pre-buffered pipe with EOF only answers the first of several prompts).
+   * Text written to the child's stdin immediately after spawn, then the
+   * pipe is closed — the naive `printf 'a\nb\n' | goodboy …` shape. C9 made
+   * non-interactive adopt fail fast instead of prompting, so no test drives
+   * prompts through a pipe anymore; the C8 gated-answers machinery that did
+   * is gone with it.
    */
-  answers?: string[];
+  stdin?: string;
 }
-
-// Prompt markers, aligned index-wise with the answers array. The order is
-// the order adopt's prompts appear (adopt.ts): author name, author email,
-// license (skipped — the fixture frontmatter declares license: MIT), confirm.
-const PROMPT_MARKERS = ['Author name:', 'Author email', 'Register this skill?'];
 
 function runCli(args: string[], opts: RunOptions): Promise<CliResult> {
   return new Promise((resolve, reject) => {
@@ -58,8 +53,11 @@ function runCli(args: string[], opts: RunOptions): Promise<CliResult> {
     let stdout = '';
     let stderr = '';
     let settled = false;
-    let answerIndex = 0;
-    const answers = opts.answers ?? [];
+
+    if (opts.stdin !== undefined) {
+      child.stdin.write(opts.stdin);
+      child.stdin.end();
+    }
 
     const timer = setTimeout(() => {
       if (settled) return;
@@ -73,22 +71,11 @@ function runCli(args: string[], opts: RunOptions): Promise<CliResult> {
       );
     }, 30_000);
 
-    const driveAnswers = (): void => {
-      if (answerIndex >= answers.length) return;
-      const output = stdout + stderr;
-      while (answerIndex < answers.length && output.includes(PROMPT_MARKERS[answerIndex])) {
-        child.stdin.write(answers[answerIndex] + '\n');
-        answerIndex += 1;
-      }
-    };
-
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
-      driveAnswers();
     });
     child.stderr.on('data', (chunk: Buffer) => {
       stderr += chunk.toString();
-      driveAnswers();
     });
     child.on('error', (err) => {
       clearTimeout(timer);
@@ -246,20 +233,53 @@ describe('goodboy real-binary end-to-end', () => {
     expect(listedAgain.stdout).not.toContain(SKILL_NAME);
   });
 
-  it('flow 4: adopt end-to-end, driven via piped stdin through its real prompts', async () => {
-    // Source has SKILL.md only — no manifest.json (adopt would refuse it).
-    // license: MIT in the frontmatter skips adopt's License prompt, leaving
-    // exactly three answers: author name, author email, final confirm.
-    writeSkillMd(sourceDir, 'MIT');
+  it('flow 4: the naive pipe that used to exit 0 silently now exits non-zero naming the missing flags', async () => {
+    // The user-visible proof of C9: `printf 'a\nb\n' | goodboy adopt <dir>`
+    // used to answer the first prompt, hit EOF on the second, and exit 0
+    // having written nothing. Non-interactive adopt now fails fast before
+    // any prompt, naming exactly which flags are missing.
+    writeSkillMd(sourceDir); // no frontmatter license → --license is missing too
 
     const adopted = await runCli(['adopt', sourceDir], {
       cwd: projectDir,
       registry: registryDir,
-      answers: ['Test Author', 'author@example.com', 'y'],
+      stdin: 'a\nb\n',
     });
 
+    expect(adopted.status).not.toBe(0);
+    const output = adopted.stdout + adopted.stderr;
+    // One joined list, exactly as the CLI prints it — "missing" precedes only
+    // the first item, so the whole string is the assertion, not three words.
+    expect(output).toContain(
+      'missing --author <name>, --license <spdx>, --yes',
+    );
+    // The original defect: nothing written, no message, exit 0.
+    expect(existsSync(join(registryDir, SKILL_NAME))).toBe(false);
+    expect(existsSync(join(sourceDir, 'manifest.json'))).toBe(false);
+  });
+
+  it('flow 5: fully-flagged non-interactive adopt registers end-to-end with no prompts', async () => {
+    // Source has SKILL.md only — no manifest.json (adopt would refuse it).
+    // No frontmatter license, so --license fills the gap; --yes waives the
+    // confirmation. Every value comes from flags: no prompt can run.
+    writeSkillMd(sourceDir);
+
+    const adopted = await runCli(
+      [
+        'adopt', sourceDir,
+        '--author', 'Test Author',
+        '--email', 'author@example.com',
+        '--license', 'Apache-2.0',
+        '--yes',
+      ],
+      { cwd: projectDir, registry: registryDir },
+    );
+
     expect(adopted.status).toBe(0);
-    expect(adopted.stdout + adopted.stderr).toContain('Adopted skill');
+    const output = adopted.stdout + adopted.stderr;
+    expect(output).toContain('Adopted skill');
+    expect(output).not.toContain('Author name:');
+    expect(output).not.toContain('Register this skill?');
 
     const entryPath = join(registryDir, SKILL_NAME, 'registry-entry.json');
     expect(existsSync(entryPath)).toBe(true);
@@ -273,6 +293,14 @@ describe('goodboy real-binary end-to-end', () => {
     const versionDir = join(registryDir, SKILL_NAME, 'versions', SKILL_VERSION);
     expect(existsSync(join(versionDir, 'manifest.json'))).toBe(true);
     expect(existsSync(join(versionDir, 'SKILL.md'))).toBe(true);
+    const manifest = JSON.parse(
+      readFileSync(join(versionDir, 'manifest.json'), 'utf8'),
+    ) as { author: { name: string; email: string }; license: string };
+    expect(manifest.author).toMatchObject({
+      name: 'Test Author',
+      email: 'author@example.com',
+    });
+    expect(manifest.license).toBe('Apache-2.0');
 
     // The source directory must be untouched — no manifest.json synthesized
     // into it (mirrors the C6 §1 source-unmodified check).
