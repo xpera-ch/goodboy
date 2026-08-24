@@ -21,6 +21,71 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-17 — A real-binary end-to-end tier, separate from the unit suite, still CI-gated
+
+**Decided (Bruno):** external review feedback — "the one thing I'd fix
+before showing this to anyone else is the mock-heavy testing — add a
+handful of tests that drive the built binary against a real temp
+filesystem" — is accepted as legitimate and acted on.
+
+**Verified before agreeing, not assumed:** 113 `vi.mock()` calls across 26
+test files; zero tests spawn the actual compiled `dist/index.js` as a
+subprocess (`skill-status.integration.test.ts` and
+`legacy-manifest.integration.test.ts` already use real temp
+filesystems with no fs mocks, but still import command modules in-process
+— a real step up from full mocking, but not what the reviewer asked for).
+This is the same failure category `CONTRIBUTING.md` already names as a
+gate that could pass for the wrong reason: "a test covering unreachable
+code, so it only passed because `node:fs` was mocked into a state the real
+filesystem cannot produce."
+
+**Scope — four flows, not a rewrite (Bruno: "doesn't have to cover
+everything... but has to be high quality and accurate... this project is
+used as a showcase, we need high trust"):**
+
+1. `add` → `install` → `verify`, clean, exit 0 (mirrors C6 §10a)
+2. same, tamper the installed file → `verify` again, exit 1, mismatch
+   (mirrors C6 §10b)
+3. `install` → `list` → `uninstall`, project scope
+4. `adopt` end-to-end, including its four interactive prompts (author
+   name, author email, license — skipped if SKILL.md frontmatter already
+   declares one — and the final confirm), driven via piped stdin.
+   Deliberately included despite being the most fragile of the four —
+   **"it's worth it, we have to show excellence."**
+
+Explicitly deferred, not silently dropped: the global-scope, shared-path
+`uninstall` confirmation flow (agent-visibility symlinks) needs a real
+pty to exercise properly and stays in C6's manual domain for now.
+
+**Tiering:** a separate test tier, not folded into the existing unit
+suite. Two reasons, both concrete: (1) `vitest.config.ts`'s main suite
+matches `src/**/*.test.ts` — any filename ending `.test.ts` regardless of
+infix, so a `*.e2e.test.ts` file placed under `src/` would still be swept
+into `npm test` and break it on a clean checkout with no `dist/` built;
+the new tests must live outside `src/` entirely. (2) They require a fresh
+build first and are inherently slower (subprocess spawns) than the
+in-process suite.
+
+**Still CI-gated (Bruno: "it has to be run through CI too, unless this
+wish makes no sense" — it does make sense and is cheap): confirmed against
+the actual `.github/workflows/ci.yml`, which already runs `npm run build
+-w packages/cli` before the test step, on every push/PR, across the Node
+24/26 matrix. Adding an e2e step is one more step in the same job, not new
+build machinery.**
+
+**Coverage:** the e2e tier does not contribute to the 80%/100% coverage
+floors — those stay computed from the fast in-process suite only. Keeps
+this from reopening the coverage policy.
+
+**Side finding, not part of this decision:** `packages/cli/package.json`'s
+`build` script already runs `chmod +x dist/index.js` — the backlog item
+believed this was still needed; it appears already done and should be
+verified and closed separately.
+
+Implementation: `docs/prompts/C8-real-binary-e2e-tests.md`.
+
+---
+
 ## 2026-08-19 — Contributor workflow skills shipped via GoodBoy itself, not `.claude/skills/`; committed and verified
 
 **Decided (Bruno):** `CLAUDE.md`'s "Standard workflow" section requires four
