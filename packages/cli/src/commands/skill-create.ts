@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { input, select } from '@inquirer/prompts';
+import { ExitPromptError } from '@inquirer/core';
 import ora from 'ora';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -149,10 +150,19 @@ export function registerSkillCreate(program: Command): void {
       try {
         await run();
       } catch (err) {
-        if (err instanceof Error && /force closed|force-closed/i.test(err.message)) {
-          process.exit(0);
+        if (err instanceof ExitPromptError) {
+          // Same §3.1 contract as adopt: a force-closed prompt (stdin ended
+          // mid-dialogue, Ctrl-C/D) must never exit 0 having done nothing —
+          // it exits non-zero naming the cause and the remedy. All of
+          // create's prompts precede its first filesystem write, so nothing
+          // was created.
+          logger.error(
+            'Input was force-closed before every prompt was answered (stdin ended mid-dialogue). ' +
+              "Nothing was created. Run 'goodboy create' in an interactive terminal.",
+          );
+        } else {
+          logger.error(err instanceof Error ? err.message : String(err));
         }
-        logger.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });

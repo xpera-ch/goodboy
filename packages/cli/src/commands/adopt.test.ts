@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
+import { ExitPromptError } from '@inquirer/core';
 import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('ora', () => ({
@@ -749,23 +750,36 @@ describe('adopt command', () => {
     expect(mockLogger.error).toHaveBeenCalledWith('SANITISED:disk full');
   });
 
-  it('exits 0 without an error message when an input prompt is force-closed', async () => {
-    mockInput.mockReset().mockRejectedValueOnce(new Error('User force closed the prompt'));
+  it('a force-closed prompt exits non-zero with a named cause and remedy — never exit 0 (C9 regression for the original defect)', async () => {
+    mockInput.mockReset().mockRejectedValueOnce(
+      new ExitPromptError('User force closed the prompt with SIGINT'),
+    );
 
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
 
-    expect(mockLogger.error).not.toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(0);
+    // The message names the cause (force-closed / stdin ended mid-dialogue)
+    // and the remedy (interactive run or the flags).
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('force-closed'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('--author <name> --email <email> [--license <spdx>] --yes'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockCpSync).not.toHaveBeenCalled();
   });
 
-  it('exits 0 without an error message when the confirmation prompt is force-closed', async () => {
-    mockConfirm.mockRejectedValueOnce(new Error('User force closed the prompt'));
+  it('a force-closed confirmation prompt exits non-zero with nothing written — never exit 0', async () => {
+    mockConfirm.mockRejectedValueOnce(
+      new ExitPromptError('User force closed the prompt with SIGINT'),
+    );
 
     await adoptCommand.parseAsync([SOURCE_PATH], { from: 'user' }).catch(() => {});
 
-    expect(mockLogger.error).not.toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('force-closed'));
+    expect(process.exit).toHaveBeenCalledWith(1);
     expect(mockCpSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).not.toHaveBeenCalled();
   });
 
   it('logs sanitiseError()\'s fallback text and exits 1 when a non-Error value is thrown (C3)', async () => {
