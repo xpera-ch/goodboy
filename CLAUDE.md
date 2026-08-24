@@ -20,15 +20,26 @@ anything, establish what is already in flight — `git branch
 If the checked-out branch is not `main`, that work is unfinished: continue
 it rather than opening a second front. See "Branching and pull requests".
 
-`docs/` — backlog, decision log, roadmap, go-public checklist, per-phase
-implementation prompts, and review reports — is the maintainer's own
-planning history. The whole directory is gitignored: present in the
-maintainer's local checkout, absent from a fresh clone of this repo. If you
-have it locally, `docs/decisions.md` is the place to check first when
-something in the code looks arbitrary, and `docs/backlog.md` for known,
-deliberate gaps rather than oversights. If you don't have it, that's
-expected — this file, the code, and `git log` are the whole record
-available to you.
+`docs/` — decision log, roadmap, product positioning, backlog, go-public
+checklist, per-phase implementation prompts, and review reports — is the
+maintainer's own planning history. **Three of those files are committed;
+the rest are gitignored** (`.gitignore` uses `docs/*` plus explicit
+negations, which is the authoritative list — this summary can go stale,
+that file cannot):
+
+- **In every clone:** `docs/decisions.md`, `docs/roadmap.md`,
+  `docs/product-positioning.md`.
+- **Local to the maintainer only:** `docs/backlog.md`,
+  `docs/go-public-checklist.md`, `docs/prompts/`, `docs/reviews/`, and
+  anything else under `docs/`.
+
+`docs/decisions.md` is therefore always available, and is the place to
+check first when something in the code looks arbitrary — it records what
+was decided, when, why, and what would reopen it. `docs/backlog.md` is the
+place for known, deliberate gaps rather than oversights, but you will only
+have it in the maintainer's checkout; if it is missing, that is expected
+rather than a broken setup, and this file, the code, and `git log` are the
+rest of the record available to you.
 
 One convention from `docs/prompts/` carries over regardless: **a prompt
 that has been executed is immutable.** Once implemented, a phase prompt is
