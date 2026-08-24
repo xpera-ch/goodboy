@@ -36,6 +36,9 @@ jobs:
       - name: Build CLI
         run: npm run build -w packages/cli
 
+      - name: Run end-to-end tests
+        run: npm run test:e2e -w packages/cli
+
       - name: Type-check registry client
         run: npm run build -w packages/registry-client
 
