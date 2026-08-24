@@ -157,6 +157,33 @@ describe('uninstall command — global (-g)', () => {
     );
   });
 
+  it('exits non-zero with the refusal message when the shared-path confirmation cannot be asked, with zero store/manifest/lock changes', async () => {
+    // removeAgentSymlinks throws the C9 refusal when its shared-path
+    // confirmation is force-closed (stdin ended mid-dialogue) — uninstall's
+    // top-level catch turns it into a non-zero exit, and nothing further
+    // runs. The F1 contract holds at this level too: no store content, no
+    // goodboy.json/goodboy.lock writes.
+    mockRemoveAgentSymlinks.mockRejectedValue(
+      new Error(
+        '/home/u/.agents/skills/my-skill is part of the shared ~/.agents/skills convention. ' +
+          "Cannot confirm removal without an interactive prompt — run 'goodboy uninstall -g my-skill' interactively to remove it.",
+      ),
+    );
+
+    await uninstallCommand.parseAsync(['my-skill', '--global'], { from: 'user' }).catch(() => {});
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('part of the shared ~/.agents/skills convention'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('interactively'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockRemoveFromStore).not.toHaveBeenCalled();
+    expect(mockRemoveSkillFromManifest).not.toHaveBeenCalled();
+    expect(mockRemoveSkillFromLock).not.toHaveBeenCalled();
+  });
+
   it('stops the spinner before the shared-path prompt and warns on decline', async () => {
     mockRemoveAgentSymlinks.mockResolvedValue(false);
 
