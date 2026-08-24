@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { ExitPromptError } from '@inquirer/core';
 
 vi.mock('node:fs/promises');
 vi.mock('@inquirer/prompts', () => ({ confirm: vi.fn() }));
@@ -387,6 +388,34 @@ describe('removeAgentSymlinks', () => {
     expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
       `Removal declined: ${join(AGENTS_SKILLS, 'my-skill')} is part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention. Nothing was uninstalled.`,
     );
+  });
+
+  it('a force-closed shared-path confirmation refuses loudly: names the shared convention and the interactive remedy, zero unlinks', async () => {
+    mockExistingSymlinks();
+    mockConfirm.mockRejectedValue(
+      new ExitPromptError('User force closed the prompt with SIGINT'),
+    );
+
+    // Same abort as a decline — the throw happens in the confirmation phase,
+    // before any unlink — but as a loud refusal (uninstall turns it into a
+    // non-zero exit) instead of a silent false (C9, decided 2026-08-24).
+    await expect(removeAgentSymlinks('my-skill', ['codex'])).rejects.toThrow(
+      `${join(AGENTS_SKILLS, 'my-skill')} is part of the shared ${AGENT_SKILL_DIRS['agents'][0]} convention. ` +
+        `Cannot confirm removal without an interactive prompt — run 'goodboy uninstall -g my-skill' interactively to remove it.`,
+    );
+
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockUnlink).not.toHaveBeenCalled();
+    expect(vi.mocked(logger.warn)).not.toHaveBeenCalled();
+  });
+
+  it('a non-force-close rejection from the shared-path confirmation propagates unchanged', async () => {
+    mockExistingSymlinks();
+    mockConfirm.mockRejectedValue(new Error('disk on fire'));
+
+    await expect(removeAgentSymlinks('my-skill', ['codex'])).rejects.toThrow('disk on fire');
+
+    expect(mockUnlink).not.toHaveBeenCalled();
   });
 
   it('handles multiple agents', async () => {

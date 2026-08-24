@@ -2,6 +2,7 @@ import { mkdir, lstat, symlink, unlink, readlink } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { confirm } from '@inquirer/prompts';
+import { ExitPromptError } from '@inquirer/core';
 import { logger } from './logger.js';
 
 // Each agent maps to a LIST of directories. A flag names an intent — "make
@@ -180,13 +181,30 @@ export async function removeAgentSymlinks(skillName: string, agents: string[]): 
 
   // Decision point: every shared-path confirmation, before anything is
   // removed. Any decline aborts the whole call — nothing is unlinked, not
-  // even exclusive paths that needed no confirmation.
+  // even exclusive paths that needed no confirmation. The same applies when
+  // the confirmation cannot be asked at all (a force-closed prompt — stdin
+  // ended mid-dialogue): that becomes a loud refusal, thrown up to uninstall
+  // for a non-zero exit, naming the shared convention and the interactive
+  // remedy (docs/backlog.md, decided 2026-08-24). The throw happens in the
+  // confirmation phase, before any unlink — zero side effects, exactly like
+  // a decline.
   for (const item of plan) {
     if (!item.shared) continue;
-    const proceed = await confirm({
-      message: `${item.path} is ${item.otherReaders}. Remove anyway?`,
-      default: false,
-    });
+    let proceed: boolean;
+    try {
+      proceed = await confirm({
+        message: `${item.path} is ${item.otherReaders}. Remove anyway?`,
+        default: false,
+      });
+    } catch (err) {
+      if (err instanceof ExitPromptError) {
+        throw new Error(
+          `${item.path} is ${item.otherReaders}. Cannot confirm removal without an interactive prompt — ` +
+            `run 'goodboy uninstall -g ${skillName}' interactively to remove it.`,
+        );
+      }
+      throw err;
+    }
     if (!proceed) {
       logger.warn(
         `Removal declined: ${item.path} is ${item.otherReaders}. Nothing was uninstalled.`,
