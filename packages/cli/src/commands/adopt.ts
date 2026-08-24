@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { input, confirm } from '@inquirer/prompts';
+import { ExitPromptError } from '@inquirer/core';
 import ora from 'ora';
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -253,10 +254,18 @@ export const adoptCommand = new Command('adopt')
       await run(pathArg);
     } catch (err) {
       if (!(err instanceof HandledFailure)) {
-        if (err instanceof Error && /force closed|force-closed/i.test(err.message)) {
-          process.exit(0);
+        if (err instanceof ExitPromptError) {
+          // A force-closed prompt (stdin ended mid-dialogue, Ctrl-C/D) must
+          // never exit 0 having done nothing — it exits non-zero naming the
+          // cause and the remedy (docs/backlog.md, decided 2026-08-24).
+          logger.error(
+            'Input was force-closed before every prompt was answered (stdin ended mid-dialogue). ' +
+              `Nothing was registered. Run 'goodboy adopt ${pathArg}' in an interactive terminal, ` +
+              'or pass every required value as a flag: --author <name> --email <email> [--license <spdx>] --yes.',
+          );
+        } else {
+          logger.error(sanitiseError(err));
         }
-        logger.error(sanitiseError(err));
       }
       process.exit(1);
     }

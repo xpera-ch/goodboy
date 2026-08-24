@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
 import { join } from 'node:path';
+import { ExitPromptError } from '@inquirer/core';
 import type { GoodBoyManifest } from '../types/index.js';
 
 vi.mock('ora', () => ({
@@ -136,6 +137,29 @@ describe('skill create — scaffolded skill', () => {
     expect(mockMkdirSync).not.toHaveBeenCalled();
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('already exists'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('a force-closed prompt exits non-zero with a named cause and remedy — never exit 0 (C9)', async () => {
+    mockInput.mockReset().mockRejectedValueOnce(
+      new ExitPromptError('User force closed the prompt with SIGINT'),
+    );
+
+    await expect(
+      buildProgram().parseAsync(['create'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called unexpectedly');
+
+    // All of create's prompts precede its first write, so nothing was
+    // created; the message names the cause and the interactive remedy.
+    expect(mockMkdirSync).not.toHaveBeenCalled();
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+    expect(mockWriteManifest).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('force-closed'),
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('interactive terminal'),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });
