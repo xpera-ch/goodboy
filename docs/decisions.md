@@ -21,6 +21,65 @@ files; this log carries project-level decisions and links to those.
 
 ---
 
+## 2026-08-24 — The workflow exemption is the prompt, not the surface
+
+**Decided (Bruno):** the operating policy that gates who may originate a
+code change is re-anchored from *which surface is running* to *whether a
+named, reviewed prompt exists*. Supersedes the surface-based framing in
+`CLAUDE.md`'s "Operating policy" section.
+
+**Why the old framing expired — this is the substantive part.** The
+original rule split chat/Cowork (plan here, don't touch code) from Claude
+Code CLI (execute reviewed prompts here). That worked only while the two
+lined up. **The maintainer moved planning and organisation into the CLI
+as well**, so "CLI session" stopped meaning "executing a reviewed plan"
+and started covering ordinary conversation too. The wording did not merely
+get misread — its premise stopped being true, and the rule had to move to
+the artifact that actually carries the review.
+
+The old text also actively encouraged the error it was meant to prevent:
+*"should not pause to ask whether it's allowed to change code, or treat
+this section as applying to itself"* reads as blanket permission for
+anything running in the CLI.
+
+**The new test is checkable rather than a judgement call:** if you cannot
+name the prompt you are executing, you are not executing one — produce the
+prompt and stop. And explicitly: approving a fix's *content* is not the
+same as the fix being routed through the workflow.
+
+### What prompted it — three lapses, one root cause
+
+All three happened in CLI sessions doing review or planning, where a small
+fix felt like part of the conversation rather than a code change:
+
+1. `schema-identity.test.ts` — the R1 exemption entry, applied during an
+   adversarial-review session (now in `e5791fb`).
+2. `registry.ts` — the C6 module-boundary comment, applied in a planning
+   conversation (now in `6cc7379`).
+3. `D-fix-codex-agent-visibility-d.md` — edited **after** it had been
+   executed, violating prompt immutability. Caught and reverted in-session.
+
+Instance 1 also went past the `adversarial-review` skill's own "fix nothing
+during the review" rule. Fixing immediately *after* a review, in the same
+session, is that violation with a delay.
+
+### Disposition of instances 1 and 2: code kept, lapse recorded
+
+**Decided (Bruno): keep the commits.** Both changes are correct and their
+content was approved; reverting them to re-apply identical code through a
+prompt is ceremony that buys nothing functional. What was actually damaged
+is the integrity of the record — those commits look like ordinary workflow
+output and were not — and this entry repairs that, which is the same
+treatment `docs/concept-secrets.md` gets for a reversed decision and
+`CLAUDE.md` gets for the twice-corrected prompt-immutability slip.
+
+**What would reopen this:** planning moving back out of the CLI would not
+restore the old rule — the prompt-based test is strictly better even when
+surfaces do line up, because it is checkable and the surface test never
+was.
+
+---
+
 ## 2026-08-17 — A real-binary end-to-end tier, separate from the unit suite, still CI-gated
 
 **Decided (Bruno):** external review feedback — "the one thing I'd fix
