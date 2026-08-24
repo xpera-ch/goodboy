@@ -26,7 +26,67 @@ const MAX_SKILL_MD_BYTES = 512 * 1024; // 512 KB
  */
 class HandledFailure extends Error {}
 
-async function run(pathArg: string): Promise<void> {
+// The three prompt validate callbacks, lifted to module level so the flag
+// path (--author/--email/--license) validates with the exact same rules and
+// messages as the prompted path — a bad flag fails with the message its
+// prompt would have shown.
+function validateAuthorName(value: string): string | true {
+  const t = value.trim();
+  if (t.length === 0) return 'Author name is required';
+  return t.length <= 128 ? true : 'Author name must be 128 characters or fewer';
+}
+
+function validateAuthorEmail(value: string): string | true {
+  const t = value.trim();
+  if (t.length === 0) return true;
+  if (t.length > 254) return 'Email address must be 254 characters or fewer';
+  return EMAIL_RE.test(t) ? true : `"${t}" is not a valid email address`;
+}
+
+function validateLicense(value: string): string | true {
+  const t = value.trim();
+  if (t.length === 0) return 'License is required';
+  return t.length <= 64 ? true : 'License must be 64 characters or fewer';
+}
+
+/**
+ * One adopt value: a supplied flag replaces its prompt, validated with the
+ * prompt's own validate callback; an invalid flag value fails fast with the
+ * same message the prompt would have shown. Values are trimmed, matching
+ * what the interactive path trims at use.
+ *
+ * Without a flag, a non-interactive run never constructs a prompt (stdin is
+ * closed — it would force-close immediately). Only the email value can
+ * reach this: the gate above guarantees author and license flags whenever
+ * they are required, and the email prompt accepts empty, so the empty
+ * answer the prompt would have accepted is supplied by construction.
+ */
+async function valueOrPrompt(
+  flag: string | undefined,
+  promptMessage: string,
+  validate: (value: string) => string | true,
+): Promise<string> {
+  if (flag !== undefined) {
+    const error = validate(flag);
+    if (error !== true) {
+      logger.error(error);
+      throw new HandledFailure();
+    }
+    return flag.trim();
+  }
+  if (process.stdin.isTTY !== true) return '';
+  const answer = await input({ message: promptMessage, validate });
+  return answer.trim();
+}
+
+interface AdoptOptions {
+  author?: string;
+  email?: string;
+  license?: string;
+  yes?: boolean;
+}
+
+async function run(pathArg: string, options: AdoptOptions): Promise<void> {
   if (isRemoteRefArgument(pathArg)) {
     logger.error(
       `"${pathArg}" looks like a URL, not a local path. ` +
@@ -127,35 +187,34 @@ async function run(pathArg: string): Promise<void> {
     throw new HandledFailure();
   }
 
-  const authorName = await input({
-    message: 'Author name:',
-    validate: (v) => {
-      const t = v.trim();
-      if (t.length === 0) return 'Author name is required';
-      return t.length <= 128 ? true : 'Author name must be 128 characters or fewer';
-    },
-  });
+  // Non-interactive runs (piped or closed stdin — no TTY) cannot answer the
+  // prompts, so adopt only proceeds when every value it needs is supplied by
+  // flag and the confirmation is waived with --yes. Anything missing fails
+  // fast here, before any prompt or filesystem write, naming exactly which
+  // flags are missing — not a generic "requires a terminal"
+  // (docs/backlog.md, "Interactive commands have no non-interactive story",
+  // decided 2026-08-24). The email flag is deliberately absent from the
+  // check: the email prompt accepts empty, so email is never required.
+  if (process.stdin.isTTY !== true) {
+    const missing: string[] = [];
+    if (options.author === undefined) missing.push('--author <name>');
+    if (!fm.license && options.license === undefined) missing.push('--license <spdx>');
+    if (!options.yes) missing.push('--yes');
+    if (missing.length > 0) {
+      logger.error(
+        `Cannot adopt non-interactively: missing ${missing.join(', ')}. ` +
+          `Re-run with every missing flag supplied, or run 'goodboy adopt ${pathArg}' in an interactive terminal.`,
+      );
+      throw new HandledFailure();
+    }
+  }
 
-  const authorEmail = await input({
-    message: 'Author email (optional):',
-    validate: (v) => {
-      const t = v.trim();
-      if (t.length === 0) return true;
-      if (t.length > 254) return 'Email address must be 254 characters or fewer';
-      return EMAIL_RE.test(t) ? true : `"${t}" is not a valid email address`;
-    },
-  });
+  const authorName = await valueOrPrompt(options.author, 'Author name:', validateAuthorName);
+  const authorEmail = await valueOrPrompt(options.email, 'Author email (optional):', validateAuthorEmail);
 
   let license = fm.license;
   if (!license) {
-    license = await input({
-      message: 'License:',
-      validate: (v) => {
-        const t = v.trim();
-        if (t.length === 0) return 'License is required';
-        return t.length <= 64 ? true : 'License must be 64 characters or fewer';
-      },
-    });
+    license = await valueOrPrompt(options.license, 'License:', validateLicense);
   }
   if (license.trim().length > 64) {
     logger.error('The license in SKILL.md exceeds the 64-character limit for manifest licenses');
@@ -210,8 +269,9 @@ async function run(pathArg: string): Promise<void> {
 
   // Registry versions are immutable — a wrong license or typo'd author
   // would cost a `registry remove` or a version bump, so the confirmation
-  // defaults to No (decisions.md, 2026-08-17).
-  const confirmed = await confirm({
+  // defaults to No (decisions.md, 2026-08-17). --yes waives it for
+  // scripted runs; the interactive default stays No.
+  const confirmed = options.yes ? true : await confirm({
     message: 'Register this skill?',
     default: false,
   });
@@ -249,9 +309,13 @@ async function run(pathArg: string): Promise<void> {
 export const adoptCommand = new Command('adopt')
   .description('Onboard an existing SKILL.md-only skill (no manifest.json) into the local registry')
   .argument('<path>', 'Local path to an existing skill directory containing SKILL.md but no manifest.json')
-  .action(async (pathArg: string) => {
+  .option('--author <name>', 'Author name — skips the author name prompt')
+  .option('--email <email>', 'Author email — skips the author email prompt (email stays optional)')
+  .option('--license <spdx>', 'License — fills the gap when SKILL.md declares none, skipping the license prompt')
+  .option('--yes', 'Skip the final "Register this skill?" confirmation')
+  .action(async (pathArg: string, options: AdoptOptions) => {
     try {
-      await run(pathArg);
+      await run(pathArg, options);
     } catch (err) {
       if (!(err instanceof HandledFailure)) {
         if (err instanceof ExitPromptError) {
