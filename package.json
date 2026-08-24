@@ -14,6 +14,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
     "publish:schema": "npm publish --workspace packages/schema --access public",
     "publish:cli": "npm publish --workspace packages/cli --access public",
     "publish:all": "npm run publish:schema && npm run publish:cli"
