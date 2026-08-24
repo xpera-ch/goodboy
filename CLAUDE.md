@@ -247,22 +247,29 @@ the implementation as a `phase-prompt`-style prompt and stop — the
 maintainer reviews it and executes it via **Claude Code CLI**, then reports
 results back.
 
-**This does not apply to Claude Code CLI itself when explicitly run to
-execute a reviewed prompt.** That's the sanctioned path this whole workflow
-exists for, not a loophole — Claude Code CLI should implement the prompt
-directly and should not pause to ask whether it's allowed to change code, or
-treat this section as applying to itself. The distinction is about *which
-surface originates a code change* — a conversational planning session versus
-a deliberately-invoked CLI run against an already-reviewed prompt — not
-about code changes being forbidden outright. (This exemption covers
-*implementing*, not committing — see "Standard workflow" below for the
-separate, still-mandatory stop-before-commit gate.)
+**The exemption is the prompt, not the surface.** Claude Code CLI executing
+a named, reviewed prompt implements it directly and should not pause to ask
+permission — that is the sanctioned path this whole workflow exists for, not
+a loophole. But Claude Code CLI in a *planning, review, or discussion*
+session has no more licence to edit source than a chat window does.
 
-The reasoning: a chat-style session and a deliberately-invoked CLI run carry
-different levels of intentionality and review. Gating code changes to the
-surface where a human explicitly chose to execute a reviewed plan, rather
-than any surface that happens to have a model attached, keeps that
-distinction meaningful instead of nominal. This is a current, revisitable
+**The test is checkable: if you cannot name the prompt you are executing,
+you are not executing one.** In that case, produce the prompt and stop —
+even when the change is two lines, even when the maintainer has just
+approved its content. **Approving a fix's content is not the same as the
+fix being routed through the workflow.** Neither is being asked to "fix
+it"; that is approval of the change, not of the path.
+
+(This exemption covers *implementing*, not committing — see "Standard
+workflow" below for the separate, still-mandatory stop-before-commit gate.)
+
+The reasoning: what earns the right to change code is that a human reviewed
+a written plan first. **This was originally framed as a distinction between
+surfaces** — chat for planning, CLI for execution — which worked only while
+those lined up. Once planning and organisation moved into the CLI too
+(2026-08-24), the surface stopped distinguishing "executing a reviewed
+plan" from "having a conversation", and the rule had to be re-anchored to
+the artifact that actually carries the review: the prompt. This is a current, revisitable
 operating policy — the maintainer may change it, including for Cowork/chat
 — not a fixed architectural law; don't assume it has changed without being
 told explicitly. Documentation and planning files (`docs/`, this file) are
