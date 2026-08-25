@@ -8,17 +8,48 @@ This repository — the code, `git log`, `git tag`, `package.json` versions
 — is the source of truth for GoodBoy's state. (Domain-specific canonical
 lists still live in their own files, e.g. `CONTRIBUTING.md` for the
 security hard-requirements list, not this one — see the closing note under
-"Collaboration style".) If a chat session surfaces project information
-that didn't come from reading these files directly this session, treat it
-as possibly stale and re-verify against the repo rather than trusting a
-prior chat's memory or summary.
+"Collaboration style".)
 
-The same applies to work in progress. A new session has no memory of the
-last one; the working tree does. Before proposing or implementing
-anything, establish what is already in flight — `git branch
---show-current`, `git status --short`, and `git log main..HEAD --oneline`.
-If the checked-out branch is not `main`, that work is unfinished: continue
-it rather than opening a second front. See "Branching and pull requests".
+### Verify, never recall — when planning as much as when implementing
+
+**Every statement about the state of this project is verified against the
+repository at the moment it is made.** What is released, what is published,
+what is committed, what is in flight, what is left to do, whether a task is
+finished — each is a fact to be checked, never recalled. This binds equally
+when planning, reviewing, summarising, and implementing; a plan built on an
+unverified premise is worse than no plan, because it looks like work.
+
+Not a source, no matter how convincing:
+
+- **Earlier in the current conversation.** A long session outlives the
+  state it describes: something true on Monday can be false by Wednesday
+  while still sitting in the transcript reading as true. *"I checked this
+  session"* is not a defence — check again.
+- **Your own previous message.** Repeating yourself is not corroboration.
+- Any prior chat, summary, handoff, report, or backlog entry. Written
+  records state what was true when written, which is not the same as what
+  is true.
+
+**Show the evidence.** When asserting something about project state, name
+the command you ran or the file you read. An unsourced claim is a guess
+wearing a fact's clothing — indistinguishable, to the reader, from a
+verified one.
+
+**The failure mode this exists to stop** is not laziness; it is a status
+carried forward because it was true when first learned. That feels like
+knowledge rather than assumption, which is exactly why it survives many
+turns before anyone notices — and why the rule has to be mechanical rather
+than a matter of care.
+
+Before planning or reporting, at minimum: `git branch --show-current`,
+`git status --short`, `git log --oneline -15`, `git tag` — plus
+`npm view <package> version` whenever the claim touches a release, and
+`gh repo view --json isPrivate` whenever it touches repository visibility.
+
+One consequence deserves naming on its own: **a new session has no memory
+of the last one; the working tree does.** If the checked-out branch is not
+`main`, that work is unfinished — continue it rather than opening a second
+front. See "Branching and pull requests".
 
 `docs/` — decision log, roadmap, product positioning, backlog, go-public
 checklist, per-phase implementation prompts, and review reports — is the
