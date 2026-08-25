@@ -80,71 +80,6 @@ was.
 
 ---
 
-## 2026-08-17 — A real-binary end-to-end tier, separate from the unit suite, still CI-gated
-
-**Decided (Bruno):** external review feedback — "the one thing I'd fix
-before showing this to anyone else is the mock-heavy testing — add a
-handful of tests that drive the built binary against a real temp
-filesystem" — is accepted as legitimate and acted on.
-
-**Verified before agreeing, not assumed:** 113 `vi.mock()` calls across 26
-test files; zero tests spawn the actual compiled `dist/index.js` as a
-subprocess (`skill-status.integration.test.ts` and
-`legacy-manifest.integration.test.ts` already use real temp
-filesystems with no fs mocks, but still import command modules in-process
-— a real step up from full mocking, but not what the reviewer asked for).
-This is the same failure category `CONTRIBUTING.md` already names as a
-gate that could pass for the wrong reason: "a test covering unreachable
-code, so it only passed because `node:fs` was mocked into a state the real
-filesystem cannot produce."
-
-**Scope — four flows, not a rewrite (Bruno: "doesn't have to cover
-everything... but has to be high quality and accurate... this project is
-used as a showcase, we need high trust"):**
-
-1. `add` → `install` → `verify`, clean, exit 0 (mirrors C6 §10a)
-2. same, tamper the installed file → `verify` again, exit 1, mismatch
-   (mirrors C6 §10b)
-3. `install` → `list` → `uninstall`, project scope
-4. `adopt` end-to-end, including its four interactive prompts (author
-   name, author email, license — skipped if SKILL.md frontmatter already
-   declares one — and the final confirm), driven via piped stdin.
-   Deliberately included despite being the most fragile of the four —
-   **"it's worth it, we have to show excellence."**
-
-Explicitly deferred, not silently dropped: the global-scope, shared-path
-`uninstall` confirmation flow (agent-visibility symlinks) needs a real
-pty to exercise properly and stays in C6's manual domain for now.
-
-**Tiering:** a separate test tier, not folded into the existing unit
-suite. Two reasons, both concrete: (1) `vitest.config.ts`'s main suite
-matches `src/**/*.test.ts` — any filename ending `.test.ts` regardless of
-infix, so a `*.e2e.test.ts` file placed under `src/` would still be swept
-into `npm test` and break it on a clean checkout with no `dist/` built;
-the new tests must live outside `src/` entirely. (2) They require a fresh
-build first and are inherently slower (subprocess spawns) than the
-in-process suite.
-
-**Still CI-gated (Bruno: "it has to be run through CI too, unless this
-wish makes no sense" — it does make sense and is cheap): confirmed against
-the actual `.github/workflows/ci.yml`, which already runs `npm run build
--w packages/cli` before the test step, on every push/PR, across the Node
-24/26 matrix. Adding an e2e step is one more step in the same job, not new
-build machinery.**
-
-**Coverage:** the e2e tier does not contribute to the 80%/100% coverage
-floors — those stay computed from the fast in-process suite only. Keeps
-this from reopening the coverage policy.
-
-**Side finding, not part of this decision:** `packages/cli/package.json`'s
-`build` script already runs `chmod +x dist/index.js` — the backlog item
-believed this was still needed; it appears already done and should be
-verified and closed separately.
-
-Implementation: `docs/prompts/C8-real-binary-e2e-tests.md`.
-
----
-
 ## 2026-08-19 — Contributor workflow skills shipped via GoodBoy itself, not `.claude/skills/`; committed and verified
 
 **Decided (Bruno):** `CLAUDE.md`'s "Standard workflow" section requires four
@@ -378,51 +313,6 @@ is the standing rule for when one does, not a record of it happening.
 
 ---
 
-## 2026-08-18 — `docs/` is gitignored, not part of what ships publicly. CONTRIBUTING.md stays as-is
-
-**Decided (Bruno):** `docs/` (the whole directory — `backlog.md`,
-`decisions.md`, `go-public-checklist.md`, `product-positioning.md`,
-`roadmap.md`, `concept-secrets.md`, `project-file-schemas-handoff.md`, plus
-the already-gitignored `prompts/` and `reviews/`) is removed from git
-tracking and added to `.gitignore`. Nothing is deleted from disk — the
-files stay exactly where they are, in the maintainer's local checkout, and
-keep working the same way locally. Going public means shipping `README.md`
-and `CLAUDE.md` from the repo root; `docs/` is maintainer-local planning
-material, not part of the release. `CONTRIBUTING.md` is unaffected — it
-stays committed and public, distinct from the still-undecided question of
-how skill-sharing/contribution actually works once there's a public
-registry or actual contributors to design it for.
-
-**Reasoning:** the alternative was reviewing and trimming every file in
-`docs/` line by line before the repo could go public — real work, already
-partway done (see the "Repo content review (root + docs/ trim)" section of
-`docs/go-public-checklist.md`, now superseded by this decision) — for
-content that exists to serve the maintainer's own working process, not a
-first-time visitor. Not shipping it is simpler than sanitising it, and
-nothing about `goodboy` the tool depends on a stranger being able to read
-the maintainer's backlog.
-
-**Consequence — this does not by itself hide `docs/` history.** All ten
-files were already committed in earlier commits; gitignoring stops future
-tracking but every prior version is still reachable via `git log`/`git
-show` on any clone once the repo is public. Bruno's call: also purge
-`docs/` from git history entirely before flipping visibility, rather than
-accept that exposure — a bigger, separate operation (rewrites every commit
-hash), tracked as its own item, own dedicated session, in
-`docs/go-public-checklist.md` and `docs/prompts/SEQUENCE.md`. This
-supersedes the History audit's 2026-08-17 "No history rewrite required"
-verdict — that verdict was about finding nothing secret, which still
-holds; this is a different reason to rewrite history (removing a directory
-wholesale, not responding to a finding).
-
-**What would reopen this:** if the project later wants `docs/` (or
-specific files from it) to be public-facing again — e.g. the decision log
-or roadmap as a deliberate transparency feature — this entry is what to
-supersede, and the earlier per-file `docs/` trim work in
-`go-public-checklist.md` would need picking back up.
-
----
-
 ## 2026-08-19 — Clarified: plain standard English, not a no-pronoun policy. Supersedes the entry below
 
 **Decided (Bruno):** the 2026-08-18 entry below overstated the actual
@@ -484,6 +374,51 @@ and `CLAUDE.md` itself were checked and already carried none of this.
 
 ---
 
+## 2026-08-18 — `docs/` is gitignored, not part of what ships publicly. CONTRIBUTING.md stays as-is
+
+**Decided (Bruno):** `docs/` (the whole directory — `backlog.md`,
+`decisions.md`, `go-public-checklist.md`, `product-positioning.md`,
+`roadmap.md`, `concept-secrets.md`, `project-file-schemas-handoff.md`, plus
+the already-gitignored `prompts/` and `reviews/`) is removed from git
+tracking and added to `.gitignore`. Nothing is deleted from disk — the
+files stay exactly where they are, in the maintainer's local checkout, and
+keep working the same way locally. Going public means shipping `README.md`
+and `CLAUDE.md` from the repo root; `docs/` is maintainer-local planning
+material, not part of the release. `CONTRIBUTING.md` is unaffected — it
+stays committed and public, distinct from the still-undecided question of
+how skill-sharing/contribution actually works once there's a public
+registry or actual contributors to design it for.
+
+**Reasoning:** the alternative was reviewing and trimming every file in
+`docs/` line by line before the repo could go public — real work, already
+partway done (see the "Repo content review (root + docs/ trim)" section of
+`docs/go-public-checklist.md`, now superseded by this decision) — for
+content that exists to serve the maintainer's own working process, not a
+first-time visitor. Not shipping it is simpler than sanitising it, and
+nothing about `goodboy` the tool depends on a stranger being able to read
+the maintainer's backlog.
+
+**Consequence — this does not by itself hide `docs/` history.** All ten
+files were already committed in earlier commits; gitignoring stops future
+tracking but every prior version is still reachable via `git log`/`git
+show` on any clone once the repo is public. Bruno's call: also purge
+`docs/` from git history entirely before flipping visibility, rather than
+accept that exposure — a bigger, separate operation (rewrites every commit
+hash), tracked as its own item, own dedicated session, in
+`docs/go-public-checklist.md` and `docs/prompts/SEQUENCE.md`. This
+supersedes the History audit's 2026-08-17 "No history rewrite required"
+verdict — that verdict was about finding nothing secret, which still
+holds; this is a different reason to rewrite history (removing a directory
+wholesale, not responding to a finding).
+
+**What would reopen this:** if the project later wants `docs/` (or
+specific files from it) to be public-facing again — e.g. the decision log
+or roadmap as a deliberate transparency feature — this entry is what to
+supersede, and the earlier per-file `docs/` trim work in
+`go-public-checklist.md` would need picking back up.
+
+---
+
 ## 2026-08-17 — `CLAUDE.md` addresses "the maintainer," not Bruno by name. Reverses a same-day decision
 
 **Decided (Bruno):** every instance of "Bruno" in `CLAUDE.md` is replaced
@@ -521,6 +456,71 @@ was not raised and is not decided here.
 **What would reopen this:** if the project ever wants CLAUDE.md to read as
 personally authored again — a deliberate stylistic choice, not an oversight
 — this entry is what to supersede.
+
+---
+
+## 2026-08-17 — A real-binary end-to-end tier, separate from the unit suite, still CI-gated
+
+**Decided (Bruno):** external review feedback — "the one thing I'd fix
+before showing this to anyone else is the mock-heavy testing — add a
+handful of tests that drive the built binary against a real temp
+filesystem" — is accepted as legitimate and acted on.
+
+**Verified before agreeing, not assumed:** 113 `vi.mock()` calls across 26
+test files; zero tests spawn the actual compiled `dist/index.js` as a
+subprocess (`skill-status.integration.test.ts` and
+`legacy-manifest.integration.test.ts` already use real temp
+filesystems with no fs mocks, but still import command modules in-process
+— a real step up from full mocking, but not what the reviewer asked for).
+This is the same failure category `CONTRIBUTING.md` already names as a
+gate that could pass for the wrong reason: "a test covering unreachable
+code, so it only passed because `node:fs` was mocked into a state the real
+filesystem cannot produce."
+
+**Scope — four flows, not a rewrite (Bruno: "doesn't have to cover
+everything... but has to be high quality and accurate... this project is
+used as a showcase, we need high trust"):**
+
+1. `add` → `install` → `verify`, clean, exit 0 (mirrors C6 §10a)
+2. same, tamper the installed file → `verify` again, exit 1, mismatch
+   (mirrors C6 §10b)
+3. `install` → `list` → `uninstall`, project scope
+4. `adopt` end-to-end, including its four interactive prompts (author
+   name, author email, license — skipped if SKILL.md frontmatter already
+   declares one — and the final confirm), driven via piped stdin.
+   Deliberately included despite being the most fragile of the four —
+   **"it's worth it, we have to show excellence."**
+
+Explicitly deferred, not silently dropped: the global-scope, shared-path
+`uninstall` confirmation flow (agent-visibility symlinks) needs a real
+pty to exercise properly and stays in C6's manual domain for now.
+
+**Tiering:** a separate test tier, not folded into the existing unit
+suite. Two reasons, both concrete: (1) `vitest.config.ts`'s main suite
+matches `src/**/*.test.ts` — any filename ending `.test.ts` regardless of
+infix, so a `*.e2e.test.ts` file placed under `src/` would still be swept
+into `npm test` and break it on a clean checkout with no `dist/` built;
+the new tests must live outside `src/` entirely. (2) They require a fresh
+build first and are inherently slower (subprocess spawns) than the
+in-process suite.
+
+**Still CI-gated (Bruno: "it has to be run through CI too, unless this
+wish makes no sense" — it does make sense and is cheap): confirmed against
+the actual `.github/workflows/ci.yml`, which already runs `npm run build
+-w packages/cli` before the test step, on every push/PR, across the Node
+24/26 matrix. Adding an e2e step is one more step in the same job, not new
+build machinery.**
+
+**Coverage:** the e2e tier does not contribute to the 80%/100% coverage
+floors — those stay computed from the fast in-process suite only. Keeps
+this from reopening the coverage policy.
+
+**Side finding, not part of this decision:** `packages/cli/package.json`'s
+`build` script already runs `chmod +x dist/index.js` — the backlog item
+believed this was still needed; it appears already done and should be
+verified and closed separately.
+
+Implementation: `docs/prompts/C8-real-binary-e2e-tests.md`.
 
 ---
 
@@ -774,6 +774,46 @@ its most natural invocation is worse than delaying the tag.
 
 ---
 
+## 2026-08-17 — Codex dual-link: `--codex` maps to `~/.agents/skills/` and `~/.codex/skills/`; the stale-Codex notice is retired
+
+**Decided (Bruno):** `AGENT_SKILL_DIRS['codex']` becomes
+`[~/.agents/skills, ~/.codex/skills]` — flags keep meaning "make visible
+to Codex", the list is the mechanism. This **supersedes** the 2026-08-13
+decision's notice ("Closed same day" above) — that design rested on a
+premise, "Codex never reads `~/.codex/skills/`", that is false for
+codex-cli 0.147.
+
+**What changed the premise — verified, not assumed (2026-08-17):**
+codex-cli 0.147 scans **both** `~/.codex/skills/` (its own skills home —
+the bundled `.system/` skills live there, and session context blocks list
+locators from it) **and** `~/.agents/skills/` (the shared cross-vendor
+convention — a probe skill placed there appeared in the next session's
+`<skills_instructions>` block with its locator). Vendor scan paths move;
+the 2026-08-13 decision even predicted that risk.
+
+**Consequences folded in:**
+
+- **The stale-Codex notice is retired entirely, not reworded.** GoodBoy
+  actively manages `~/.codex/skills/` again, so "no longer read by Codex"
+  would be a false claim; and 0.2.0-era links already in that dir become
+  valid managed targets — the next install reports them as "already linked
+  correctly". Nothing to migrate, no cleanup logic (see
+  `docs/backlog.md`'s codex entry for the follow-through).
+- **`~/.agents/skills/` stays shared** (codex, gemini, `agents`) — the
+  uninstall confirmation prompt is unchanged, derived live from the map;
+  the message still names only real co-readers (`gemini`), never the
+  internal `agents` key.
+- **`~/.codex/skills/` is codex-exclusive** — it is planned without a
+  prompt on uninstall; a declined shared-path confirmation still aborts
+  the whole removal with zero unlinks (the F1 contract, unchanged).
+
+**Not changed:** `claude-code`, `gemini`, and the `agents` key; the
+already-linked log line gains its path (message polish folded in from
+`docs/backlog.md`). Completion is untouched — the engine does not
+reference agent directories.
+
+---
+
 ## 2026-08-15 — Terminal tab-completion: self-generated templates + a hidden `__complete` protocol
 
 **Decided (Bruno, 2026-08-15):** GoodBoy gets shell tab-completion for
@@ -908,46 +948,6 @@ print a one-time notice** when `codex` is actually processed by
 legacy path, and if it still has entries, a line pointing out it's no
 longer read and safe to delete. Scoped to the moment Codex is touched, not
 a standing background scan.
-
----
-
-## 2026-08-17 — Codex dual-link: `--codex` maps to `~/.agents/skills/` and `~/.codex/skills/`; the stale-Codex notice is retired
-
-**Decided (Bruno):** `AGENT_SKILL_DIRS['codex']` becomes
-`[~/.agents/skills, ~/.codex/skills]` — flags keep meaning "make visible
-to Codex", the list is the mechanism. This **supersedes** the 2026-08-13
-decision's notice ("Closed same day" above) — that design rested on a
-premise, "Codex never reads `~/.codex/skills/`", that is false for
-codex-cli 0.147.
-
-**What changed the premise — verified, not assumed (2026-08-17):**
-codex-cli 0.147 scans **both** `~/.codex/skills/` (its own skills home —
-the bundled `.system/` skills live there, and session context blocks list
-locators from it) **and** `~/.agents/skills/` (the shared cross-vendor
-convention — a probe skill placed there appeared in the next session's
-`<skills_instructions>` block with its locator). Vendor scan paths move;
-the 2026-08-13 decision even predicted that risk.
-
-**Consequences folded in:**
-
-- **The stale-Codex notice is retired entirely, not reworded.** GoodBoy
-  actively manages `~/.codex/skills/` again, so "no longer read by Codex"
-  would be a false claim; and 0.2.0-era links already in that dir become
-  valid managed targets — the next install reports them as "already linked
-  correctly". Nothing to migrate, no cleanup logic (see
-  `docs/backlog.md`'s codex entry for the follow-through).
-- **`~/.agents/skills/` stays shared** (codex, gemini, `agents`) — the
-  uninstall confirmation prompt is unchanged, derived live from the map;
-  the message still names only real co-readers (`gemini`), never the
-  internal `agents` key.
-- **`~/.codex/skills/` is codex-exclusive** — it is planned without a
-  prompt on uninstall; a declined shared-path confirmation still aborts
-  the whole removal with zero unlinks (the F1 contract, unchanged).
-
-**Not changed:** `claude-code`, `gemini`, and the `agents` key; the
-already-linked log line gains its path (message polish folded in from
-`docs/backlog.md`). Completion is untouched — the engine does not
-reference agent directories.
 
 ---
 
@@ -1399,3 +1399,5 @@ Not yet backfilled into this log. The authoritative records remain:
 
 Backfilling these is worthwhile but not urgent; do it when touching them
 for other reasons rather than as a dedicated pass.
+
+
