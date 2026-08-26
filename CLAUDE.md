@@ -370,6 +370,16 @@ where `<type>` is the Conventional Commits type the work will use (`feat`,
 prompt's filename in `docs/prompts/` — so the branch and the prompt that
 authorised it are recognisably the same work.
 
+**Documentation and planning changes still get a branch, named for
+themselves.** They are exempt from needing a phase prompt (see "Operating
+policy"), so there is no prompt filename for the slug to match — use a
+short descriptive one naming the change: `docs/skill-mirror-workflow`,
+`docs/changelog-unreleased`. The rule being served is that a branch is
+recognisable as its work; a prompt filename is how that is achieved when a
+prompt exists, not the point in itself. **Exempt from a prompt is not
+exempt from a branch:** `main` is protected and takes no direct pushes
+regardless of what is being changed.
+
 ```sh
 git switch main && git pull
 git switch -c docs/branching-strategy
