@@ -337,6 +337,26 @@ already have them:
   skill, which reads that file — never `CONTRIBUTING.md` — as source of
   truth.
 
+## `contributor-skills/` is a mirror, not a source
+
+The four workflow skills in `contributor-skills/` are **published copies**.
+They originate in a separate upstream repository, and they arrive here
+**last** — after the change has been added to a registry and installed and
+used. `CONTRIBUTING.md` tells contributors to `goodboy add` them, which is
+this directory's whole job: to be installed *from*.
+
+**Do not edit anything under `contributor-skills/` directly.** An edit here
+reaches no registry, is not what the maintainer is running, and is
+overwritten by the next mirror — so it looks applied while changing
+nothing. If one of these skills needs a change, it is made upstream and
+mirrored down; say so rather than editing the copy.
+
+The reason is structural rather than procedural: if this directory could
+feed a registry, it would be a source in practice whatever it is called,
+and a second source of the same skill drifts from the first. That has
+already happened once — a version number here moved ahead of its upstream
+manifest, and neither copy could say which was authoritative.
+
 ## Branching and pull requests
 
 `main` is protected. It takes no direct pushes, and every change lands
