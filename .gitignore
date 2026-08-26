@@ -13,3 +13,5 @@ docs/*
 _to_delete/
 .claude/skills/engineering-principles/
 vitest.config.ts.timestamp-*
+# Local, internal-only companion to CLAUDE.md (see that file for the public rules)
+CLAUDE.local.md
