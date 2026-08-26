@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Scripts relying on the old silent exit-0 must be updated.** A force-closed
+  prompt (piped stdin ending mid-dialogue, Ctrl-C/D) used to make `goodboy
+  adopt` and `goodboy skill create` **exit 0 having done nothing, silently**.
+  They now exit non-zero, naming the cause and the remedy. That was a bug —
+  but anyone who scripted against the old success sees different behaviour:
+  a script that appeared to pass will now fail, and the failure is the
+  point, because nothing was written either way. Run the command
+  interactively, or for `adopt` supply the values as flags (below).
+
+### Added
+
+- `goodboy adopt` can now run entirely non-interactively:
+  `--author <name> --email <email> [--license <spdx>] --yes`. A run with
+  every value supplied by flag never prompts; a non-interactive run (piped
+  or closed stdin) that is missing anything fails fast before any prompt or
+  write, naming exactly which flags are missing. `--author` and `--yes` are
+  always required; `--license` is required unless the skill's `SKILL.md`
+  frontmatter already declares one; `--email` is optional.
+
+### Fixed
+
+- **`goodboy uninstall` refuses loudly, not cryptically, when the shared-path
+  confirmation is force-closed.** Removing a skill path that other tools
+  read needs an interactive confirmation; a confirmation that cannot be
+  asked is a refusal — nothing is unlinked, and the message names the
+  shared convention and the interactive remedy instead of a raw error.
+  There is deliberately no flag to override it non-interactively.
+
 ## [0.3.0] - 2026-08-20
 
 ### Removed
