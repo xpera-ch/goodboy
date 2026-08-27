@@ -150,7 +150,15 @@ Then report the path you wrote alongside the verdict, so the reader can
 find it without searching.
 
 Do not fix anything during the review. After the report is written to disk,
-stop and wait for instructions on which findings to address.
+stop and wait for instructions on which findings to address — and when they
+arrive, the rule still holds: the review session ends with the report.
+Being told to fix a finding approves the change; it does not authorise
+applying it here. A reviewer who fixes what they just reviewed is reviewing
+their own work on the next pass, and the fix arrives with no plan of its
+own. Implement the fixes through whatever process the project uses to
+introduce changes — a written plan or prompt where one is the convention,
+otherwise a fresh session that takes the report as input. If the
+convention is unclear, ask.
 
 ## Known traps
 
