@@ -167,11 +167,36 @@ use one of these two patterns:
    `['version', 'x', '--bump', 'patch']`, the parent's `opts()` is `{}`
    while the child's is `{ bump: 'patch' }`.
 
-A command with no options (`adopt`) has nothing to leak and needs neither.
+A command with genuinely no options has nothing to leak and needs
+neither — but check rather than assume: `adopt` was that example until
+it gained four options, and a command that acquires one silently starts
+needing a reset.
 
 If you add a test that fails under `--sequence.shuffle` but passes in
 default order, that is a real defect in the test, not a flake — fix the
 setup rather than pinning the order.
+
+### A filesystem command's effect is asserted on a real filesystem
+
+A command whose primary effect is on the filesystem has at least one test
+asserting that effect on a real filesystem. Mocked tests verify the code
+does what it says, not that what it says is right — a wrong constant or a
+wrong path composition is invisible to a suite that takes the code's own
+assumptions as its reference. Both tiers stay: the mocked suite covers
+error branches cheaply and keeps the 100% pins reachable; the integration
+test proves the wiring.
+
+Covered today: `adopt` (the parent-directory collision regression, and the
+source-untouched guarantee) and `install` (project copy, and global
+symlinks asserted by *resolved target*, not existence). The tests live in
+`*.integration.test.ts` files and use `createIntegrationWorld()` from
+`src/__fixtures__/integration-world.ts`, which creates the temp registry
+directory **before** setting `GOODBOY_REGISTRY` — a nonexistent path makes
+`getRegistryPath()` fall back silently to the real `~/.goodboy/registry`.
+
+Not yet covered: `add`, `upgrade`, `uninstall` — a later decision on
+evidence. Adding one of them means adding its real-fs test here, not
+deleting the mock tier.
 
 ## Updating the schema
 
