@@ -49,6 +49,9 @@ export function generateOversizedManifest(): string {
   return JSON.stringify(base);
 }
 
+export { createIntegrationWorld, destroyIntegrationWorld } from './integration-world.js';
+export type { IntegrationWorld } from './integration-world.js';
+
 export function createTempDir(): string {
   const dir = join(tmpdir(), `goodboy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
